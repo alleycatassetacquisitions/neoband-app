@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neoband App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tomorrow:wght@400&display=swap" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: 'Charged Vector Black';
+            src: url('./Charge Vector Black.otf') format('opentype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        body {
+            background-color: #000000;
+            color: #0BDCF3;
+            font-family: 'Tomorrow', sans-serif;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        /* Login Page Styles */
+        .login-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 50px;
+        }
+
+        .login-header-container {
+            position: relative;
+            width: 320px;
+            margin-bottom: 50px;
+        }
+
+        .login-header-image {
+            width: 100%;
+            height: auto;
+        }
+
+        .login-title {
+            font-family: 'Charged Vector Black', sans-serif;
+            font-size: 32px;
+            color: #000000;
+            position: absolute;
+            bottom: 25%;
+            right: 16px;
+            margin: 0;
+            text-align: right;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .login-input-label {
+            color: #0BDCF3;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 10px;
+            background-color: #FFFFFF;
+            border: none;
+            color: #000000;
+            font-family: 'Tomorrow', sans-serif;
+        }
+
+        .login-button {
+            background-color: transparent;
+            color: #0BDCF3;
+            border: 2px solid #0BDCF3;
+            padding: 10px 20px;
+            font-family: 'Tomorrow', sans-serif;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .login-button:hover {
+            background-color: #0BDCF3;
+            color: #000000;
+        }
+
+        .forgot-password {
+            color: #0BDCF3;
+            text-decoration: none;
+            font-size: 12px;
+            align-self: flex-end;
+        }
+
+        /* Existing Faction Page Styles */
+        .connection-status {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            background-color: red;
+        }
+
+        .status-text {
+            color: #0BDCF3;
+            font-family: 'Tomorrow', sans-serif;
+            font-size: 16px;
+        }
+
+        .header-container {
+            position: relative;
+            width: 320px;
+            margin-bottom: 50px;
+        }
+
+        .header-image {
+            width: 100%;
+            height: auto;
+        }
+
+        .faction-title {
+            font-family: 'Charged Vector Black', sans-serif;
+            font-size: 32px;
+            color: #000000;
+            position: absolute;
+            bottom: 25%;
+            right: 16px;
+            margin: 0;
+            text-align: right;
+        }
+
+        .content-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: max-content;
+            margin: 0 auto;
+        }
+
+        .field-container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: max-content;
+            margin-bottom: 15px;
+        }
+        .field-title-header, .input-header {
+            font-family: 'Charged Vector Black', sans-serif;
+            font-size: 24px;
+            color: #0BDCF3;
+            text-align: left;
+            width: max-content;
+            padding: 15px;
+            background-color: #000000;
+            margin-top: 10%;
+        }
+        .field-title {
+            font-family: 'Tomorrow', sans-serif;
+            font-size: 20px;
+            color: #0BDCF3;
+            background-color: #000000;
+            text-align: justify;
+            width: 48%;
+            padding: 5px;
+        }
+        .input {
+            font-family: 'Tomorrow', sans-serif;
+            font-size: 20px;
+            background-color: #FFFFFF;
+            color: #000000;
+            width: 48%;
+            padding: 5px;
+            border: none;
+            text-align: center;
+        }
+        .read-write-button {
+            font-family: 'Tomorrow', sans-serif;
+            background-color: #0BDCF3;
+            color: #000000;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 20px;
+            margin-top: 15%;
+        }
+        .read-write-button:hover {
+            background-color: #000000;
+            color: #0BDCF3;
+        }
+        [contenteditable="true"]:focus {
+            outline: none;
+            background-color: rgba(11, 220, 243, 0.1);
+        }
+        @media (max-width: 480px) {
+            .field-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .field-title-header, .input-header, .field-title, .input {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+
+        /* Hide/Show Logic */
+        .faction-page {
+            display: none;
+        }
+
+        .faction-page.active {
+            display: block;
+        }
+
+        .login-page.hidden {
+            display: none;
+        }
+
+        /* User Registration Page Styles */
+        .registration-page {
+            display: none;
+        }
+
+        .registration-page.active {
+            display: block;
+        }
+
+        /* Allegiances Page Styles */
+        .allegiances-page {
+            display: none;
+        }
+
+        .allegiances-page.active {
+            display: block;
+        }
+
+        .logout-button {
+            background-color: transparent;
+            color: #0BDCF3;
+            border: 2px solid #0BDCF3;
+            padding: 10px 20px;
+            font-family: 'Tomorrow', sans-serif;
+            cursor: pointer;
+            margin-top: 40px;
+            transition: all 0.3s ease;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .logout-button:hover {
+            background-color: #0BDCF3;
+            color: #000000;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Page -->
+    <div class="login-page" id="loginPage">
+        <div class="login-header-container">
+            <img src="./Neoapp-Page-Header.png" alt="Header" class="login-header-image">
+            <div class="login-title">NEOBAND APP</div>
+        </div>
+        <form class="login-form" id="loginForm">
+            <div>
+                <div class="login-input-label">Username</div>
+                <input type="text" class="login-input" id="username" placeholder="alex@email.com" required>
+            </div>
+            <div>
+                <div class="login-input-label">Password</div>
+                <input type="password" class="login-input" id="password" placeholder="Enter your password" required>
+            </div>
+            <button type="submit" class="login-button">LOGIN NOW</button>
+        </form>
+    </div>
+
+    <!-- Faction Page -->
+    <div class="faction-page" id="factionPage">
+        <div class="connection-status">
+            <div class="status-indicator"></div>
+            <div class="status-text">Waiting</div>
+        </div>
+        <div class="header-container">
+            <img src="./Neoapp-Page-Header.png" alt="Header" class="header-image">
+            <div class="faction-title" contenteditable="true">ALLEYCAT</div>
+        </div>
+        <div class="content-container">
+            <div class="field-container">
+                <div class="field-title">Hunter/Bounty</div>
+                <input class="input" type="text" placeholder="Enter Hunter/Bounty">
+            </div>
+            <div class="field-container">
+                <div class="field-title"># of wins</div>
+                <input class="input" type="text" placeholder="Enter # of wins">
+            </div>
+            <div class="field-container">
+                <div class="field-title">Best Draw Time</div>
+                <input class="input" type="text" placeholder="Enter Best Draw Time">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="read-write-button">READ</button>
+                <button class="read-write-button">WRITE</button>
+            </div>
+            <button class="logout-button" id="logoutButton">LOGOUT</button>
+        </div>
+    </div>
+
+    <!-- User Registration (Intake) Page -->
+    <div class="registration-page" id="registrationPage">
+        <div class="connection-status">
+            <div class="status-indicator"></div>
+            <div class="status-text">Waiting</div>
+        </div>
+        <div class="header-container">
+            <img src="./Neoapp-Page-Header.png" alt="Header" class="header-image">
+            <div class="faction-title">INTAKE</div>
+        </div>
+        <div class="content-container">
+            <div class="field-container">
+                <div class="field-title">New Username</div>
+                <input class="input" type="text" placeholder="Enter new username">
+            </div>
+            <div class="field-container">
+                <div class="field-title">Band ID</div>
+                <input class="input" type="text" placeholder="Waiting for band..." readonly>
+            </div>
+            <div class="field-container">
+                <div class="field-title">Status</div>
+                <input class="input" type="text" placeholder="Unregistered" readonly>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="read-write-button">READ</button>
+                <button class="read-write-button">WRITE</button>
+                <button class="read-write-button">RESET</button>
+            </div>
+            <button class="logout-button" id="registrationLogoutButton">LOGOUT</button>
+        </div>
+    </div>
+
+    <!-- Allegiances Page -->
+    <div class="allegiances-page" id="allegiancesPage">
+        <div class="connection-status">
+            <div class="status-indicator"></div>
+            <div class="status-text">Waiting</div>
+        </div>
+        <div class="header-container">
+            <img src="./Neoapp-Page-Header.png" alt="Header" class="header-image">
+            <div class="faction-title">ALLEGIANCES</div>
+        </div>
+        <div class="content-container">
+            <!-- 16 editable fields -->
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 1</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 2</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 3</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 4</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 5</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 6</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 7</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 8</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 9</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 10</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 11</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 12</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 13</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 14</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 15</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div class="field-container">
+                <div class="field-title" contenteditable="true">TEXT 16</div>
+                <input class="input" type="text" placeholder="Enter text">
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="read-write-button">READ</button>
+                <button class="read-write-button">WRITE</button>
+            </div>
+            <button class="logout-button" id="allegiancesLogoutButton">LOGOUT</button>
+        </div>
+    </div>
+
+    <script>
+        function setFactionPageContent(isAdmin) {
+            const factionTitle = document.querySelector('.faction-title');
+            const fieldTitles = document.querySelectorAll('.field-title');
+            const inputs = document.querySelectorAll('.input');
+
+            if (isAdmin) {
+                factionTitle.textContent = 'FACTION';
+                fieldTitles.forEach(title => {
+                    title.textContent = 'TEXT';
+                });
+                inputs.forEach(input => {
+                    input.placeholder = 'Enter text';
+                });
+            } else {
+                factionTitle.textContent = 'ALLEYCAT';
+                const alleycatFields = ['Hunter/Bounty', '# of wins', 'Best Draw Time'];
+                fieldTitles.forEach((title, index) => {
+                    title.textContent = alleycatFields[index];
+                });
+                inputs.forEach((input, index) => {
+                    input.placeholder = `Enter ${alleycatFields[index]}`;
+                });
+            }
+        }
+
+        function showPage(pageId) {
+            // Hide all pages
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('factionPage').classList.remove('active');
+            document.getElementById('registrationPage').classList.remove('active');
+            document.getElementById('allegiancesPage').classList.remove('active');
+
+            // Show the requested page
+            document.getElementById(pageId).classList.add('active');
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            // Check credentials and show appropriate page
+            if (username === 'cyonic' && password === 'cyonic') {
+                showPage('factionPage');
+                setFactionPageContent(false);
+            } else if (username === 'admin' && password === 'admin') {
+                showPage('factionPage');
+                setFactionPageContent(true);
+            } else if (username === 'ureg' && password === 'ureg') {
+                showPage('registrationPage');
+            } else if (username === 'alleg' && password === 'alleg') {
+                showPage('allegiancesPage');
+            } else {
+                alert('Invalid credentials. Please try again.');
+            }
+        });
+
+        // Logout functionality for all pages
+        function setupLogoutButton(buttonId) {
+            document.getElementById(buttonId).addEventListener('click', function() {
+                document.getElementById('loginPage').classList.remove('hidden');
+                document.getElementById('factionPage').classList.remove('active');
+                document.getElementById('registrationPage').classList.remove('active');
+                document.getElementById('allegiancesPage').classList.remove('active');
+                // Clear the login form
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+            });
+        }
+
+        // Setup logout buttons for all pages
+        setupLogoutButton('logoutButton');
+        setupLogoutButton('registrationLogoutButton');
+        setupLogoutButton('allegiancesLogoutButton');
+
+        // Placeholder for Neoband connection code
+        function initializeNeobandConnection() {
+            // TODO: Add code to establish connection to Neoband reader
+            console.log("Initializing Neoband connection...");
+        }
+
+        // Call the placeholder function to ensure it's executed
+        initializeNeobandConnection();
+    </script>
+</body>
+</html> 

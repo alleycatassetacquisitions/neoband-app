@@ -437,7 +437,115 @@
         </div>
     </div>
 
+    <!-- Add these script imports at the top of the file -->
+    <script src="neoband-reader.js"></script>
+    <script src="credentials-manager.js"></script>
+    <script src="logger.js"></script>
+
     <script>
+        // Initialize components
+        const reader = new NeobandReader();
+        const credentialsManager = new CredentialsManager();
+        const logger = new NeobandLogger();
+
+        // Status indicator update function
+        async function updateStatusIndicator() {
+            const indicators = document.querySelectorAll('.status-indicator');
+            const statusTexts = document.querySelectorAll('.status-text');
+            
+            const isConnected = await reader.checkForBand();
+            
+            indicators.forEach(indicator => {
+                indicator.style.backgroundColor = isConnected ? '#00ff00' : '#ff0000';
+            });
+            
+            statusTexts.forEach(text => {
+                text.textContent = isConnected ? 'Connected' : 'Waiting';
+            });
+        }
+
+        // Start periodic status check
+        setInterval(updateStatusIndicator, 1000);
+
+        // Update login form submission
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            const result = credentialsManager.validateCredentials(username, password);
+            
+            if (result.valid) {
+                await logger.log('login', { username, role: result.role });
+                
+                if (result.role === 'faction') {
+                    showPage('factionPage');
+                    setFactionPageContent(false);
+                } else if (result.role === 'admin') {
+                    showPage('factionPage');
+                    setFactionPageContent(true);
+                } else if (result.role === 'staff') {
+                    showPage('registrationPage');
+                } else if (result.role === 'allegiance') {
+                    showPage('allegiancesPage');
+                }
+            } else {
+                alert('Invalid credentials. Please try again.');
+            }
+        });
+
+        // Add read/write functionality
+        async function handleRead(pageId) {
+            try {
+                const data = await reader.readBand(credentialsManager.currentKeyB);
+                if (data) {
+                    // TODO: Update page fields with data
+                    await logger.log('read', { page: pageId, data });
+                }
+            } catch (error) {
+                console.error('Read error:', error);
+            }
+        }
+
+        async function handleWrite(pageId) {
+            try {
+                // TODO: Collect data from page fields
+                const data = {};
+                const success = await reader.writeBand(credentialsManager.currentKeyA, data);
+                if (success) {
+                    await logger.log('write', { page: pageId, data });
+                }
+            } catch (error) {
+                console.error('Write error:', error);
+            }
+        }
+
+        // Add reset functionality for registration page
+        async function handleReset() {
+            try {
+                const success = await reader.resetBand(credentialsManager.currentKeyA);
+                if (success) {
+                    await logger.log('reset', { success });
+                    // Clear input fields
+                    document.querySelectorAll('.registration-page .input').forEach(input => {
+                        input.value = '';
+                    });
+                }
+            } catch (error) {
+                console.error('Reset error:', error);
+            }
+        }
+
+        // Initialize the app
+        async function initializeApp() {
+            await reader.initialize();
+            await credentialsManager.loadGeneratedCredentials();
+            updateStatusIndicator();
+        }
+
+        // Call initialize on page load
+        window.addEventListener('load', initializeApp);
+
         function setFactionPageContent(isAdmin) {
             const factionTitle = document.querySelector('.faction-title');
             const fieldTitles = document.querySelectorAll('.field-title');
@@ -474,27 +582,6 @@
             document.getElementById(pageId).classList.add('active');
         }
 
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            // Check credentials and show appropriate page
-            if (username === 'cyonic' && password === 'cyonic') {
-                showPage('factionPage');
-                setFactionPageContent(false);
-            } else if (username === 'admin' && password === 'admin') {
-                showPage('factionPage');
-                setFactionPageContent(true);
-            } else if (username === 'ureg' && password === 'ureg') {
-                showPage('registrationPage');
-            } else if (username === 'alleg' && password === 'alleg') {
-                showPage('allegiancesPage');
-            } else {
-                alert('Invalid credentials. Please try again.');
-            }
-        });
-
         // Logout functionality for all pages
         function setupLogoutButton(buttonId) {
             document.getElementById(buttonId).addEventListener('click', function() {
@@ -512,15 +599,6 @@
         setupLogoutButton('logoutButton');
         setupLogoutButton('registrationLogoutButton');
         setupLogoutButton('allegiancesLogoutButton');
-
-        // Placeholder for Neoband connection code
-        function initializeNeobandConnection() {
-            // TODO: Add code to establish connection to Neoband reader
-            console.log("Initializing Neoband connection...");
-        }
-
-        // Call the placeholder function to ensure it's executed
-        initializeNeobandConnection();
     </script>
 </body>
 </html> 

@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "../neoband_credential_generator"
+		},
+		{
+			"path": "../../D-Logic Files"
 		}
 	]
 }

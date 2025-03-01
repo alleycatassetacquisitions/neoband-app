@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html ufr lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Neoband App</title>
+    <!-- Custom font import for the application -->
     <link href="https://fonts.googleapis.com/css2?family=Tomorrow:wght@400&display=swap" rel="stylesheet">
     <style>
+        /* Custom font definition for Charged Vector Black */
         @font-face {
             font-family: 'Charged Vector Black';
             src: url('./Charge Vector Black.otf') format('opentype');
@@ -13,6 +15,7 @@
             font-style: normal;
         }
         
+        /* Global styles for the entire application */
         body {
             background-color: #000000;
             color: #0BDCF3;
@@ -271,7 +274,8 @@
     </style>
 </head>
 <body>
-    <!-- Login Page -->
+    <!-- Login Page: Handles user authentication -->
+    <!-- Contains username/password inputs and login button -->
     <div class="login-page" id="loginPage">
         <div class="login-header-container">
             <img src="./Neoapp-Page-Header.png" alt="Header" class="login-header-image">
@@ -290,7 +294,8 @@
         </form>
     </div>
 
-    <!-- Faction Page -->
+    <!-- Faction Page: Displays faction-specific information -->
+    <!-- Shows connection status, faction title, and editable fields for faction data -->
     <div class="faction-page" id="factionPage">
         <div class="connection-status">
             <div class="status-indicator"></div>
@@ -301,6 +306,11 @@
             <div class="faction-title" contenteditable="true">ALLEYCAT</div>
         </div>
         <div class="content-container">
+            <!-- New Username Field -->
+            <div class="field-container">
+                <div class="field-title">Username</div>
+                <input class="input" type="text" id="factionUsernameField" placeholder="Waiting for scan..." readonly>
+            </div>
             <div class="field-container">
                 <div class="field-title">Hunter/Bounty</div>
                 <input class="input" type="text" placeholder="Enter Hunter/Bounty">
@@ -321,7 +331,7 @@
         </div>
     </div>
 
-    <!-- User Registration (Intake) Page -->
+    <!-- User Registration (Intake) Page: Handles new user registration -->
     <div class="registration-page" id="registrationPage">
         <div class="connection-status">
             <div class="status-indicator"></div>
@@ -334,26 +344,27 @@
         <div class="content-container">
             <div class="field-container">
                 <div class="field-title">New Username</div>
-                <input class="input" type="text" placeholder="Enter new username">
+                <input class="input" type="text" id="usernameInput" placeholder="Enter new username">
             </div>
             <div class="field-container">
                 <div class="field-title">Band ID</div>
-                <input class="input" type="text" placeholder="Waiting for band..." readonly>
+                <input class="input" type="text" id="bandIdInput" placeholder="Waiting for band..." readonly>
             </div>
             <div class="field-container">
                 <div class="field-title">Status</div>
-                <input class="input" type="text" placeholder="Unregistered" readonly>
+                <input class="input" type="text" id="statusInput" placeholder="Unregistered" readonly>
             </div>
             <div style="display: flex; gap: 10px;">
-                <button class="read-write-button">READ</button>
-                <button class="read-write-button">WRITE</button>
-                <button class="read-write-button">RESET</button>
+                <button class="read-write-button" onclick="handleRead()">READ</button>
+                <button class="read-write-button" onclick="handleWrite()">WRITE</button>
+                <button class="read-write-button" onclick="handleReset()">RESET</button>
             </div>
             <button class="logout-button" id="registrationLogoutButton">LOGOUT</button>
         </div>
     </div>
 
-    <!-- Allegiances Page -->
+    <!-- Allegiances Page: Manages allegiance relationships -->
+    <!-- Contains 16 editable text fields for allegiance data -->
     <div class="allegiances-page" id="allegiancesPage">
         <div class="connection-status">
             <div class="status-indicator"></div>
@@ -364,6 +375,11 @@
             <div class="faction-title">ALLEGIANCES</div>
         </div>
         <div class="content-container">
+            <!-- New Username Field -->
+            <div class="field-container">
+                <div class="field-title">Username</div>
+                <input class="input" type="text" id="allegiancesUsernameField" placeholder="Waiting for scan..." readonly>
+            </div>
             <!-- 16 editable fields -->
             <div class="field-container">
                 <div class="field-title" contenteditable="true">TEXT 1</div>
@@ -437,18 +453,19 @@
         </div>
     </div>
 
-    <!-- Add these script imports at the top of the file -->
+    <!-- External JavaScript Dependencies -->
+    <!-- These files handle NFC reading, credential management, and logging -->
     <script src="neoband-reader.js"></script>
     <script src="credentials-manager.js"></script>
     <script src="logger.js"></script>
 
     <script>
-        // Initialize components
+        // Component Initialization
         const reader = new NeobandReader();
         const credentialsManager = new CredentialsManager();
         const logger = new NeobandLogger();
 
-        // Status indicator update function
+        // Status Indicator Function
         async function updateStatusIndicator() {
             const indicators = document.querySelectorAll('.status-indicator');
             const statusTexts = document.querySelectorAll('.status-text');
@@ -462,12 +479,67 @@
             statusTexts.forEach(text => {
                 text.textContent = isConnected ? 'Connected' : 'Waiting';
             });
+
+            // If connected, try to read username
+            if (isConnected) {
+                await handleUsernameRead();
+            }
         }
 
-        // Start periodic status check
+        // Username Auto-Population
+        async function handleUsernameRead() {
+            try {
+                const publicKey = sessionStorage.getItem('publicKey');
+                if (!publicKey) {
+                    console.warn("No public key found. Please log in again.");
+                    return;
+                }
+
+                const username = await reader.readUsername(publicKey);
+                
+                // Update username field on faction page if it exists
+                const factionUsernameField = document.getElementById('factionUsernameField');
+                if (factionUsernameField) {
+                    factionUsernameField.value = username;
+                }
+
+                // Update username field on allegiances page if it exists
+                const allegiancesUsernameField = document.getElementById('allegiancesUsernameField');
+                if (allegiancesUsernameField) {
+                    allegiancesUsernameField.value = username;
+                }
+
+                await logger.log('username_read', { username });
+            } catch (error) {
+                console.error('Error reading username:', error);
+            }
+        }
+
+        // Start periodic status check and username update
         setInterval(updateStatusIndicator, 1000);
 
-        // Update login form submission
+        // Test functions for session storage
+        function testSessionStorage() {
+            console.log('Testing Session Storage:');
+            const publicKey = sessionStorage.getItem('publicKey');
+            const privateKey = sessionStorage.getItem('privateKey');
+
+            console.log('Public Key:', publicKey);
+            console.log('Expected: Should match user\'s public key');
+
+            console.log('Private Key:', privateKey);
+            console.log('Expected: Should match user\'s private key');
+
+            // Test key validation
+            if (publicKey && privateKey) {
+                console.log('Session storage test: PASSED');
+            } else {
+                console.error('Session storage test: FAILED - Missing keys');
+            }
+        }
+
+        // Login Form Handler
+        // Validates credentials and routes users to appropriate pages based on role
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const username = document.getElementById('username').value;
@@ -476,8 +548,14 @@
             const result = credentialsManager.validateCredentials(username, password);
             
             if (result.valid) {
+                sessionStorage.setItem('publicKey', result.publicKey);
+                sessionStorage.setItem('privateKey', result.privateKey);
+                
                 await logger.log('login', { username, role: result.role });
                 
+                // Run session storage test after successful login
+                testSessionStorage();
+
                 if (result.role === 'faction') {
                     showPage('factionPage');
                     setFactionPageContent(false);
@@ -491,52 +569,131 @@
                 }
             } else {
                 alert('Invalid credentials. Please try again.');
+                // Clear session storage on failed login
+                sessionStorage.removeItem('publicKey');
+                sessionStorage.removeItem('privateKey');
             }
         });
 
-        // Add read/write functionality
-        async function handleRead(pageId) {
+        // Band Registration Functions
+        async function handleRead() {
             try {
-                const data = await reader.readBand(credentialsManager.currentKeyB);
-                if (data) {
-                    // TODO: Update page fields with data
-                    await logger.log('read', { page: pageId, data });
+                const publicKey = sessionStorage.getItem('publicKey');
+                if (!publicKey) {
+                    alert("Session expired. Please log in again.");
+                    return;
+                }
+
+                const bandData = await reader.readBand(publicKey);
+                if (!bandData) {
+                    alert("No band detected. Please scan a Neoband.");
+                    return;
+                }
+
+                const bandId = bandData.bandId;
+                document.getElementById('bandIdInput').value = bandId;
+
+                if (bandData.username) {
+                    // Band is registered
+                    document.getElementById('usernameInput').value = bandData.username;
+                    document.getElementById('statusInput').value = "Registered";
+                    await logger.log('read', { action: 'read_registered_band', bandId, username: bandData.username });
+                } else {
+                    // Band is unregistered
+                    document.getElementById('usernameInput').value = "";
+                    document.getElementById('statusInput').value = "Unregistered";
+                    await logger.log('read', { action: 'read_unregistered_band', bandId });
                 }
             } catch (error) {
-                console.error('Read error:', error);
+                console.error('Error reading band:', error);
+                alert("Error reading band. Please try again.");
             }
         }
 
-        async function handleWrite(pageId) {
+        async function handleWrite() {
             try {
-                // TODO: Collect data from page fields
-                const data = {};
-                const success = await reader.writeBand(credentialsManager.currentKeyA, data);
+                const privateKey = sessionStorage.getItem('privateKey');
+                if (!privateKey) {
+                    alert("Session expired. Please log in again.");
+                    return;
+                }
+
+                const username = document.getElementById('usernameInput').value.trim();
+                const bandId = document.getElementById('bandIdInput').value;
+
+                if (!bandId) {
+                    alert("Please scan a band first.");
+                    return;
+                }
+
+                if (!username) {
+                    alert("Please enter a username.");
+                    return;
+                }
+
+                const data = {
+                    username,
+                    bandId,
+                    registrationDate: new Date().toISOString()
+                };
+
+                const success = await reader.writeBand(privateKey, data);
                 if (success) {
-                    await logger.log('write', { page: pageId, data });
+                    document.getElementById('statusInput').value = "Registered";
+                    await logger.log('write', { 
+                        action: 'register_band', 
+                        bandId, 
+                        username 
+                    });
+                    alert("Band successfully registered!");
+                } else {
+                    alert("Failed to register the band. Please try again.");
                 }
             } catch (error) {
-                console.error('Write error:', error);
+                console.error('Error writing to band:', error);
+                alert("Error writing to band. Please try again.");
             }
         }
 
-        // Add reset functionality for registration page
         async function handleReset() {
             try {
-                const success = await reader.resetBand(credentialsManager.currentKeyA);
+                const privateKey = sessionStorage.getItem('privateKey');
+                if (!privateKey) {
+                    alert("Session expired. Please log in again.");
+                    return;
+                }
+
+                const bandId = document.getElementById('bandIdInput').value;
+                if (!bandId) {
+                    alert("Please scan a band first.");
+                    return;
+                }
+
+                if (!confirm("Are you sure you want to reset this band? This will erase all data.")) {
+                    return;
+                }
+
+                const success = await reader.resetBand(privateKey);
                 if (success) {
-                    await logger.log('reset', { success });
-                    // Clear input fields
-                    document.querySelectorAll('.registration-page .input').forEach(input => {
-                        input.value = '';
+                    document.getElementById('usernameInput').value = "";
+                    document.getElementById('bandIdInput').value = "Waiting for band...";
+                    document.getElementById('statusInput').value = "Unregistered";
+                    await logger.log('reset', { 
+                        action: 'reset_band', 
+                        bandId 
                     });
+                    alert("Band successfully reset!");
+                } else {
+                    alert("Failed to reset the band. Please try again.");
                 }
             } catch (error) {
-                console.error('Reset error:', error);
+                console.error('Error resetting band:', error);
+                alert("Error resetting band. Please try again.");
             }
         }
 
-        // Initialize the app
+        // Application Initialization
+        // Sets up the NFC reader and loads credentials on page load
         async function initializeApp() {
             await reader.initialize();
             await credentialsManager.loadGeneratedCredentials();
@@ -546,6 +703,8 @@
         // Call initialize on page load
         window.addEventListener('load', initializeApp);
 
+        // Page Content Management
+        // Controls what content is displayed based on user role
         function setFactionPageContent(isAdmin) {
             const factionTitle = document.querySelector('.faction-title');
             const fieldTitles = document.querySelectorAll('.field-title');
@@ -571,6 +730,8 @@
             }
         }
 
+        // Page Navigation
+        // Handles showing/hiding different pages of the application
         function showPage(pageId) {
             // Hide all pages
             document.getElementById('loginPage').classList.add('hidden');
@@ -580,9 +741,13 @@
 
             // Show the requested page
             document.getElementById(pageId).classList.add('active');
+
+            // Apply default placeholders after page switch
+            applyDefaultPlaceholders();
         }
 
-        // Logout functionality for all pages
+        // Logout Management
+        // Handles user logout across all pages
         function setupLogoutButton(buttonId) {
             document.getElementById(buttonId).addEventListener('click', function() {
                 document.getElementById('loginPage').classList.remove('hidden');
@@ -595,10 +760,125 @@
             });
         }
 
-        // Setup logout buttons for all pages
+        // Initialize logout functionality
         setupLogoutButton('logoutButton');
         setupLogoutButton('registrationLogoutButton');
         setupLogoutButton('allegiancesLogoutButton');
+
+        // Placeholder Defaults Implementation
+        function applyDefaultPlaceholders() {
+            // Select all elements with the class "field-title"
+            document.querySelectorAll('.field-title').forEach(title => {
+                if (!title.textContent.trim()) {
+                    title.textContent = "Field Title"; // Apply default text if empty
+                }
+            });
+
+            // Select all input fields
+            document.querySelectorAll('.input').forEach(input => {
+                if (!input.placeholder.trim()) {
+                    input.placeholder = "Input"; // Apply default placeholder if empty
+                }
+            });
+        }
+
+        // Run applyDefaultPlaceholders when the page loads
+        window.addEventListener('load', applyDefaultPlaceholders);
+
+        // Test functions for Feature #3: Auto-Populated Username Field
+        function runUsernameTests() {
+            console.group('Running Username Field Tests');
+            
+            // Test 1: Username field exists on both pages
+            console.log('Test 1: Checking if username field exists...');
+            const factionUsernameField = document.getElementById('factionUsernameField');
+            const allegiancesUsernameField = document.getElementById('allegiancesUsernameField');
+            console.assert(factionUsernameField !== null, 'Test Failed: Username field missing on Faction page');
+            console.assert(allegiancesUsernameField !== null, 'Test Failed: Username field missing on Allegiances page');
+
+            // Test 2: Default placeholder is correct
+            console.log('Test 2: Checking default placeholder...');
+            console.assert(factionUsernameField.placeholder === 'Waiting for scan...', 
+                'Test Failed: Faction page default placeholder incorrect');
+            console.assert(allegiancesUsernameField.placeholder === 'Waiting for scan...', 
+                'Test Failed: Allegiances page default placeholder incorrect');
+
+            // Test 3: Username field is read-only
+            console.log('Test 3: Checking if fields are read-only...');
+            console.assert(factionUsernameField.readOnly === true, 
+                'Test Failed: Faction username field should be read-only');
+            console.assert(allegiancesUsernameField.readOnly === true, 
+                'Test Failed: Allegiances username field should be read-only');
+
+            // Test 4: Simulate successful username read
+            console.log('Test 4: Testing successful username read...');
+            simulateSuccessfulRead();
+
+            // Test 5: Simulate failed read (no band)
+            console.log('Test 5: Testing no band detected...');
+            simulateFailedRead();
+
+            // Test 6: Simulate invalid public key
+            console.log('Test 6: Testing invalid public key...');
+            simulateInvalidPublicKey();
+
+            console.groupEnd();
+        }
+
+        // Helper function to simulate successful read
+        async function simulateSuccessfulRead() {
+            // Store a valid public key
+            sessionStorage.setItem('publicKey', 'PUB_CYONIC');
+            
+            // Call handleUsernameRead and check result after delay
+            await handleUsernameRead();
+            
+            setTimeout(() => {
+                const factionField = document.getElementById('factionUsernameField');
+                const allegiancesField = document.getElementById('allegiancesUsernameField');
+                
+                console.assert(factionField.value !== 'Waiting for scan...' && factionField.value !== '', 
+                    'Test Failed: Username not updated on Faction page');
+                console.assert(allegiancesField.value !== 'Waiting for scan...' && allegiancesField.value !== '', 
+                    'Test Failed: Username not updated on Allegiances page');
+            }, 2000);
+        }
+
+        // Helper function to simulate failed read (no band)
+        async function simulateFailedRead() {
+            // Temporarily modify reader behavior
+            const originalReadUsername = reader.readUsername;
+            reader.readUsername = async () => null;
+            
+            await handleUsernameRead();
+            
+            // Restore original behavior
+            reader.readUsername = originalReadUsername;
+        }
+
+        // Helper function to simulate invalid public key
+        async function simulateInvalidPublicKey() {
+            sessionStorage.setItem('publicKey', 'INVALID_KEY');
+            await handleUsernameRead();
+            
+            setTimeout(() => {
+                const factionField = document.getElementById('factionUsernameField');
+                const allegiancesField = document.getElementById('allegiancesUsernameField');
+                
+                console.assert(factionField.value === 'Error', 
+                    'Test Failed: Invalid key error not handled on Faction page');
+                console.assert(allegiancesField.value === 'Error', 
+                    'Test Failed: Invalid key error not handled on Allegiances page');
+            }, 2000);
+        }
+
+        // Run tests when in development mode
+        if (process.env.NODE_ENV !== 'production') {
+            window.addEventListener('load', () => {
+                console.log('Running Username Field Tests...');
+                runUsernameTests();
+            });
+        }
     </script>
 </body>
 </html> 

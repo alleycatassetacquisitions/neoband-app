@@ -1,0 +1,13 @@
+---
+description: These rules are for the AI Developer of the Neoband App
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+You are a Junior Developer working on a project called the Neoband App. This App runs off a device hosted webpage on a d-logic "µFR Zero Online LITE: ISO14443 A/B Network NFC RFID Reader Writer". This Main document explaining this app is located here in the notepafe called "Neoband App Doc 21925" . Documentaion for new feature requests are located "@Dev Instrcutions " Always reference these notebooks  as well as the code itself, before makeing any changes or updates to the code. 
+
+Also never make changes that loose pre-existing functionality or design unless specifcly requested
+
+This app in all aspects must be simple and easy to understand, use, edit, and customize. This app needs to be easily customizable for new developers, engineers, and makers. 

@@ -455,9 +455,344 @@
 
     <!-- External JavaScript Dependencies -->
     <!-- These files handle NFC reading, credential management, and logging -->
-    <script src="neoband-reader.js"></script>
-    <script src="credentials-manager.js"></script>
-    <script src="logger.js"></script>
+    <script>
+        // Contents of neoband-reader.js
+        // D-Logic Reader Interface
+        class NeobandReader {
+            constructor() {
+                this.isConnected = false;
+                this.currentBandId = null;
+            }
+
+            // Initialize connection to D-Logic reader
+            async initialize() {
+                try {
+                    console.log("Initializing D-Logic reader connection...");
+                    // Try to use the ufRequest function if available (D-Logic reader environment)
+                    if (typeof ufRequest === 'function') {
+                        this.isConnected = true;
+                        console.log("D-Logic reader environment detected");
+                    } else {
+                        console.log("D-Logic reader environment not detected, running in simulation mode");
+                        this.isConnected = false;
+                    }
+                    return true;
+                } catch (error) {
+                    console.error("Failed to initialize reader:", error);
+                    return false;
+                }
+            }
+
+            // Check if a Neoband is present on the reader
+            async checkForBand() {
+                try {
+                    console.log("Checking for Neoband...");
+                    if (typeof ufRequest === 'function') {
+                        // Use the D-Logic API to check for a card
+                        let cardDetected = false;
+                        
+                        // Create a promise that will be resolved when the ufRequest callback is called
+                        return new Promise((resolve) => {
+                            ufRequest("GetCardIdEx", function() {
+                                const output = ufResponse();
+                                console.log("Card check response:", output);
+                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
+                                    resolve(true);
+                                } else {
+                                    resolve(false);
+                                }
+                            });
+                        });
+                    }
+                    return false;
+                } catch (error) {
+                    console.error("Error checking for band:", error);
+                    return false;
+                }
+            }
+
+            // Read username from Neoband
+            async readUsername(publicKey) {
+                try {
+                    if (!publicKey) {
+                        throw new Error("Public key is required to read username");
+                    }
+                    
+                    console.log(`Reading username from Neoband using Public Key: ${publicKey}...`);
+                    const bandData = await this.readBand(publicKey);
+                    
+                    if (bandData && bandData.username) {
+                        return bandData.username;
+                    } else {
+                        console.warn("No username found on this Neoband.");
+                        return "Unknown User";
+                    }
+                } catch (error) {
+                    console.error("Error reading username from band:", error);
+                    return "Error";
+                }
+            }
+
+            // Read data from Neoband
+            async readBand(publicKey) {
+                try {
+                    if (!publicKey) {
+                        throw new Error("Public key required for reading band data");
+                    }
+                    console.log(`Reading Neoband data using Public Key: ${publicKey}...`);
+                    
+                    // Check if we're in the D-Logic reader environment
+                    if (typeof ufRequest === 'function') {
+                        // Create a promise that will be resolved when the ufRequest callback is called
+                        return new Promise((resolve) => {
+                            // First get the card ID
+                            ufRequest("GetCardIdEx", function() {
+                                const output = ufResponse();
+                                console.log("Card ID response:", output);
+                                
+                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
+                                    const bandId = output.CardUid;
+                                    
+                                    // For demo purposes, create a mock response based on the card ID
+                                    // In a real implementation, you would read data from specific blocks on the card
+                                    resolve({
+                                        username: `user_${bandId.substring(0, 8)}`,
+                                        bandId: bandId,
+                                        registrationDate: new Date().toISOString()
+                                    });
+                                } else {
+                                    resolve(null);
+                                }
+                            });
+                        });
+                    }
+                    
+                    // For demo purposes when not in D-Logic environment, return mock data based on the public key
+                    if (publicKey === 'PUB_CYONIC') {
+                        return {
+                            username: 'cyonic_user',
+                            bandId: '12:34:56:78',
+                            registrationDate: new Date().toISOString()
+                        };
+                    }
+                    
+                    return null;
+                } catch (error) {
+                    console.error("Error reading band:", error);
+                    return null;
+                }
+            }
+
+            // Write data to Neoband
+            async writeBand(privateKey, data) {
+                try {
+                    if (!privateKey) {
+                        throw new Error("Private key required for writing to band");
+                    }
+                    console.log(`Writing to Neoband using Private Key: ${privateKey}...`, data);
+                    
+                    // Check if we're in the D-Logic reader environment
+                    if (typeof ufRequest === 'function') {
+                        // Create a promise that will be resolved when the ufRequest callback is called
+                        return new Promise((resolve) => {
+                            // First check if a card is present
+                            ufRequest("GetCardIdEx", function() {
+                                const output = ufResponse();
+                                console.log("Card ID response for write:", output);
+                                
+                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
+                                    // For demo purposes, we'll just log the data we would write
+                                    // In a real implementation, you would write data to specific blocks on the card
+                                    console.log("Would write data to card:", data);
+                                    
+                                    // Signal success with a UI indicator
+                                    ufRequest("ReaderUISignal 1 2", function() {
+                                        resolve(true);
+                                    });
+                                } else {
+                                    resolve(false);
+                                }
+                            });
+                        });
+                    }
+                    
+                    // For demo purposes when not in D-Logic environment
+                    return true;
+                } catch (error) {
+                    console.error("Error writing to band:", error);
+                    return false;
+                }
+            }
+
+            // Reset Neoband to default state
+            async resetBand(privateKey) {
+                try {
+                    if (!privateKey) {
+                        throw new Error("Private key required for resetting band");
+                    }
+                    console.log(`Resetting Neoband using Private Key: ${privateKey}...`);
+                    
+                    // Check if we're in the D-Logic reader environment
+                    if (typeof ufRequest === 'function') {
+                        // Create a promise that will be resolved when the ufRequest callback is called
+                        return new Promise((resolve) => {
+                            // First check if a card is present
+                            ufRequest("GetCardIdEx", function() {
+                                const output = ufResponse();
+                                console.log("Card ID response for reset:", output);
+                                
+                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
+                                    // For demo purposes, we'll just log that we would reset the card
+                                    // In a real implementation, you would write empty data to specific blocks on the card
+                                    console.log("Would reset card with ID:", output.CardUid);
+                                    
+                                    // Signal success with a UI indicator (red light for reset)
+                                    ufRequest("ReaderUISignal 2 2", function() {
+                                        resolve(true);
+                                    });
+                                } else {
+                                    resolve(false);
+                                }
+                            });
+                        });
+                    }
+                    
+                    // For demo purposes when not in D-Logic environment
+                    return true;
+                } catch (error) {
+                    console.error("Error resetting band:", error);
+                    return false;
+                }
+            }
+        }
+    </script>
+    <script>
+        // Contents of credentials-manager.js
+        class CredentialsManager {
+            constructor() {
+                // Demo credentials with public and private keys
+                this.demoCredentials = {
+                    'cyonic': { 
+                        password: 'cyonic', 
+                        role: 'faction', 
+                        publicKey: 'PUB_CYONIC', 
+                        privateKey: 'PRIV_CYONIC' 
+                    },
+                    'admin': { 
+                        password: 'admin', 
+                        role: 'admin', 
+                        publicKey: 'PUB_ADMIN', 
+                        privateKey: 'PRIV_ADMIN' 
+                    },
+                    'ureg': { 
+                        password: 'ureg', 
+                        role: 'staff', 
+                        publicKey: 'PUB_UREG', 
+                        privateKey: 'PRIV_UREG' 
+                    },
+                    'alleg': { 
+                        password: 'alleg', 
+                        role: 'allegiance', 
+                        publicKey: 'PUB_ALLEG', 
+                        privateKey: 'PRIV_ALLEG' 
+                    }
+                };
+
+                // Generated credentials will be loaded from credentials_updated.csv
+                this.generatedCredentials = {};
+            }
+
+            async loadGeneratedCredentials() {
+                try {
+                    // TODO: Add code to load credentials from credentials_updated.csv
+                    console.log("Loading generated credentials...");
+                } catch (error) {
+                    console.error("Error loading generated credentials:", error);
+                }
+            }
+
+            validateCredentials(username, password) {
+                // Check demo credentials first
+                if (this.demoCredentials[username] && 
+                    this.demoCredentials[username].password === password) {
+                    return {
+                        valid: true,
+                        role: this.demoCredentials[username].role,
+                        publicKey: this.demoCredentials[username].publicKey,
+                        privateKey: this.demoCredentials[username].privateKey
+                    };
+                }
+
+                // Check generated credentials
+                if (this.generatedCredentials[username] && 
+                    this.generatedCredentials[username].password === password) {
+                    return {
+                        valid: true,
+                        role: this.generatedCredentials[username].role,
+                        publicKey: this.generatedCredentials[username].publicKey,
+                        privateKey: this.generatedCredentials[username].privateKey
+                    };
+                }
+
+                return { valid: false };
+            }
+        }
+    </script>
+    <script>
+        // Contents of logger.js
+        class NeobandLogger {
+            constructor() {
+                this.logQueue = [];
+            }
+
+            async log(action, details) {
+                const timestamp = new Date().toISOString();
+                const logEntry = {
+                    timestamp,
+                    action,
+                    // Mask sensitive key data in logs
+                    details: this.maskSensitiveData(details)
+                };
+
+                // Add to queue
+                this.logQueue.push(logEntry);
+
+                // Automatically flush if queue gets too large
+                if (this.logQueue.length > 100) {
+                    await this.flush();
+                }
+
+                // TODO: Add code to write to SD card when available
+                console.log("Log Entry:", logEntry);
+            }
+
+            maskSensitiveData(details) {
+                if (!details) return details;
+                
+                const maskedDetails = { ...details };
+                
+                // Mask sensitive key data if present
+                if (maskedDetails.publicKey) {
+                    maskedDetails.publicKey = `${maskedDetails.publicKey.substring(0, 4)}...`;
+                }
+                if (maskedDetails.privateKey) {
+                    maskedDetails.privateKey = `${maskedDetails.privateKey.substring(0, 4)}...`;
+                }
+                
+                return maskedDetails;
+            }
+
+            async flush() {
+                try {
+                    // TODO: Add code to write queued logs to SD card
+                    console.log("Flushing logs to SD card...");
+                    this.logQueue = [];
+                } catch (error) {
+                    console.error("Error flushing logs:", error);
+                }
+            }
+        }
+    </script>
 
     <script>
         // Component Initialization
@@ -576,6 +911,9 @@
         });
 
         // Band Registration Functions
+        //Never change the main field-titles and place holders for the registration page.
+        // These field-titles and their place holders should always remain the same:
+        // Field-titles & Placeholders: New Username, Enter new username, Band ID, Waiting for band..., Status, Unregistered, READ, WRITE
         async function handleRead() {
             try {
                 const publicKey = sessionStorage.getItem('publicKey');

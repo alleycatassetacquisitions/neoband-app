@@ -16,6 +16,7 @@ build/
 # IDE and editor files
 .idea/
 .vscode/
+.cursor/rules
 *.swp
 *.swo
 .DS_Store

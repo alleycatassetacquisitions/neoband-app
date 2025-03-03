@@ -510,6 +510,40 @@
                     return false;
                 }
             }
+            
+            // New method to read band ID without needing a key
+            async readBandId() {
+                try {
+                    console.log("Reading Neoband ID...");
+                    
+                    // Check if we're in the D-Logic reader environment
+                    if (typeof ufRequest === 'function') {
+                        // Create a promise that will be resolved when the ufRequest callback is called
+                        return new Promise((resolve) => {
+                            // Get the card ID
+                            ufRequest("GetCardIdEx", function() {
+                                const output = ufResponse();
+                                console.log("Card ID response:", output);
+                                
+                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
+                                    const bandId = output.CardUid;
+                                    console.log("Band ID read:", bandId);
+                                    resolve(bandId);
+                                } else {
+                                    console.warn("Failed to read band ID");
+                                    resolve(null);
+                                }
+                            });
+                        });
+                    }
+                    
+                    // For demo purposes when not in D-Logic environment
+                    return "12:34:56:78"; // Simulated band ID
+                } catch (error) {
+                    console.error("Error reading band ID:", error);
+                    return null;
+                }
+            }
 
             // Read username from Neoband
             async readUsername(publicKey) {
@@ -815,9 +849,31 @@
                 text.textContent = isConnected ? 'Connected' : 'Waiting';
             });
 
-            // If connected, try to read username
+            // If connected, try to read username and band ID
             if (isConnected) {
                 await handleUsernameRead();
+                await handleBandIdRead();
+            }
+        }
+
+        // Band ID Auto-Population
+        async function handleBandIdRead() {
+            try {
+                const bandId = await reader.readBandId();
+                
+                if (!bandId) {
+                    console.warn("No band detected or failed to read band ID.");
+                    return;
+                }
+                
+                // Update band ID field on registration page if it exists
+                const bandIdField = document.getElementById('bandIdInput');
+                if (bandIdField) {
+                    bandIdField.value = bandId;
+                    await logger.log('band_id_read', { bandId });
+                }
+            } catch (error) {
+                console.error('Error reading band ID:', error);
             }
         }
 

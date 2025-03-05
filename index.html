@@ -569,35 +569,53 @@
          */
         async function handleRead() {
             try {
-                const publicKey = sessionStorage.getItem('publicKey');
-                if (!publicKey) {
-                    alert("Session expired. Please log in again.");
+                // Default key for MIFARE tags (FF FF FF FF FF FF)
+                const defaultKey = "FFFFFFFFFFFF";
+                
+                // Log the start of the read operation
+                console.log('Starting block read operation');
+                
+                // Check if the mifare-helper.js is loaded
+                if (typeof readBlock !== 'function') {
+                    console.error('MIFARE helper functions not available. Make sure mifare-helper.js is loaded.');
+                    alert("NFC reader functions not available. Please refresh the page.");
                     return;
                 }
-
-                const bandData = await reader.readBand(publicKey);
-                if (!bandData) {
-                    alert("No band detected. Please scan a Neoband.");
-                    return;
-                }
-
-                const bandId = bandData.bandId;
-                document.getElementById('bandIdInput').value = bandId;
-
-                if (bandData.username) {
-                    // Band is registered
-                    document.getElementById('usernameInput').value = bandData.username;
-                    document.getElementById('statusInput').value = "Registered";
-                    await window.logger.log('read', { action: 'read_registered_band', bandId, username: bandData.username });
+                
+                // Read from block 1 using the default key
+                const { success, data } = await readBlock(1, defaultKey, 'A');
+                
+                if (success) {
+                    console.log('Successfully read from block 1:', data);
+                    
+                    // Update the band ID input field
+                    const bandIdInput = document.getElementById('bandIdInput');
+                    if (bandIdInput) {
+                        bandIdInput.value = data ? JSON.stringify(data) : "No data";
+                    }
+                    
+                    // Update status field
+                    const statusInput = document.getElementById('statusInput');
+                    if (statusInput) {
+                        statusInput.value = "Read successful";
+                    }
+                    
+                    await window.logger.log('block_read', { blockNumber: 1, success: true });
                 } else {
-                    // Band is unregistered
-                    document.getElementById('usernameInput').value = "";
-                    document.getElementById('statusInput').value = "Unregistered";
-                    await window.logger.log('read', { action: 'read_unregistered_band', bandId });
+                    console.error('Failed to read from block 1');
+                    alert("Failed to read from band. Please try again.");
+                    
+                    // Update status field
+                    const statusInput = document.getElementById('statusInput');
+                    if (statusInput) {
+                        statusInput.value = "Read failed";
+                    }
+                    
+                    await window.logger.log('block_read', { blockNumber: 1, success: false });
                 }
             } catch (error) {
-                console.error('Error reading band:', error);
-                alert("Error reading band. Please try again.");
+                console.error('Error during block read operation:', error);
+                alert("Error reading from band: " + error.message);
             }
         }
 
@@ -707,7 +725,6 @@
         // Application Initialization
         async function initializeApp() {
             await reader.initialize();
-            await window.credentialsManager.loadGeneratedCredentials();
             updateStatusIndicator();
         }
 
@@ -749,15 +766,6 @@
 
                 // Generated credentials will be loaded from credentials_updated.csv
                 this.generatedCredentials = {};
-            }
-
-            async loadGeneratedCredentials() {
-                try {
-                    // TODO: Add code to load credentials from credentials_updated.csv
-                    console.log("Loading generated credentials...");
-                } catch (error) {
-                    console.error("Error loading generated credentials:", error);
-                }
             }
 
             validateCredentials(username, password) {
@@ -860,9 +868,6 @@
                 
                 await window.logger.log('login', { username, role: result.role });
                 
-                // Run session storage test after successful login
-                testSessionStorage();
-
                 if (result.role === 'faction') {
                     showPage('factionPage');
                     setFactionPageContent(false);
@@ -881,28 +886,6 @@
                 sessionStorage.removeItem('privateKey');
             }
         });
-
-        /**
-         * Session Storage Validation Test
-         */
-        function testSessionStorage() {
-            console.log('Testing Session Storage:');
-            const publicKey = sessionStorage.getItem('publicKey');
-            const privateKey = sessionStorage.getItem('privateKey');
-
-            console.log('Public Key:', publicKey);
-            console.log('Expected: Should match user\'s public key');
-
-            console.log('Private Key:', privateKey);
-            console.log('Expected: Should match user\'s private key');
-
-            // Test key validation
-            if (publicKey && privateKey) {
-                console.log('Session storage test: PASSED');
-            } else {
-                console.error('Session storage test: FAILED - Missing keys');
-            }
-        }
 
         // Page Content Management
         function setFactionPageContent(isAdmin) {

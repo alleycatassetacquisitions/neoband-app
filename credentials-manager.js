@@ -49,23 +49,6 @@ class CredentialsManager {
     }
 
     /**
-     * Load generated credentials from the CSV file
-     * 
-     * @returns {Promise<void>}
-     * 
-     * This method is intended to load actual user credentials from an external source
-     * (credentials_updated.csv). Currently implemented as a placeholder (TODO).
-     */
-    async loadGeneratedCredentials() {
-        try {
-            // TODO: Add code to load credentials from credentials_updated.csv
-            console.log("Loading generated credentials...");
-        } catch (error) {
-            console.error("Error loading generated credentials:", error);
-        }
-    }
-
-    /**
      * Validate user credentials and return authentication result
      * 
      * @param {string} username - The username to validate
@@ -101,37 +84,4 @@ class CredentialsManager {
 
         return { valid: false };
     }
-} 
-
-/**
- * Test function for CredentialsManager
- * 
- * This function runs a series of test cases against the CredentialsManager to verify
- * proper credential validation behavior for valid and invalid scenarios.
- */
-function testCredentialsManager() {
-    const manager = new CredentialsManager();
-    
-    console.log('Test Case 1: Valid Login');
-    console.log('Input: cyonic/cyonic');
-    const validResult = manager.validateCredentials('cyonic', 'cyonic');
-    console.log('Result:', validResult);
-    console.log('Expected: valid=true, role=faction, has public/private keys\n');
-
-    console.log('Test Case 2: Invalid Password');
-    console.log('Input: cyonic/wrongpass');
-    const invalidPassResult = manager.validateCredentials('cyonic', 'wrongpass');
-    console.log('Result:', invalidPassResult);
-    console.log('Expected: valid=false\n');
-
-    console.log('Test Case 3: Non-existent User');
-    console.log('Input: unknown/randompass');
-    const nonExistentResult = manager.validateCredentials('unknown', 'randompass');
-    console.log('Result:', nonExistentResult);
-    console.log('Expected: valid=false\n');
-}
-
-// Run tests if not in production
-if (process.env.NODE_ENV !== 'production') {
-    testCredentialsManager();
 }

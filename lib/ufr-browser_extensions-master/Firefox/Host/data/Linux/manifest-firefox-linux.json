@@ -1,0 +1,7 @@
+{
+  "name": "dlogic",
+  "description": "UFR Firefox extension",
+  "path": "/usr/local/bin/ufr",
+  "type": "stdio",
+  "allowed_extensions": [ "ufr@d-logic.rs" ]
+}

@@ -1,0 +1,48 @@
+#!/bin/bash
+arc=`$(echo uname -m)`
+
+
+read -p "Install host system-wide or local (s/l)?" choice
+case "$choice" in 
+  s|S ) 
+if [ "$(id -u)" != "0" ]; then
+   echo "You need root privilegies to install host system-wide" 1>&2
+   exit 1
+else
+
+if [ "$arc" = "x86_64" ]; then
+
+	mkdir -p /usr/lib/mozilla/native-messaging-hosts/
+	cp data/Linux/x86_64/ufr /usr/local/bin/ufr
+	cp data/Linux/manifest-firefox-linux.json /usr/lib/mozilla/native-messaging-hosts/dlogic.json
+else
+
+	mkdir -p /usr/lib/mozilla/native-messaging-hosts/
+	cp data/Linux/x86/ufr /usr/local/bin/ufr
+	cp data/Linux/manifest-firefox-linux.json /usr/lib/mozilla/native-messaging-hosts/dlogic.json
+fi
+echo "Host installed successfully"
+fi
+
+;;
+  l|L )
+	mkdir -p /home/$USER/.mozilla/native-messaging-hosts/
+echo '{"name": "dlogic","description": "UFR Firefox extension","path": "/home/'$USER'/.config/dlogic/ufr","type": "stdio","allowed_extensions": [ "ufr@d-logic.rs" ]}'> /home/$USER/.mozilla/native-messaging-hosts/dlogic.json
+if [ "$arc" = "x86_64" ]; then
+
+	mkdir -p /home/$USER/.config/dlogic/
+
+	cp data/Linux/x86_64/ufr /home/$USER/.config/dlogic/
+
+else
+
+	mkdir -p /home/'$USER'/.config/dlogic/
+
+	cp data/Linux/x86/ufr /home/$USER/.config/dlogic/
+
+fi
+echo "Host installed successfully";;
+  * ) echo "Invalid input";;
+esac
+
+

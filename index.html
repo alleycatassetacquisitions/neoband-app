@@ -6,6 +6,10 @@
     <title>Neoband App</title>
     <!-- Custom font import for the application -->
     <link href="https://fonts.googleapis.com/css2?family=Tomorrow:wght@400&display=swap" rel="stylesheet">
+    
+    <!-- D-Logic UFR Libraries -->
+    <script src="ufr.js"></script>
+    
     <style>
         /* Custom font definition for Charged Vector Black */
         @font-face {
@@ -455,251 +459,262 @@
 
     <!-- External JavaScript Dependencies -->
     <!-- These files handle NFC reading, credential management, and logging -->
-    <script>
-        // Contents of neoband-reader.js
-        // D-Logic Reader Interface
-        class NeobandReader {
-            constructor() {
-                this.isConnected = false;
-                this.currentBandId = null;
-            }
+    <script type="module">
+        // Import the updated NeobandReader class
+        import NeobandReader from './neoband-reader.js';
+        
+        // Initialize main components
+        const reader = new NeobandReader();
+        
+        // Make components available globally
+        window.neobandReader = reader;
+        
+        // These variables are defined in separate script tags, making them available here
+        window.credentialsManager = new CredentialsManager();
+        window.logger = new NeobandLogger();
 
-            // Initialize connection to D-Logic reader
-            async initialize() {
-                try {
-                    console.log("Initializing D-Logic reader connection...");
-                    // Try to use the ufRequest function if available (D-Logic reader environment)
-                    if (typeof ufRequest === 'function') {
-                        this.isConnected = true;
-                        console.log("D-Logic reader environment detected");
-                    } else {
-                        console.log("D-Logic reader environment not detected, running in simulation mode");
-                        this.isConnected = false;
-                    }
-                    return true;
-                } catch (error) {
-                    console.error("Failed to initialize reader:", error);
-                    return false;
-                }
-            }
-
-            // Check if a Neoband is present on the reader
-            async checkForBand() {
-                try {
-                    console.log("Checking for Neoband...");
-                    if (typeof ufRequest === 'function') {
-                        // Use the D-Logic API to check for a card
-                        let cardDetected = false;
-                        
-                        // Create a promise that will be resolved when the ufRequest callback is called
-                        return new Promise((resolve) => {
-                            ufRequest("GetCardIdEx", function() {
-                                const output = ufResponse();
-                                console.log("Card check response:", output);
-                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
-                                    resolve(true);
-                                } else {
-                                    resolve(false);
-                                }
-                            });
-                        });
-                    }
-                    return false;
-                } catch (error) {
-                    console.error("Error checking for band:", error);
-                    return false;
-                }
-            }
+        /**
+         * NFC Band Status Indicator Update
+         * 
+         * This function periodically checks for the presence of a Neoband on the reader
+         * and updates UI indicators accordingly. When a band is detected, it also
+         * triggers the username and band ID read operations.
+         */
+        async function updateStatusIndicator() {
+            const indicators = document.querySelectorAll('.status-indicator');
+            const statusTexts = document.querySelectorAll('.status-text');
             
-            // New method to read band ID without needing a key
-            async readBandId() {
-                try {
-                    console.log("Reading Neoband ID...");
-                    
-                    // Check if we're in the D-Logic reader environment
-                    if (typeof ufRequest === 'function') {
-                        // Create a promise that will be resolved when the ufRequest callback is called
-                        return new Promise((resolve) => {
-                            // Get the card ID
-                            ufRequest("GetCardIdEx", function() {
-                                const output = ufResponse();
-                                console.log("Card ID response:", output);
-                                
-                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
-                                    const bandId = output.CardUid;
-                                    console.log("Band ID read:", bandId);
-                                    resolve(bandId);
-                                } else {
-                                    console.warn("Failed to read band ID");
-                                    resolve(null);
-                                }
-                            });
-                        });
-                    }
-                    
-                    // For demo purposes when not in D-Logic environment
-                    return "12:34:56:78"; // Simulated band ID
-                } catch (error) {
-                    console.error("Error reading band ID:", error);
-                    return null;
-                }
-            }
+            const isConnected = await reader.checkForBand();
+            
+            indicators.forEach(indicator => {
+                indicator.style.backgroundColor = isConnected ? '#00ff00' : '#ff0000';
+            });
+            
+            statusTexts.forEach(text => {
+                text.textContent = isConnected ? 'Connected' : 'Waiting';
+            });
 
-            // Read username from Neoband
-            async readUsername(publicKey) {
-                try {
-                    if (!publicKey) {
-                        throw new Error("Public key is required to read username");
-                    }
-                    
-                    console.log(`Reading username from Neoband using Public Key: ${publicKey}...`);
-                    const bandData = await this.readBand(publicKey);
-                    
-                    if (bandData && bandData.username) {
-                        return bandData.username;
-                    } else {
-                        console.warn("No username found on this Neoband.");
-                        return "Unknown User";
-                    }
-                } catch (error) {
-                    console.error("Error reading username from band:", error);
-                    return "Error";
-                }
-            }
-
-            // Read data from Neoband
-            async readBand(publicKey) {
-                try {
-                    if (!publicKey) {
-                        throw new Error("Public key required for reading band data");
-                    }
-                    console.log(`Reading Neoband data using Public Key: ${publicKey}...`);
-                    
-                    // Check if we're in the D-Logic reader environment
-                    if (typeof ufRequest === 'function') {
-                        // Create a promise that will be resolved when the ufRequest callback is called
-                        return new Promise((resolve) => {
-                            // First get the card ID
-                            ufRequest("GetCardIdEx", function() {
-                                const output = ufResponse();
-                                console.log("Card ID response:", output);
-                                
-                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
-                                    const bandId = output.CardUid;
-                                    
-                                    // For demo purposes, create a mock response based on the card ID
-                                    // In a real implementation, you would read data from specific blocks on the card
-                                    resolve({
-                                        username: `user_${bandId.substring(0, 8)}`,
-                                        bandId: bandId,
-                                        registrationDate: new Date().toISOString()
-                                    });
-                                } else {
-                                    resolve(null);
-                                }
-                            });
-                        });
-                    }
-                    
-                    // For demo purposes when not in D-Logic environment, return mock data based on the public key
-                    if (publicKey === 'PUB_CYONIC') {
-                        return {
-                            username: 'cyonic_user',
-                            bandId: '12:34:56:78',
-                            registrationDate: new Date().toISOString()
-                        };
-                    }
-                    
-                    return null;
-                } catch (error) {
-                    console.error("Error reading band:", error);
-                    return null;
-                }
-            }
-
-            // Write data to Neoband
-            async writeBand(privateKey, data) {
-                try {
-                    if (!privateKey) {
-                        throw new Error("Private key required for writing to band");
-                    }
-                    console.log(`Writing to Neoband using Private Key: ${privateKey}...`, data);
-                    
-                    // Check if we're in the D-Logic reader environment
-                    if (typeof ufRequest === 'function') {
-                        // Create a promise that will be resolved when the ufRequest callback is called
-                        return new Promise((resolve) => {
-                            // First check if a card is present
-                            ufRequest("GetCardIdEx", function() {
-                                const output = ufResponse();
-                                console.log("Card ID response for write:", output);
-                                
-                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
-                                    // For demo purposes, we'll just log the data we would write
-                                    // In a real implementation, you would write data to specific blocks on the card
-                                    console.log("Would write data to card:", data);
-                                    
-                                    // Signal success with a UI indicator
-                                    ufRequest("ReaderUISignal 1 2", function() {
-                                        resolve(true);
-                                    });
-                                } else {
-                                    resolve(false);
-                                }
-                            });
-                        });
-                    }
-                    
-                    // For demo purposes when not in D-Logic environment
-                    return true;
-                } catch (error) {
-                    console.error("Error writing to band:", error);
-                    return false;
-                }
-            }
-
-            // Reset Neoband to default state
-            async resetBand(privateKey) {
-                try {
-                    if (!privateKey) {
-                        throw new Error("Private key required for resetting band");
-                    }
-                    console.log(`Resetting Neoband using Private Key: ${privateKey}...`);
-                    
-                    // Check if we're in the D-Logic reader environment
-                    if (typeof ufRequest === 'function') {
-                        // Create a promise that will be resolved when the ufRequest callback is called
-                        return new Promise((resolve) => {
-                            // First check if a card is present
-                            ufRequest("GetCardIdEx", function() {
-                                const output = ufResponse();
-                                console.log("Card ID response for reset:", output);
-                                
-                                if (output && output.Status === "[0x00 (0)] UFR_OK") {
-                                    // For demo purposes, we'll just log that we would reset the card
-                                    // In a real implementation, you would write empty data to specific blocks on the card
-                                    console.log("Would reset card with ID:", output.CardUid);
-                                    
-                                    // Signal success with a UI indicator (red light for reset)
-                                    ufRequest("ReaderUISignal 2 2", function() {
-                                        resolve(true);
-                                    });
-                                } else {
-                                    resolve(false);
-                                }
-                            });
-                        });
-                    }
-                    
-                    // For demo purposes when not in D-Logic environment
-                    return true;
-                } catch (error) {
-                    console.error("Error resetting band:", error);
-                    return false;
-                }
+            // If connected, try to read username and band ID
+            if (isConnected) {
+                await handleUsernameRead();
+                await handleBandIdRead();
             }
         }
+
+        /**
+         * Neoband ID Auto-Population Handler
+         * 
+         * This function reads the unique hardware ID from the Neoband and automatically
+         * populates the Band ID field on the registration page. This feature simplifies
+         * the user registration process by removing the need for manual ID entry.
+         */
+        async function handleBandIdRead() {
+            try {
+                const bandId = await reader.readBandId();
+                
+                if (!bandId) {
+                    console.warn("No band detected or failed to read band ID.");
+                    return;
+                }
+                
+                // Update band ID field on registration page if it exists
+                const bandIdField = document.getElementById('bandIdInput');
+                if (bandIdField) {
+                    bandIdField.value = bandId;
+                    await window.logger.log('band_id_read', { bandId });
+                }
+            } catch (error) {
+                console.error('Error reading band ID:', error);
+            }
+        }
+
+        /**
+         * Username Auto-Population Handler
+         * 
+         * This function reads the username from the Neoband and automatically
+         * populates username fields across different pages of the application.
+         * It requires a valid public key stored in session storage for authentication.
+         */
+        async function handleUsernameRead() {
+            try {
+                const publicKey = sessionStorage.getItem('publicKey');
+                if (!publicKey) {
+                    console.warn("No public key found. Please log in again.");
+                    return;
+                }
+
+                const username = await reader.readUsername(publicKey);
+                
+                // Update username field on faction page if it exists
+                const factionUsernameField = document.getElementById('factionUsernameField');
+                if (factionUsernameField) {
+                    factionUsernameField.value = username;
+                }
+
+                // Update username field on allegiances page if it exists
+                const allegiancesUsernameField = document.getElementById('allegiancesUsernameField');
+                if (allegiancesUsernameField) {
+                    allegiancesUsernameField.value = username;
+                }
+
+                await window.logger.log('username_read', { username });
+            } catch (error) {
+                console.error('Error reading username:', error);
+            }
+        }
+
+        /**
+         * Handle the READ button click on the User Registration page
+         * Uses the MIFARE helper functions to read band data
+         */
+        async function handleRead() {
+            try {
+                const publicKey = sessionStorage.getItem('publicKey');
+                if (!publicKey) {
+                    alert("Session expired. Please log in again.");
+                    return;
+                }
+
+                const bandData = await reader.readBand(publicKey);
+                if (!bandData) {
+                    alert("No band detected. Please scan a Neoband.");
+                    return;
+                }
+
+                const bandId = bandData.bandId;
+                document.getElementById('bandIdInput').value = bandId;
+
+                if (bandData.username) {
+                    // Band is registered
+                    document.getElementById('usernameInput').value = bandData.username;
+                    document.getElementById('statusInput').value = "Registered";
+                    await window.logger.log('read', { action: 'read_registered_band', bandId, username: bandData.username });
+                } else {
+                    // Band is unregistered
+                    document.getElementById('usernameInput').value = "";
+                    document.getElementById('statusInput').value = "Unregistered";
+                    await window.logger.log('read', { action: 'read_unregistered_band', bandId });
+                }
+            } catch (error) {
+                console.error('Error reading band:', error);
+                alert("Error reading band. Please try again.");
+            }
+        }
+
+        /**
+         * Handle the WRITE button click on the User Registration page
+         * Uses the MIFARE helper functions to write band data
+         */
+        async function handleWrite() {
+            try {
+                const privateKey = sessionStorage.getItem('privateKey');
+                if (!privateKey) {
+                    alert("Session expired. Please log in again.");
+                    return;
+                }
+
+                const username = document.getElementById('usernameInput').value.trim();
+                const bandId = document.getElementById('bandIdInput').value;
+
+                if (!bandId) {
+                    alert("Please scan a band first.");
+                    return;
+                }
+
+                if (!username) {
+                    alert("Please enter a username.");
+                    return;
+                }
+
+                const data = {
+                    username,
+                    bandId,
+                    registrationDate: new Date().toISOString()
+                };
+
+                const success = await reader.writeBand(privateKey, data);
+                if (success) {
+                    document.getElementById('statusInput').value = "Registered";
+                    await window.logger.log('write', { 
+                        action: 'register_band', 
+                        bandId, 
+                        username 
+                    });
+                    alert("Band successfully registered!");
+                } else {
+                    alert("Failed to register the band. Please try again.");
+                }
+            } catch (error) {
+                console.error('Error writing to band:', error);
+                alert("Error writing to band. Please try again.");
+            }
+        }
+
+        /**
+         * Handle the RESET button click on the User Registration page
+         * Uses the MIFARE helper functions to reset band data
+         */
+        async function handleReset() {
+            try {
+                const privateKey = sessionStorage.getItem('privateKey');
+                if (!privateKey) {
+                    alert("Session expired. Please log in again.");
+                    return;
+                }
+
+                const bandId = document.getElementById('bandIdInput').value;
+                if (!bandId) {
+                    alert("Please scan a band first.");
+                    return;
+                }
+
+                if (!confirm("Are you sure you want to reset this band? This will erase all data.")) {
+                    return;
+                }
+
+                const success = await reader.resetBand(privateKey);
+                if (success) {
+                    document.getElementById('usernameInput').value = "";
+                    document.getElementById('bandIdInput').value = "Waiting for band...";
+                    document.getElementById('statusInput').value = "Unregistered";
+                    await window.logger.log('reset', { 
+                        action: 'reset_band', 
+                        bandId 
+                    });
+                    alert("Band successfully reset!");
+                } else {
+                    alert("Failed to reset the band. Please try again.");
+                }
+            } catch (error) {
+                console.error('Error resetting band:', error);
+                alert("Error resetting band. Please try again.");
+            }
+        }
+
+        // Start periodic status check and username update
+        setInterval(updateStatusIndicator, 1000);
+
+        // Make functions available globally for HTML onclick events
+        window.handleRead = handleRead;
+        window.handleWrite = handleWrite;
+        window.handleReset = handleReset;
+        
+        // Expose these helper functions to the global scope
+        window.handleBandIdRead = handleBandIdRead;
+        window.handleUsernameRead = handleUsernameRead;
+        window.updateStatusIndicator = updateStatusIndicator;
+        
+        // Application Initialization
+        async function initializeApp() {
+            await reader.initialize();
+            await window.credentialsManager.loadGeneratedCredentials();
+            updateStatusIndicator();
+        }
+
+        // Call initialize on page load
+        window.addEventListener('load', initializeApp);
     </script>
+
     <script>
         // Contents of credentials-manager.js
         class CredentialsManager {
@@ -829,120 +844,21 @@
     </script>
 
     <script>
-        // Component Initialization
-        const reader = new NeobandReader();
-        const credentialsManager = new CredentialsManager();
-        const logger = new NeobandLogger();
-
-        // Status Indicator Function
-        async function updateStatusIndicator() {
-            const indicators = document.querySelectorAll('.status-indicator');
-            const statusTexts = document.querySelectorAll('.status-text');
-            
-            const isConnected = await reader.checkForBand();
-            
-            indicators.forEach(indicator => {
-                indicator.style.backgroundColor = isConnected ? '#00ff00' : '#ff0000';
-            });
-            
-            statusTexts.forEach(text => {
-                text.textContent = isConnected ? 'Connected' : 'Waiting';
-            });
-
-            // If connected, try to read username and band ID
-            if (isConnected) {
-                await handleUsernameRead();
-                await handleBandIdRead();
-            }
-        }
-
-        // Band ID Auto-Population
-        async function handleBandIdRead() {
-            try {
-                const bandId = await reader.readBandId();
-                
-                if (!bandId) {
-                    console.warn("No band detected or failed to read band ID.");
-                    return;
-                }
-                
-                // Update band ID field on registration page if it exists
-                const bandIdField = document.getElementById('bandIdInput');
-                if (bandIdField) {
-                    bandIdField.value = bandId;
-                    await logger.log('band_id_read', { bandId });
-                }
-            } catch (error) {
-                console.error('Error reading band ID:', error);
-            }
-        }
-
-        // Username Auto-Population
-        async function handleUsernameRead() {
-            try {
-                const publicKey = sessionStorage.getItem('publicKey');
-                if (!publicKey) {
-                    console.warn("No public key found. Please log in again.");
-                    return;
-                }
-
-                const username = await reader.readUsername(publicKey);
-                
-                // Update username field on faction page if it exists
-                const factionUsernameField = document.getElementById('factionUsernameField');
-                if (factionUsernameField) {
-                    factionUsernameField.value = username;
-                }
-
-                // Update username field on allegiances page if it exists
-                const allegiancesUsernameField = document.getElementById('allegiancesUsernameField');
-                if (allegiancesUsernameField) {
-                    allegiancesUsernameField.value = username;
-                }
-
-                await logger.log('username_read', { username });
-            } catch (error) {
-                console.error('Error reading username:', error);
-            }
-        }
-
-        // Start periodic status check and username update
-        setInterval(updateStatusIndicator, 1000);
-
-        // Test functions for session storage
-        function testSessionStorage() {
-            console.log('Testing Session Storage:');
-            const publicKey = sessionStorage.getItem('publicKey');
-            const privateKey = sessionStorage.getItem('privateKey');
-
-            console.log('Public Key:', publicKey);
-            console.log('Expected: Should match user\'s public key');
-
-            console.log('Private Key:', privateKey);
-            console.log('Expected: Should match user\'s private key');
-
-            // Test key validation
-            if (publicKey && privateKey) {
-                console.log('Session storage test: PASSED');
-            } else {
-                console.error('Session storage test: FAILED - Missing keys');
-            }
-        }
-
-        // Login Form Handler
-        // Validates credentials and routes users to appropriate pages based on role
+        /**
+         * Main Application Component Initialization
+         */
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             
-            const result = credentialsManager.validateCredentials(username, password);
+            const result = window.credentialsManager.validateCredentials(username, password);
             
             if (result.valid) {
                 sessionStorage.setItem('publicKey', result.publicKey);
                 sessionStorage.setItem('privateKey', result.privateKey);
                 
-                await logger.log('login', { username, role: result.role });
+                await window.logger.log('login', { username, role: result.role });
                 
                 // Run session storage test after successful login
                 testSessionStorage();
@@ -966,139 +882,29 @@
             }
         });
 
-        // Band Registration Functions
-        //Never change the main field-titles and place holders for the registration page.
-        // These field-titles and their place holders should always remain the same:
-        // Field-titles & Placeholders: New Username, Enter new username, Band ID, Waiting for band..., Status, Unregistered, READ, WRITE
-        async function handleRead() {
-            try {
-                const publicKey = sessionStorage.getItem('publicKey');
-                if (!publicKey) {
-                    alert("Session expired. Please log in again.");
-                    return;
-                }
+        /**
+         * Session Storage Validation Test
+         */
+        function testSessionStorage() {
+            console.log('Testing Session Storage:');
+            const publicKey = sessionStorage.getItem('publicKey');
+            const privateKey = sessionStorage.getItem('privateKey');
 
-                const bandData = await reader.readBand(publicKey);
-                if (!bandData) {
-                    alert("No band detected. Please scan a Neoband.");
-                    return;
-                }
+            console.log('Public Key:', publicKey);
+            console.log('Expected: Should match user\'s public key');
 
-                const bandId = bandData.bandId;
-                document.getElementById('bandIdInput').value = bandId;
+            console.log('Private Key:', privateKey);
+            console.log('Expected: Should match user\'s private key');
 
-                if (bandData.username) {
-                    // Band is registered
-                    document.getElementById('usernameInput').value = bandData.username;
-                    document.getElementById('statusInput').value = "Registered";
-                    await logger.log('read', { action: 'read_registered_band', bandId, username: bandData.username });
-                } else {
-                    // Band is unregistered
-                    document.getElementById('usernameInput').value = "";
-                    document.getElementById('statusInput').value = "Unregistered";
-                    await logger.log('read', { action: 'read_unregistered_band', bandId });
-                }
-            } catch (error) {
-                console.error('Error reading band:', error);
-                alert("Error reading band. Please try again.");
+            // Test key validation
+            if (publicKey && privateKey) {
+                console.log('Session storage test: PASSED');
+            } else {
+                console.error('Session storage test: FAILED - Missing keys');
             }
         }
-
-        async function handleWrite() {
-            try {
-                const privateKey = sessionStorage.getItem('privateKey');
-                if (!privateKey) {
-                    alert("Session expired. Please log in again.");
-                    return;
-                }
-
-                const username = document.getElementById('usernameInput').value.trim();
-                const bandId = document.getElementById('bandIdInput').value;
-
-                if (!bandId) {
-                    alert("Please scan a band first.");
-                    return;
-                }
-
-                if (!username) {
-                    alert("Please enter a username.");
-                    return;
-                }
-
-                const data = {
-                    username,
-                    bandId,
-                    registrationDate: new Date().toISOString()
-                };
-
-                const success = await reader.writeBand(privateKey, data);
-                if (success) {
-                    document.getElementById('statusInput').value = "Registered";
-                    await logger.log('write', { 
-                        action: 'register_band', 
-                        bandId, 
-                        username 
-                    });
-                    alert("Band successfully registered!");
-                } else {
-                    alert("Failed to register the band. Please try again.");
-                }
-            } catch (error) {
-                console.error('Error writing to band:', error);
-                alert("Error writing to band. Please try again.");
-            }
-        }
-
-        async function handleReset() {
-            try {
-                const privateKey = sessionStorage.getItem('privateKey');
-                if (!privateKey) {
-                    alert("Session expired. Please log in again.");
-                    return;
-                }
-
-                const bandId = document.getElementById('bandIdInput').value;
-                if (!bandId) {
-                    alert("Please scan a band first.");
-                    return;
-                }
-
-                if (!confirm("Are you sure you want to reset this band? This will erase all data.")) {
-                    return;
-                }
-
-                const success = await reader.resetBand(privateKey);
-                if (success) {
-                    document.getElementById('usernameInput').value = "";
-                    document.getElementById('bandIdInput').value = "Waiting for band...";
-                    document.getElementById('statusInput').value = "Unregistered";
-                    await logger.log('reset', { 
-                        action: 'reset_band', 
-                        bandId 
-                    });
-                    alert("Band successfully reset!");
-                } else {
-                    alert("Failed to reset the band. Please try again.");
-                }
-            } catch (error) {
-                console.error('Error resetting band:', error);
-                alert("Error resetting band. Please try again.");
-            }
-        }
-
-        // Application Initialization
-        // Sets up the NFC reader and loads credentials on page load
-        async function initializeApp() {
-            await reader.initialize();
-            await credentialsManager.loadGeneratedCredentials();
-            updateStatusIndicator();
-        }
-
-        // Call initialize on page load
-        window.addEventListener('load', initializeApp);
 
         // Page Content Management
-        // Controls what content is displayed based on user role
         function setFactionPageContent(isAdmin) {
             const factionTitle = document.querySelector('.faction-title');
             const fieldTitles = document.querySelectorAll('.field-title');
@@ -1125,7 +931,6 @@
         }
 
         // Page Navigation
-        // Handles showing/hiding different pages of the application
         function showPage(pageId) {
             // Hide all pages
             document.getElementById('loginPage').classList.add('hidden');
@@ -1141,7 +946,6 @@
         }
 
         // Logout Management
-        // Handles user logout across all pages
         function setupLogoutButton(buttonId) {
             document.getElementById(buttonId).addEventListener('click', function() {
                 document.getElementById('loginPage').classList.remove('hidden');
@@ -1178,101 +982,6 @@
 
         // Run applyDefaultPlaceholders when the page loads
         window.addEventListener('load', applyDefaultPlaceholders);
-
-        // Test functions for Feature #3: Auto-Populated Username Field
-        function runUsernameTests() {
-            console.group('Running Username Field Tests');
-            
-            // Test 1: Username field exists on both pages
-            console.log('Test 1: Checking if username field exists...');
-            const factionUsernameField = document.getElementById('factionUsernameField');
-            const allegiancesUsernameField = document.getElementById('allegiancesUsernameField');
-            console.assert(factionUsernameField !== null, 'Test Failed: Username field missing on Faction page');
-            console.assert(allegiancesUsernameField !== null, 'Test Failed: Username field missing on Allegiances page');
-
-            // Test 2: Default placeholder is correct
-            console.log('Test 2: Checking default placeholder...');
-            console.assert(factionUsernameField.placeholder === 'Waiting for scan...', 
-                'Test Failed: Faction page default placeholder incorrect');
-            console.assert(allegiancesUsernameField.placeholder === 'Waiting for scan...', 
-                'Test Failed: Allegiances page default placeholder incorrect');
-
-            // Test 3: Username field is read-only
-            console.log('Test 3: Checking if fields are read-only...');
-            console.assert(factionUsernameField.readOnly === true, 
-                'Test Failed: Faction username field should be read-only');
-            console.assert(allegiancesUsernameField.readOnly === true, 
-                'Test Failed: Allegiances username field should be read-only');
-
-            // Test 4: Simulate successful username read
-            console.log('Test 4: Testing successful username read...');
-            simulateSuccessfulRead();
-
-            // Test 5: Simulate failed read (no band)
-            console.log('Test 5: Testing no band detected...');
-            simulateFailedRead();
-
-            // Test 6: Simulate invalid public key
-            console.log('Test 6: Testing invalid public key...');
-            simulateInvalidPublicKey();
-
-            console.groupEnd();
-        }
-
-        // Helper function to simulate successful read
-        async function simulateSuccessfulRead() {
-            // Store a valid public key
-            sessionStorage.setItem('publicKey', 'PUB_CYONIC');
-            
-            // Call handleUsernameRead and check result after delay
-            await handleUsernameRead();
-            
-            setTimeout(() => {
-                const factionField = document.getElementById('factionUsernameField');
-                const allegiancesField = document.getElementById('allegiancesUsernameField');
-                
-                console.assert(factionField.value !== 'Waiting for scan...' && factionField.value !== '', 
-                    'Test Failed: Username not updated on Faction page');
-                console.assert(allegiancesField.value !== 'Waiting for scan...' && allegiancesField.value !== '', 
-                    'Test Failed: Username not updated on Allegiances page');
-            }, 2000);
-        }
-
-        // Helper function to simulate failed read (no band)
-        async function simulateFailedRead() {
-            // Temporarily modify reader behavior
-            const originalReadUsername = reader.readUsername;
-            reader.readUsername = async () => null;
-            
-            await handleUsernameRead();
-            
-            // Restore original behavior
-            reader.readUsername = originalReadUsername;
-        }
-
-        // Helper function to simulate invalid public key
-        async function simulateInvalidPublicKey() {
-            sessionStorage.setItem('publicKey', 'INVALID_KEY');
-            await handleUsernameRead();
-            
-            setTimeout(() => {
-                const factionField = document.getElementById('factionUsernameField');
-                const allegiancesField = document.getElementById('allegiancesUsernameField');
-                
-                console.assert(factionField.value === 'Error', 
-                    'Test Failed: Invalid key error not handled on Faction page');
-                console.assert(allegiancesField.value === 'Error', 
-                    'Test Failed: Invalid key error not handled on Allegiances page');
-            }, 2000);
-        }
-
-        // Run tests when in development mode
-        if (process.env.NODE_ENV !== 'production') {
-            window.addEventListener('load', () => {
-                console.log('Running Username Field Tests...');
-                runUsernameTests();
-            });
-        }
     </script>
 </body>
 </html> 

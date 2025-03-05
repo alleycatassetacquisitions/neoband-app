@@ -1,0 +1,51 @@
+#!/bin/bash
+arc=`$(echo uname -m)`
+
+
+read -p "Install host system-wide or local (s/l)?" choice
+case "$choice" in 
+  s|S ) 
+if [ "$(id -u)" != "0" ]; then
+   echo "You need root privilegies to install host system-wide" 1>&2
+   exit 1
+else
+
+read -p "Enter Chrome extension ID: " id
+echo '{"name": "ufr.dlogic.chrome","description": "UFR","path": "/usr/local/bin/ufr","type": "stdio","allowed_origins": ["chrome-extension://'$id''/'"]}' > data/Linux/ufr.dlogic.chrome.json
+
+if [ "$arc" = "x86_64" ]; then
+	mkdir -p /etc/opt/chrome/native-messaging-hosts
+	cp data/Linux/x86_64/ufr /usr/local/bin/ufr
+	cp data/Linux/ufr.dlogic.chrome.json /etc/opt/chrome/native-messaging-hosts/ufr.dlogic.chrome.json
+else
+	mkdir -p /etc/opt/chrome/native-messaging-hosts
+	cp data/Linux/x86/ufr /usr/local/bin/ufr
+	cp data/Linux/ufr.dlogic.chrome.json /etc/opt/chrome/native-messaging-hosts/ufr.dlogic.chrome.json
+fi
+
+echo "Host installed successfully"
+fi
+
+;;
+  l|L )
+
+read -p "Enter Chrome extension ID: " id
+echo '{"name": "ufr.dlogic.chrome","description": "UFR","path": "/home/'$USER'/.config/dlogic/ufr","type": "stdio","allowed_origins": ["chrome-extension://'$id''/'"]}' > /home/$USER/.config/google-chrome/NativeMessagingHosts/ufr.dlogic.chrome.json
+
+if [ "$arc" = "x86_64" ]; then
+	mkdir -p /home/$USER/.config/dlogic
+	mkdir -p /home/$USER/.config/google-chrome/NativeMessagingHosts
+	cp data/Linux/x86_64/ufr /home/$USER/.config/dlogic/ufr
+
+else
+	mkdir -p /home/$USER/.config/dlogic
+	mkdir -p /home/$USER/.config/google-chrome/NativeMessagingHosts
+	cp data/Linux/x86_64/ufr /home/$USER/.config/dlogic/ufr
+
+fi
+
+echo "Host installed successfully";;
+  * ) echo "Invalid input";;
+esac
+
+

@@ -1,0 +1,1 @@
+{"name": "com.dlogic.native","description": "UFR","path": "/etc/opt/chrome/native-messaging-hosts/ufr","type": "stdio","allowed_origins": ["chrome-extension:$id"]}

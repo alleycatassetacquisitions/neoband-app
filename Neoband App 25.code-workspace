@@ -8,6 +8,15 @@
 		},
 		{
 			"path": "../../D-Logic Files"
+		},
+		{
+			"path": "../Ref Files"
+		},
+		{
+			"path": "../../Mifare Cards"
 		}
-	]
+	],
+	"settings": {
+		"editor.acceptSuggestionOnEnter": "on"
+	}
 }

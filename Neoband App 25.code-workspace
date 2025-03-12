@@ -14,9 +14,13 @@
 		},
 		{
 			"path": "../../Mifare Cards"
+		},
+		{
+			"path": "../Neoband App 25 -JS"
 		}
 	],
 	"settings": {
-		"editor.acceptSuggestionOnEnter": "on"
+		"editor.acceptSuggestionOnEnter": "on",
+		"pieces.autocomplete": true
 	}
 }

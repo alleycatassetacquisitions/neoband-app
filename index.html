@@ -1,786 +1,473 @@
 <!DOCTYPE html>
-<html ufr lang="en">
+<html ufr>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neoband App</title>
-    <!-- Custom font import for the application -->
-    <!-- Custom font definition for Tomorrow -->
-    <style>
-        @font-face {
-            font-family: 'Tomorrow';
-            src: url('app/Tomorrow-Bold.ttf') format('truetype');
-            font-weight: bold;
-            font-style: normal;
-        }
-        
-        @font-face {
-            font-family: 'Tomorrow';
-            src: url('app/Tomorrow-Black.ttf') format('truetype');
-            font-weight: 900;
-            font-style: normal;
-        }
-    </style>
-    
-    <!-- D-Logic UFR Libraries -->
-    <script src="app/ufr.js"></script>
-    
-    <!-- Global handler functions -->
-    <script type="module" src="app/global-handlers.js"></script>
-    
-    <style>
-        /* Custom font definition for Charged Vector Black */
-        @font-face {
-            font-family: 'Charged Vector Black';
-            src: url('app/Charge Vector Black.otf') format('opentype');
-            font-weight: normal;
-            font-style: normal;
-        }
-        
-        /* Global styles for the entire application */
-        body {
-            background-color: #000000;
-            color: #0BDCF3;
-            font-family: 'Tomorrow', sans-serif;
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-            box-sizing: border-box;
-            position: relative;
-        }
-
-        /* Navigation Menu Styles */
-        .nav-menu {
-            background-color: #000000;
-            padding: 15px 0;
-            margin: -20px -20px 20px -20px;
-            border-bottom: 2px solid #0BDCF3;
-        }
-
-        .nav-menu ul {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-        }
-
-        .nav-menu a {
-            color: #0BDCF3;
-            text-decoration: none;
-            font-family: 'Tomorrow', sans-serif;
-            font-size: 16px;
-            text-transform: uppercase;
-            transition: all 0.3s ease;
-        }
-
-        .nav-menu a:hover {
-            color: #FFFFFF;
-        }
-
-        /* Login Page Styles */
-        .login-page {
-            display: none;
-        }
-
-        .login-header-container {
-            position: relative;
-            width: 320px;
-            margin-bottom: 50px;
-        }
-
-        .login-header-image {
-            width: 100%;
-            height: auto;
-        }
-
-        .login-title {
-            font-family: 'Charged Vector Black', sans-serif;
-            font-size: 32px;
-            color: #000000;
-            position: absolute;
-            bottom: 25%;
-            right: 16px;
-            margin: 0;
-            text-align: right;
-        }
-
-        .login-form {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            width: 100%;
-            max-width: 300px;
-        }
-
-        .login-input-label {
-            color: #0BDCF3;
-            font-size: 14px;
-            text-transform: uppercase;
-        }
-
-        .login-input {
-            width: 100%;
-            padding: 10px;
-            background-color: #FFFFFF;
-            border: none;
-            color: #000000;
-            font-family: 'Tomorrow', sans-serif;
-        }
-
-        .login-button {
-            background-color: transparent;
-            color: #0BDCF3;
-            border: 2px solid #0BDCF3;
-            padding: 10px 20px;
-            font-family: 'Tomorrow', sans-serif;
-            cursor: pointer;
-            margin-top: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .login-button:hover {
-            background-color: #0BDCF3;
-            color: #000000;
-        }
-
-        .forgot-password {
-            color: #0BDCF3;
-            text-decoration: none;
-            font-size: 12px;
-            align-self: flex-end;
-        }
-
-        /* Existing Faction Page Styles */
-        .connection-status {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-indicator {
-            width: 20px;
-            height: 20px;
-            background-color: red;
-        }
-
-        .status-text {
-            color: #0BDCF3;
-            font-family: 'Tomorrow', sans-serif;
-            font-size: 16px;
-        }
-
-        .header-container {
-            position: relative;
-            width: 320px;
-            margin-bottom: 50px;
-        }
-
-        .header-image {
-            width: 100%;
-            height: auto;
-        }
-
-        .faction-title {
-            font-family: 'Charged Vector Black', sans-serif;
-            font-size: 32px;
-            color: #000000;
-            position: absolute;
-            bottom: 25%;
-            right: 16px;
-            margin: 0;
-            text-align: right;
-        }
-
-        .content-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-            max-width: max-content;
-            margin: 0 auto;
-        }
-
-        .field-container {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-            max-width: max-content;
-            margin-bottom: 15px;
-        }
-        .field-title-header, .input-header {
-            font-family: 'Charged Vector Black', sans-serif;
-            font-size: 24px;
-            color: #0BDCF3;
-            text-align: left;
-            width: max-content;
-            padding: 15px;
-            background-color: #000000;
-            margin-top: 10%;
-        }
-        .field-title {
-            font-family: 'Tomorrow', sans-serif;
-            font-size: 20px;
-            color: #0BDCF3;
-            background-color: #000000;
-            text-align: justify;
-            width: 48%;
-            padding: 5px;
-        }
-        .input {
-            font-family: 'Tomorrow', sans-serif;
-            font-size: 20px;
-            background-color: #FFFFFF;
-            color: #000000;
-            width: 48%;
-            padding: 5px;
-            border: none;
-            text-align: center;
-        }
-        .read-write-button {
-            font-family: 'Tomorrow', sans-serif;
-            background-color: #0BDCF3;
-            color: #000000;
-            border: none;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 20px;
-            margin-top: 15%;
-        }
-        .read-write-button:hover {
-            background-color: #000000;
-            color: #0BDCF3;
-        }
-        [contenteditable="true"]:focus {
-            outline: none;
-            background-color: rgba(11, 220, 243, 0.1);
-        }
-        @media (max-width: 480px) {
-            .field-container {
-                flex-direction: column;
-                align-items: center;
-            }
-            .field-title-header, .input-header, .field-title, .input {
-                width: 100%;
-                margin-bottom: 5px;
-            }
-        }
-
-        /* Hide/Show Logic */
-        .faction-page, .registration-page, .allegiances-page {
-            display: none;
-        }
-
-        .faction-page.active, .registration-page.active, .allegiances-page.active {
-            display: block;
-        }
-
-        .logout-button {
-            background-color: transparent;
-            color: #0BDCF3;
-            border: 2px solid #0BDCF3;
-            padding: 10px 20px;
-            font-family: 'Tomorrow', sans-serif;
-            cursor: pointer;
-            margin-top: 40px;
-            transition: all 0.3s ease;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .logout-button:hover {
-            background-color: #0BDCF3;
-            color: #000000;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neoband App Inline – Complete Version</title>
+  <style>
+    /* Font definitions */
+    @font-face {
+      font-family: 'Tomorrow';
+      src: url('app/Tomorrow-Bold.ttf') format('truetype');
+      font-weight: bold;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Tomorrow';
+      src: url('app/Tomorrow-Black.ttf') format('truetype');
+      font-weight: 900;
+      font-style: normal;
+    }
+    /* Global Styles */
+    body {
+      background-color: #000000;
+      color: #0BDCF3;
+      font-family: 'Tomorrow', sans-serif;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      box-sizing: border-box;
+      position: relative;
+    }
+    .nav-menu {
+      background-color: #000000;
+      padding: 15px 0;
+      border-bottom: 2px solid #0BDCF3;
+    }
+    .nav-menu ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+    }
+    .nav-menu a {
+      color: #0BDCF3;
+      text-decoration: none;
+      font-size: 16px;
+      text-transform: uppercase;
+      transition: all 0.3s ease;
+    }
+    .nav-menu a:hover {
+      color: #FFFFFF;
+    }
+    .page {
+      display: none;
+      margin-top: 20px;
+    }
+    .active {
+      display: block;
+    }
+    .input {
+      font-size: 20px;
+      background-color: #FFFFFF;
+      color: #000000;
+      padding: 5px;
+      border: none;
+      text-align: center;
+      margin-bottom: 10px;
+      width: 100%;
+      max-width: 300px;
+    }
+    .read-write-button {
+      font-size: 20px;
+      background-color: #0BDCF3;
+      color: #000000;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    .read-write-button:hover {
+      background-color: #000000;
+      color: #0BDCF3;
+    }
+    .status-display {
+      background-color: #FFFFFF;
+      color: #000000;
+      padding: 5px;
+      border: none;
+      text-align: center;
+      margin-top: 10px;
+      width: 100%;
+      max-width: 300px;
+    }
+    .editable-label {
+      font-size: 18px;
+      margin-bottom: 5px;
+      padding: 3px;
+      border: 1px dashed #0BDCF3;
+      display: inline-block;
+      min-width: 80px;
+      cursor: text;
+    }
+    .allegiance-group {
+      margin-bottom: 15px;
+    }
+  </style>
 </head>
 <body>
-    <!-- Navigation Menu -->
-    <nav class="nav-menu">
-        <ul>
-            <li><a href="#" onclick="showPage('factionPage')">Faction Page</a></li>
-            <li><a href="#" onclick="showPage('registrationPage')">Registration Page</a></li>
-            <li><a href="#" onclick="showPage('allegiancesPage')">Allegiances Page</a></li>
-        </ul>
-    </nav>
 
-    <!-- Login Page: Handles user authentication -->
-    <!-- Contains username/password inputs and login button -->
-    <div class="login-page" id="loginPage">
-        <div class="login-header-container">
-            <img src="app/Neoapp-Page-Header.png" alt="Header" class="login-header-image">
-            <div class="login-title">NEOBAND APP</div>
-        </div>
-        <form class="login-form" id="loginForm">
-            <div>
-                <div class="login-input-label">Username</div>
-                <input type="text" class="login-input" id="username" placeholder="alex@email.com" required>
-            </div>
-            <div>
-                <div class="login-input-label">Password</div>
-                <input type="password" class="login-input" id="password" placeholder="Enter your password" required>
-            </div>
-            <button type="submit" class="login-button">LOGIN NOW</button>
-        </form>
+  <!-- Navigation Menu -->
+  <nav class="nav-menu">
+    <ul>
+      <li><a href="#" onclick="showPage('registrationPage')">Registration</a></li>
+      <li><a href="#" onclick="showPage('factionPage')">Factions</a></li>
+      <li><a href="#" onclick="showPage('allegiancesPage')">Allegiances</a></li>
+    </ul>
+  </nav>
+
+  <!-- Registration Page -->
+  <div id="registrationPage" class="page active">
+    <h2>User Registration</h2>
+    <div>
+      <label>New Username:</label><br>
+      <input id="usernameInput" class="input" type="text" maxlength="7" placeholder="Enter new username">
     </div>
-    -->
-
-    <!-- Faction Page: Displays faction-specific information -->
-    <!-- Shows connection status, faction title, and editable fields for faction data -->
-    <div class="faction-page" id="factionPage">
-        <div class="connection-status">
-            <div class="status-indicator"></div>
-            <div class="status-text">Waiting</div>
-        </div>
-        <div class="header-container">
-            <img src="app/Neoapp-Page-Header.png" alt="Header" class="header-image">
-            <div class="faction-title" contenteditable="true">ALLEYCAT</div>
-        </div>
-        <div class="content-container">
-            <!-- New Username Field -->
-            <div class="field-container">
-                <div class="field-title">Username</div>
-                <input class="input" type="text" id="factionUsernameField" placeholder="Waiting for scan..." readonly>
-            </div>
-            <div class="field-container">
-                <div class="field-title">Hunter/Bounty</div>
-                <input class="input" type="text" id="hunterBountyInput" placeholder="Enter Hunter/Bounty">
-            </div>
-            <div class="field-container">
-                <div class="field-title"># of wins</div>
-                <input class="input" type="text" id="winsInput" placeholder="Enter # of wins">
-            </div>
-            <div class="field-container">
-                <div class="field-title">Best Draw Time</div>
-                <input class="input" type="text" id="drawTimeInput" placeholder="Enter Best Draw Time">
-            </div>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button class="read-write-button" onclick="handleScanTag()">SCAN</button>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <button class="read-write-button" onclick="handleFactionRead()">READ</button>
-                <button class="read-write-button" onclick="handleFactionWrite()">WRITE</button>
-            </div>
-            <!-- TODO: Re-implement logout functionality in future release
-            <button class="logout-button" id="logoutButton">LOGOUT</button>
-            -->
-        </div>
+    <div>
+      <label>Band ID:</label><br>
+      <input id="bandIdInput" class="input" type="text" readonly placeholder="Waiting for band...">
     </div>
-        
-    <!-- User Registration (Intake) Page: Handles new user registration -->
-    <div class="registration-page" id="registrationPage">
-        <div class="connection-status">
-            <div class="status-indicator"></div>
-            <div class="status-text">Waiting</div>
-        </div>
-        <div class="header-container">
-            <img src="app/Neoapp-Page-Header.png" alt="Header" class="header-image">
-            <div class="faction-title">INTAKE</div>
-        </div>
-        <div class="content-container">
-            <div class="field-container">
-                <div class="field-title">New Username (max 7 chars)</div>
-                <input class="input" type="text" id="usernameInput" placeholder="Enter new username" maxlength="7">
-            </div>
-            <div class="field-container">
-                <div class="field-title">Band ID</div>
-                <input class="input" type="text" id="bandIdInput" placeholder="Waiting for band..." readonly>
-            </div>
-            <div class="field-container">
-                <div class="field-title">Status</div>
-                <input class="input" type="text" id="statusInput" placeholder="Unregistered" readonly>
-            </div>
-            <!-- Hidden fields for linear addressing -->
-            <input type="hidden" id="linear_address_input" value="4">
-            <input type="hidden" id="data_length_input" value="16">
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button class="read-write-button" onclick="handleScanTag()">SCAN</button>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <button class="read-write-button" onclick="handleRead()">READ</button>
-                <button class="read-write-button" onclick="handleWrite()">WRITE</button>
-                <button class="read-write-button" onclick="handleReset()">RESET</button>
-            </div>
-            <!-- TODO: Re-implement logout functionality in future release
-            <button class="logout-button" id="registrationLogoutButton">LOGOUT</button>
-            -->
-        </div>
+    <div>
+      <label>Status:</label><br>
+      <input id="statusInput" class="status-display" type="text" readonly placeholder="Unregistered" value="Unregistered">
     </div>
-        
-    <!-- Allegiances Page: Manages allegiance relationships -->
-    <!-- Contains 16 editable text fields for allegiance data -->
-    <div class="allegiances-page" id="allegiancesPage">
-        <div class="connection-status">
-            <div class="status-indicator"></div>
-            <div class="status-text">Waiting</div>
-        </div>
-        <div class="header-container">
-            <img src="app/Neoapp-Page-Header.png" alt="Header" class="header-image">
-            <div class="faction-title">ALLEGIANCES</div>
-        </div>
-        <div class="content-container">
-            <!-- New Username Field -->
-            <div class="field-container">
-                <div class="field-title">Username</div>
-                <input class="input" type="text" id="allegiancesUsernameField" placeholder="Waiting for scan..." readonly>
-            </div>
-            <!-- 16 editable fields -->
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 1</div>
-                <input class="input" type="text" id="allegiance1Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 2</div>
-                <input class="input" type="text" id="allegiance2Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 3</div>
-                <input class="input" type="text" id="allegiance3Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 4</div>
-                <input class="input" type="text" id="allegiance4Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 5</div>
-                <input class="input" type="text" id="allegiance5Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 6</div>
-                <input class="input" type="text" id="allegiance6Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 7</div>
-                <input class="input" type="text" id="allegiance7Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 8</div>
-                <input class="input" type="text" id="allegiance8Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 9</div>
-                <input class="input" type="text" id="allegiance9Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 10</div>
-                <input class="input" type="text" id="allegiance10Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 11</div>
-                <input class="input" type="text" id="allegiance11Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 12</div>
-                <input class="input" type="text" id="allegiance12Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 13</div>
-                <input class="input" type="text" id="allegiance13Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 14</div>
-                <input class="input" type="text" id="allegiance14Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 15</div>
-                <input class="input" type="text" id="allegiance15Input" placeholder="Enter text">
-            </div>
-            <div class="field-container">
-                <div class="field-title" contenteditable="true">TEXT 16</div>
-                <input class="input" type="text" id="allegiance16Input" placeholder="Enter text">
-            </div>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button class="read-write-button" onclick="handleScanTag()">SCAN</button>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <button class="read-write-button" onclick="handleAllegiancesRead()">READ</button>
-                <button class="read-write-button" onclick="handleAllegiancesWrite()">WRITE</button>
-            </div>
-            <!-- TODO: Re-implement logout functionality in future release
-            <button class="logout-button" id="allegiancesLogoutButton">LOGOUT</button>
-            -->
-        </div>
+    <div style="margin-top:20px;">
+      <button class="read-write-button" onclick="handleScanTag()">SCAN</button>
+      <button class="read-write-button" onclick="handleReadRegistration()">READ</button>
+      <button class="read-write-button" onclick="handleWriteRegistration()">WRITE</button>
+      <button class="read-write-button" onclick="handleResetRegistration()">RESET</button>
     </div>
-    
-    <!-- External JavaScript Dependencies -->
-    <!-- These files handle NFC reading, credential management, and logging -->
-    <script type="module">
-        // Import the updated NeobandReader class
-        import NeobandReader from 'app/neoband-reader.js';
-        
-        // Import all required mifare-helper functions
-        import { 
-            checkCardPresence, 
-            readBlock,
-            writeBlock,
-            formatCard
-        } from 'app/mifare-helper.js';
-        
-        // Import global handlers
-        import 'app/global-handlers.js';
-        
-        // Initialize main components
-        const reader = new NeobandReader();
-        window.neobandReader = reader;
-        window.logger = new NeobandLogger();
+  </div>
 
-        // Application Initialization
-        async function initializeApp() {
-            await reader.initialize();
-            // Use the consolidated updateStatusIndicator function from global-handlers.js
-            window.updateStatusIndicator();
-        }
-        
-        // Call initialize on page load
-        window.addEventListener('load', initializeApp);
-    </script>
+  <!-- Faction Page -->
+  <div id="factionPage" class="page">
+    <h2>Factions</h2>
+    <div>
+      <label>Faction Username:</label><br>
+      <input id="factionUsernameField" class="input" type="text" readonly placeholder="Waiting for scan...">
+    </div>
+    <div>
+      <label>Hunter/Bounty:</label><br>
+      <input id="hunterBountyInput" class="input" type="text" placeholder="Enter Hunter/Bounty">
+    </div>
+    <div>
+      <label># of Wins:</label><br>
+      <input id="winsInput" class="input" type="text" placeholder="Enter # of wins">
+    </div>
+    <div>
+      <label>Best Draw Time:</label><br>
+      <input id="drawTimeInput" class="input" type="text" placeholder="Enter Best Draw Time">
+    </div>
+    <div>
+      <label>Faction Title:</label><br>
+      <div id="factionTitle" class="editable-label" contenteditable="true">ALLEYCAT</div>
+    </div>
+    <div style="margin-top:20px;">
+      <button class="read-write-button" onclick="handleReadFaction()">READ</button>
+      <button class="read-write-button" onclick="handleWriteFaction()">WRITE</button>
+    </div>
+  </div>
 
-    <script>
-        // TODO: Re-implement credentials manager in future release
-        /*
-        // Contents of credentials-manager.js
-        class CredentialsManager {
-            constructor() {
-                // Demo credentials with public and private keys
-                this.demoCredentials = {
-                    'cyonic': { 
-                        password: 'cyonic', 
-                        role: 'faction', 
-                        publicKey: 'PUB_CYONIC', 
-                        privateKey: 'PRIV_CYONIC' 
-                    },
-                    'admin': { 
-                        password: 'admin', 
-                        role: 'admin', 
-                        publicKey: 'PUB_ADMIN', 
-                        privateKey: 'PRIV_ADMIN' 
-                    },
-                    'ureg': { 
-                        password: 'ureg', 
-                        role: 'staff', 
-                        publicKey: 'PUB_UREG', 
-                        privateKey: 'PRIV_UREG' 
-                    },
-                    'alleg': { 
-                        password: 'alleg', 
-                        role: 'allegiance', 
-                        publicKey: 'PUB_ALLEG', 
-                        privateKey: 'PRIV_ALLEG' 
-                    }
-                };
+  <!-- Allegiances Page -->
+  <div id="allegiancesPage" class="page">
+    <h2>Allegiances</h2>
+    <div>
+      <label>Allegiances Username:</label><br>
+      <input id="allegiancesUsernameField" class="input" type="text" readonly placeholder="Waiting for scan...">
+    </div>
+    <!-- 16 Allegiance Fields -->
+    <div id="allegiancesContainer">
+      <!-- We will create 16 groups dynamically in JavaScript -->
+    </div>
+    <div style="margin-top:20px;">
+      <button class="read-write-button" onclick="handleReadAllegiances()">READ</button>
+      <button class="read-write-button" onclick="handleWriteAllegiances()">WRITE</button>
+    </div>
+  </div>
 
-                // Generated credentials will be loaded from credentials_updated.csv
-                this.generatedCredentials = {};
-            }
+  <!-- Inline JavaScript for NFC Operations and Page Management -->
+  <script>
+    // Navigation helper.
+    function showPage(pageId) {
+      var pages = document.getElementsByClassName("page");
+      for (var i = 0; i < pages.length; i++) {
+        pages[i].classList.remove("active");
+      }
+      document.getElementById(pageId).classList.add("active");
+      // If Allegiances page, build fields if not built.
+      if(pageId === "allegiancesPage") {
+        buildAllegiancesFields();
+      }
+    }
 
-            validateCredentials(username, password) {
-                // Check demo credentials first
-                if (this.demoCredentials[username] && 
-                    this.demoCredentials[username].password === password) {
-                    return {
-                        valid: true,
-                        role: this.demoCredentials[username].role,
-                        publicKey: this.demoCredentials[username].publicKey,
-                        privateKey: this.demoCredentials[username].privateKey
-                    };
-                }
-                
-                // Check generated credentials
-                if (this.generatedCredentials[username] && 
-                    this.generatedCredentials[username].password === password) {
-                    return {
-                        valid: true,
-                        role: this.generatedCredentials[username].role,
-                        publicKey: this.generatedCredentials[username].publicKey,
-                        privateKey: this.generatedCredentials[username].privateKey
-                    };
-                }
+    // Sleep function.
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
 
-                return { valid: false };
-            }
-        }
-        */
-    </script>
-    <script>
-        // Contents of logger.js
-        class NeobandLogger {
-            constructor() {
-                this.logQueue = [];
-            }
+    // Convert text to hex.
+    function textToHex(text) {
+      var hex = "";
+      for (var i = 0; i < text.length; i++) {
+        hex += text.charCodeAt(i).toString(16).padStart(2, '0');
+      }
+      return hex;
+    }
 
-            async log(action, details) {
-                const timestamp = new Date().toISOString();
-                const logEntry = {
-                    timestamp,
-                    action,
-                    // Mask sensitive key data in logs
-                    details: this.maskSensitiveData(details)
-                };
+    // Pad hex string to totalLength with "FF".
+    function padHex(hexStr, totalLength) {
+      while (hexStr.length < totalLength) {
+        hexStr += "FF";
+      }
+      return hexStr;
+    }
 
-                // Add to queue
-                this.logQueue.push(logEntry);
+    // Convert hex string to text; trim trailing "FF" padding.
+    function hexToText(hexStr) {
+      hexStr = hexStr.replace(/(FF)+$/i, "");
+      var text = "";
+      for (var i = 0; i < hexStr.length; i += 2) {
+        text += String.fromCharCode(parseInt(hexStr.substr(i, 2), 16));
+      }
+      return text;
+    }
 
-                // Automatically flush if queue gets too large
-                if (this.logQueue.length > 100) {
-                    await this.flush();
-                }
-
-                // TODO: Add code to write to SD card when available
-                console.log("Log Entry:", logEntry);
-            }
-
-            maskSensitiveData(details) {
-                if (!details) return details;
-                
-                const maskedDetails = { ...details };
-                
-                // Mask sensitive key data if present
-                if (maskedDetails.publicKey) {
-                    maskedDetails.publicKey = `${maskedDetails.publicKey.substring(0, 4)}...`;
-                }
-                if (maskedDetails.privateKey) {
-                    maskedDetails.privateKey = `${maskedDetails.privateKey.substring(0, 4)}...`;
-                }
-                
-                return maskedDetails;
-            }
-
-            async flush() {
-                try {
-                    // TODO: Add code to write queued logs to SD card
-                    console.log("Flushing logs to SD card...");
-                    this.logQueue = [];
-                } catch (error) {
-                    console.error("Error flushing logs:", error);
-                }
-            }
-        }
-    </script>
-    
-    <script>
-        /**
-         * Main Application Component Initialization
-         */
-        // Page Content Management
-        function setFactionPageContent() {
-            const factionTitle = document.querySelector('.faction-title');
-            const fieldTitles = document.querySelectorAll('.field-title');
-            const inputs = document.querySelectorAll('.input');
-
-            factionTitle.textContent = 'ALLEYCAT';
-            const alleycatFields = ['Hunter/Bounty', '# of wins', 'Best Draw Time'];
-            fieldTitles.forEach((title, index) => {
-                if (index < alleycatFields.length) {
-                    title.textContent = alleycatFields[index];
-                }
-            });
-            inputs.forEach((input, index) => {
-                if (index < alleycatFields.length) {
-                    input.placeholder = `Enter ${alleycatFields[index]}`;
-                }
-            });
-        }
-
-        // Page Navigation
-        function showPage(pageId) {
-            // Hide all pages
-            document.getElementById('factionPage').classList.remove('active');
-            document.getElementById('registrationPage').classList.remove('active');
-            document.getElementById('allegiancesPage').classList.remove('active');
-
-            // Show the requested page
-            document.getElementById(pageId).classList.add('active');
-
-            // Initialize page-specific content
-            if (pageId === 'factionPage') {
-                setFactionPageContent();
-            } else if (pageId === 'allegiancesPage') {
-                // Initialize allegiances page fields
-                for (let i = 1; i <= 16; i++) {
-                    const fieldTitle = document.querySelector(`#allegiancesPage .field-container:nth-child(${i + 1}) .field-title`);
-                    const input = document.querySelector(`#allegiancesPage .field-container:nth-child(${i + 1}) .input`);
-                    if (fieldTitle) {
-                        fieldTitle.textContent = `TEXT ${i}`;
-                    }
-                    if (input) {
-                        input.placeholder = 'Enter text';
-                    }
-                }
-            }
-
-            // Apply default placeholders
-            applyDefaultPlaceholders();
-        }
-
-        // Placeholder Defaults Implementation
-        function applyDefaultPlaceholders() {
-            // Set default placeholders for registration page
-            const registrationFields = {
-                'usernameInput': 'Enter new username',
-                'bandIdInput': 'Waiting for band...',
-                'statusInput': 'Unregistered'
-            };
-
-            // Apply registration page defaults
-            Object.entries(registrationFields).forEach(([id, placeholder]) => {
-                const input = document.getElementById(id);
-                if (input && !input.value) {
-                    input.placeholder = placeholder;
-                }
-            });
-
-            // Set default placeholders for empty fields
-            document.querySelectorAll('.field-title').forEach(title => {
-                if (!title.textContent.trim()) {
-                    title.textContent = "Field Title";
-                }
-            });
-
-            document.querySelectorAll('.input').forEach(input => {
-                if (!input.placeholder.trim()) {
-                    input.placeholder = "Input";
-                }
-            });
-        }
-
-        // Initialize the app
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize the NFC reader
-            if (window.initialize) {
-                window.initialize();
-            }
-            
-            // Show faction page by default
-            showPage('factionPage');
-            
-            // Set up interval for status indicator updates
-            setInterval(window.updateStatusIndicator, 1000);
-            
-            // Apply default placeholders
-            applyDefaultPlaceholders();
-            
-            // Set up event listeners for scan buttons
-            document.querySelectorAll('.read-write-button').forEach(button => {
-                if (button.textContent === 'SCAN') {
-                    button.addEventListener('click', window.handleScanTag);
-                }
-            });
-            
-            // Log application start
-            if (window.logger) {
-                window.logger.log('app_start', { timestamp: new Date().toISOString() });
-            }
-            
-            console.log('Neoband App initialized successfully');
+    // Generic function to perform a linear write at a given address.
+    async function writeField(address, text) {
+      var hexData = textToHex(text);
+      // Pad or truncate hexData to exactly 32 hex characters (16 bytes).
+      if(hexData.length > 32) {
+        hexData = hexData.substr(0, 32);
+      } else {
+        hexData = padHex(hexData, 32);
+      }
+      var auth_mode = " 0x60";
+      var key_index = 0;
+      var command = "LinearWrite 0x" + hexData + " " + address + " 16" + auth_mode + " " + key_index;
+      await sleep(500);
+      return new Promise(function(resolve, reject) {
+        ufRequest(command, function() {
+          var output = ufResponse();
+          if (output.Status === "[0x00 (0)] UFR_OK") {
+            resolve();
+          } else {
+            reject("Write failed at address " + address + ": " + output.Status);
+          }
         });
-    </script>
-    
-    <!-- Local D-Logic uFR API instead of external CDN -->
-    <script src="app/ufr.js"></script>
+      });
+    }
+
+    // Generic function to perform a linear read from a given address.
+    async function readField(address) {
+      var auth_mode = " 0x60";
+      var key_index = 0;
+      var command = "LinearRead h " + address + " 16" + auth_mode + " " + key_index;
+      await sleep(500);
+      return new Promise(function(resolve, reject) {
+        ufRequest(command, function() {
+          var output = ufResponse();
+          if (output.Status === "[0x00 (0)] UFR_OK") {
+            var rawHex = output.Data;
+            if(rawHex.startsWith("0x") || rawHex.startsWith("0X")) {
+              rawHex = rawHex.slice(2);
+            }
+            resolve(hexToText(rawHex));
+          } else {
+            reject("Read failed at address " + address + ": " + output.Status);
+          }
+        });
+      });
+    }
+
+    // Registration Page functions.
+    async function handleScanTag() {
+      try {
+        ufRequest("GetCardIdEx", function() {
+          var output = ufResponse();
+          if (output && output.Status === "[0x00 (0)] UFR_OK") {
+            var uid = output.CardUid || "Unknown UID";
+            document.getElementById("bandIdInput").value = uid;
+            document.getElementById("statusInput").value = "Connected";
+            // Update username fields on Faction and Allegiances pages.
+            document.getElementById("factionUsernameField").value = uid;
+            document.getElementById("allegiancesUsernameField").value = uid;
+          } else {
+            alert("Failed to scan tag. Status: " + (output ? output.Status : "Unknown"));
+            document.getElementById("statusInput").value = "Error";
+          }
+        });
+      } catch (error) {
+        alert("Error scanning tag: " + error.message);
+      }
+    }
+
+    async function handleReadRegistration() {
+      try {
+        // Read username from address 4.
+        var username = await readField("4");
+        document.getElementById("usernameInput").value = username;
+        document.getElementById("statusInput").value = "Read OK";
+      } catch (error) {
+        document.getElementById("statusInput").value = "Read Error";
+        alert(error);
+      }
+    }
+
+    async function handleWriteRegistration() {
+      try {
+        var username = document.getElementById("usernameInput").value.trim();
+        if (!document.getElementById("bandIdInput").value.trim()) {
+          alert("Please scan a band first.");
+          return;
+        }
+        if (!username) {
+          alert("Please enter a username.");
+          return;
+        }
+        if (username.length > 7) {
+          alert("Username must be 7 characters or less.");
+          return;
+        }
+        await writeField("4", username);
+        document.getElementById("statusInput").value = "Registered";
+        alert("Registration successful!");
+      } catch (error) {
+        document.getElementById("statusInput").value = "Write Error";
+        alert(error);
+      }
+    }
+
+    async function handleResetRegistration() {
+      try {
+        if (!document.getElementById("bandIdInput").value.trim()) {
+          alert("Please scan a band first.");
+          return;
+        }
+        if (!confirm("Are you sure you want to reset this band? This will erase the username.")) {
+          return;
+        }
+        await writeField("4", "");
+        document.getElementById("usernameInput").value = "";
+        document.getElementById("bandIdInput").value = "Waiting for band...";
+        document.getElementById("statusInput").value = "Unregistered";
+        alert("Reset successful!");
+      } catch (error) {
+        alert(error);
+      }
+    }
+
+    // Faction Page functions.
+    async function handleReadFaction() {
+      try {
+        // Faction username (from registration address 4)
+        var factionUser = await readField("4");
+        document.getElementById("factionUsernameField").value = factionUser;
+        // Hunter/Bounty at address 8.
+        var hunterBounty = await readField("8");
+        document.getElementById("hunterBountyInput").value = hunterBounty;
+        // Wins at address 9.
+        var wins = await readField("9");
+        document.getElementById("winsInput").value = wins;
+        // Draw Time at address 10.
+        var drawTime = await readField("10");
+        document.getElementById("drawTimeInput").value = drawTime;
+      } catch (error) {
+        alert("Faction read error: " + error);
+      }
+    }
+
+    async function handleWriteFaction() {
+      try {
+        // For faction page, we write only the fields that are editable:
+        // Hunter/Bounty to address 8.
+        await writeField("8", document.getElementById("hunterBountyInput").value.trim());
+        // Wins to address 9.
+        await writeField("9", document.getElementById("winsInput").value.trim());
+        // Draw Time to address 10.
+        await writeField("10", document.getElementById("drawTimeInput").value.trim());
+        alert("Faction data written successfully!");
+      } catch (error) {
+        alert("Faction write error: " + error);
+      }
+    }
+
+    // Allegiances Page functions.
+    // Build the 16 editable allegiance fields dynamically.
+    function buildAllegiancesFields() {
+      var container = document.getElementById("allegiancesContainer");
+      if (container.childElementCount > 0) return; // Already built.
+      for (var i = 1; i <= 16; i++) {
+        // Create a group div.
+        var group = document.createElement("div");
+        group.className = "allegiance-group";
+        // Create an editable label.
+        var label = document.createElement("div");
+        label.className = "editable-label";
+        label.contentEditable = "true";
+        label.innerText = "TEXT " + i;
+        // Create an input field.
+        var input = document.createElement("input");
+        input.type = "text";
+        input.className = "input";
+        input.placeholder = "Enter text";
+        // Set an ID for the input.
+        input.id = "allegiance" + i;
+        // Append label and input to the group.
+        group.appendChild(label);
+        group.appendChild(document.createElement("br"));
+        group.appendChild(input);
+        // Append the group to the container.
+        container.appendChild(group);
+      }
+    }
+
+    // Mapping of allegiance fields to their preassigned addresses.
+    const allegianceAddresses = {
+      1: "12", 2: "13", 3: "14", 4: "16",
+      5: "17", 6: "18", 7: "20", 8: "21",
+      9: "22", 10: "24", 11: "25", 12: "26",
+      13: "28", 14: "29", 15: "30", 16: "32"
+    };
+
+    async function handleReadAllegiances() {
+      try {
+        // Update the Allegiances Username (from address 4).
+        var allegUser = await readField("4");
+        document.getElementById("allegiancesUsernameField").value = allegUser;
+        // Loop through each allegiance field.
+        for (var i = 1; i <= 16; i++) {
+          var address = allegianceAddresses[i];
+          var text = await readField(address);
+          document.getElementById("allegiance" + i).value = text;
+        }
+      } catch (error) {
+        alert("Allegiances read error: " + error);
+      }
+    }
+
+    async function handleWriteAllegiances() {
+      try {
+        // Write Allegiances Username (if needed, from address 4).
+        // Here we assume it's the same as the registration username.
+        var regUser = document.getElementById("usernameInput").value.trim();
+        if(regUser) {
+          await writeField("4", regUser);
+          document.getElementById("allegiancesUsernameField").value = regUser;
+        }
+        // Loop through each allegiance field.
+        for (var i = 1; i <= 16; i++) {
+          var address = allegianceAddresses[i];
+          var text = document.getElementById("allegiance" + i).value.trim();
+          await writeField(address, text);
+        }
+        alert("Allegiances data written successfully!");
+      } catch (error) {
+        alert("Allegiances write error: " + error);
+      }
+    }
+  </script>
+
 </body>
-</html> 
+</html>

@@ -8,6 +8,19 @@
 		},
 		{
 			"path": "../../D-Logic Files"
+		},
+		{
+			"path": "../Ref Files"
+		},
+		{
+			"path": "../../Mifare Cards"
+		},
+		{
+			"path": "../Neoband App 25 -JS"
 		}
-	]
+	],
+	"settings": {
+		"editor.acceptSuggestionOnEnter": "on",
+		"pieces.autocomplete": true
+	}
 }

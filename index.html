@@ -3,9 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Neoband App Inline – Complete Version</title>
+  <title>Neoband App</title>
+  
+  <!-- 
+  ============================================================================
+  CSS STYLES SECTION
+  ============================================================================
+  This section contains all the styling for the Neoband App, including:
+  - Custom font definitions for the Tomorrow font family
+  - Global styles for the body and common elements
+  - Navigation menu styling
+  - Page layout and visibility controls
+  - Form input and button styling
+  - Status displays and editable labels
+  ============================================================================
+  -->
   <style>
-    /* Font definitions */
+    /* Font definitions - Loading custom Tomorrow fonts for the futuristic UI */
     @font-face {
       font-family: 'Tomorrow';
       src: url('app/Tomorrow-Bold.ttf') format('truetype');
@@ -18,10 +32,11 @@
       font-weight: 900;
       font-style: normal;
     }
-    /* Global Styles */
+    
+    /* Global Styles - Dark cyberpunk theme with cyan accent colors */
     body {
-      background-color: #000000;
-      color: #0BDCF3;
+      background-color: #000000; /* Black background for the futuristic look */
+      color: #0BDCF3;            /* Cyan text for high contrast and sci-fi feel */
       font-family: 'Tomorrow', sans-serif;
       margin: 0;
       padding: 20px;
@@ -29,10 +44,12 @@
       box-sizing: border-box;
       position: relative;
     }
+    
+    /* Navigation menu styling - Horizontal menu with cyan border */
     .nav-menu {
       background-color: #000000;
       padding: 15px 0;
-      border-bottom: 2px solid #0BDCF3;
+      border-bottom: 2px solid #0BDCF3; /* Cyan border for visual separation */
     }
     .nav-menu ul {
       list-style: none;
@@ -50,8 +67,10 @@
       transition: all 0.3s ease;
     }
     .nav-menu a:hover {
-      color: #FFFFFF;
+      color: #FFFFFF; /* White on hover for better interaction feedback */
     }
+    
+    /* Page visibility control - Only show active page */
     .page {
       display: none;
       margin-top: 20px;
@@ -59,6 +78,8 @@
     .active {
       display: block;
     }
+    
+    /* Form elements styling */
     .input {
       font-size: 20px;
       background-color: #FFFFFF;
@@ -72,15 +93,15 @@
     }
     .read-write-button {
       font-size: 20px;
-      background-color: #0BDCF3;
-      color: #000000;
+      background-color: #0BDCF3; /* Cyan buttons */
+      color: #000000;            /* Black text for contrast */
       border: none;
       padding: 10px 20px;
       cursor: pointer;
       margin: 10px 5px;
     }
     .read-write-button:hover {
-      background-color: #000000;
+      background-color: #000000; /* Inverted colors on hover */
       color: #0BDCF3;
     }
     .status-display {
@@ -93,15 +114,19 @@
       width: 100%;
       max-width: 300px;
     }
+    
+    /* Editable label styling for faction titles and allegiances */
     .editable-label {
       font-size: 18px;
       margin-bottom: 5px;
       padding: 3px;
-      border: 1px dashed #0BDCF3;
+      border: 1px dashed #0BDCF3; /* Dashed border to indicate editability */
       display: inline-block;
       min-width: 80px;
       cursor: text;
     }
+    
+    /* Allegiance group container */
     .allegiance-group {
       margin-bottom: 15px;
     }
@@ -109,7 +134,17 @@
 </head>
 <body>
 
-  <!-- Navigation Menu -->
+  <!-- 
+  ============================================================================
+  NAVIGATION MENU SECTION
+  ============================================================================
+  This section contains the main navigation menu that allows users to switch
+  between the three main pages of the application:
+  - Registration Page: For registering new users with their Neoband
+  - Factions Page: For managing faction-related data
+  - Allegiances Page: For managing allegiance relationships
+  ============================================================================
+  -->
   <nav class="nav-menu">
     <ul>
       <li><a href="#" onclick="showPage('registrationPage')">Registration</a></li>
@@ -118,7 +153,23 @@
     </ul>
   </nav>
 
-  <!-- Registration Page -->
+  <!-- 
+  ============================================================================
+  REGISTRATION PAGE
+  ============================================================================
+  This page handles the initial user registration process:
+  - Allows setting a new username (max 7 characters)
+  - Displays the scanned band ID
+  - Shows the current registration status
+  - Provides buttons for scanning, reading, writing, and resetting the band
+  
+  NFC Operations:
+  - SCAN: Reads the band's unique ID
+  - READ: Retrieves the username from address 4
+  - WRITE: Writes the username to address 4
+  - RESET: Clears the username from the band
+  ============================================================================
+  -->
   <div id="registrationPage" class="page active">
     <h2>User Registration</h2>
     <div>
@@ -141,7 +192,23 @@
     </div>
   </div>
 
-  <!-- Faction Page -->
+  <!-- 
+  ============================================================================
+  FACTION PAGE
+  ============================================================================
+  This page manages faction-related data for a registered user:
+  - Displays the username from the scanned band
+  - Allows setting Hunter/Bounty status
+  - Tracks number of wins
+  - Records best draw time
+  - Allows editing faction title
+  
+  NFC Operations:
+  - READ: Retrieves faction data from addresses 4 (username), 8 (hunter/bounty),
+          9 (wins), and 10 (draw time)
+  - WRITE: Writes faction data to addresses 8, 9, and 10
+  ============================================================================
+  -->
   <div id="factionPage" class="page">
     <h2>Factions</h2>
     <div>
@@ -170,14 +237,30 @@
     </div>
   </div>
 
-  <!-- Allegiances Page -->
+  <!-- 
+  ============================================================================
+  ALLEGIANCES PAGE
+  ============================================================================
+  This page manages allegiance relationships for a registered user:
+  - Displays the username from the scanned band
+  - Provides 16 editable allegiance fields
+  - Each allegiance has an editable label and input field
+  
+  NFC Operations:
+  - READ: Retrieves allegiance data from address 4 (username) and addresses
+          12-32 (16 allegiance fields)
+  - WRITE: Writes allegiance data to addresses 4 and 12-32
+  
+  Note: The 16 allegiance fields are dynamically generated in JavaScript
+  ============================================================================
+  -->
   <div id="allegiancesPage" class="page">
     <h2>Allegiances</h2>
     <div>
       <label>Allegiances Username:</label><br>
       <input id="allegiancesUsernameField" class="input" type="text" readonly placeholder="Waiting for scan...">
     </div>
-    <!-- 16 Allegiance Fields -->
+    <!-- Container for 16 dynamically generated allegiance fields -->
     <div id="allegiancesContainer">
       <!-- We will create 16 groups dynamically in JavaScript -->
     </div>
@@ -187,27 +270,66 @@
     </div>
   </div>
 
-  <!-- Inline JavaScript for NFC Operations and Page Management -->
+  <!-- 
+  ============================================================================
+  JAVASCRIPT SECTION
+  ============================================================================
+  This section contains all the JavaScript functionality for the Neoband App,
+  organized into logical sections:
+  
+  1. Utility Functions:
+     - Navigation and page management
+     - Sleep function for timing operations
+     - Text-to-hex and hex-to-text conversion
+     - Padding functions for NFC data
+  
+  2. NFC Communication Functions:
+     - Generic read/write functions for NFC operations
+     - Address-specific read/write operations
+  
+  3. Page-Specific Functions:
+     - Registration page handlers
+     - Faction page handlers
+     - Allegiances page handlers
+  ============================================================================
+  -->
   <script>
-    // Navigation helper.
+    //==========================================================================
+    // UTILITY FUNCTIONS
+    //==========================================================================
+    
+    /**
+     * Shows the selected page and hides all others
+     * @param {string} pageId - The ID of the page to display
+     */
     function showPage(pageId) {
+      // Hide all pages
       var pages = document.getElementsByClassName("page");
       for (var i = 0; i < pages.length; i++) {
         pages[i].classList.remove("active");
       }
+      // Show the selected page
       document.getElementById(pageId).classList.add("active");
-      // If Allegiances page, build fields if not built.
+      // If Allegiances page, build fields if not built
       if(pageId === "allegiancesPage") {
         buildAllegiancesFields();
       }
     }
 
-    // Sleep function.
+    /**
+     * Creates a promise that resolves after the specified time
+     * @param {number} ms - Milliseconds to wait
+     * @returns {Promise} - Promise that resolves after the delay
+     */
     function sleep(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // Convert text to hex.
+    /**
+     * Converts text string to hexadecimal representation
+     * @param {string} text - Text to convert
+     * @returns {string} - Hexadecimal representation
+     */
     function textToHex(text) {
       var hex = "";
       for (var i = 0; i < text.length; i++) {
@@ -216,7 +338,12 @@
       return hex;
     }
 
-    // Pad hex string to totalLength with "FF".
+    /**
+     * Pads a hex string to the specified length with "FF"
+     * @param {string} hexStr - Hex string to pad
+     * @param {number} totalLength - Target length
+     * @returns {string} - Padded hex string
+     */
     function padHex(hexStr, totalLength) {
       while (hexStr.length < totalLength) {
         hexStr += "FF";
@@ -224,8 +351,13 @@
       return hexStr;
     }
 
-    // Convert hex string to text; trim trailing "FF" padding.
+    /**
+     * Converts hex string to text, trimming trailing "FF" padding
+     * @param {string} hexStr - Hex string to convert
+     * @returns {string} - Resulting text
+     */
     function hexToText(hexStr) {
+      // Remove trailing FF padding
       hexStr = hexStr.replace(/(FF)+$/i, "");
       var text = "";
       for (var i = 0; i < hexStr.length; i += 2) {
@@ -234,19 +366,31 @@
       return text;
     }
 
-    // Generic function to perform a linear write at a given address.
+    //==========================================================================
+    // NFC COMMUNICATION FUNCTIONS
+    //==========================================================================
+    
+    /**
+     * Writes text data to a specific NFC address
+     * @param {string} address - NFC memory address
+     * @param {string} text - Text to write
+     * @returns {Promise} - Resolves when write is complete
+     */
     async function writeField(address, text) {
       var hexData = textToHex(text);
-      // Pad or truncate hexData to exactly 32 hex characters (16 bytes).
+      // Pad or truncate hexData to exactly 32 hex characters (16 bytes)
       if(hexData.length > 32) {
         hexData = hexData.substr(0, 32);
       } else {
         hexData = padHex(hexData, 32);
       }
-      var auth_mode = " 0x60";
-      var key_index = 0;
+      var auth_mode = " 0x60";  // Authentication mode
+      var key_index = 0;        // Key index for authentication
       var command = "LinearWrite 0x" + hexData + " " + address + " 16" + auth_mode + " " + key_index;
+      
+      // Add delay to ensure NFC operations don't overlap
       await sleep(500);
+      
       return new Promise(function(resolve, reject) {
         ufRequest(command, function() {
           var output = ufResponse();
@@ -259,12 +403,19 @@
       });
     }
 
-    // Generic function to perform a linear read from a given address.
+    /**
+     * Reads text data from a specific NFC address
+     * @param {string} address - NFC memory address
+     * @returns {Promise<string>} - Resolves with the read text
+     */
     async function readField(address) {
-      var auth_mode = " 0x60";
-      var key_index = 0;
+      var auth_mode = " 0x60";  // Authentication mode
+      var key_index = 0;        // Key index for authentication
       var command = "LinearRead h " + address + " 16" + auth_mode + " " + key_index;
+      
+      // Add delay to ensure NFC operations don't overlap
       await sleep(500);
+      
       return new Promise(function(resolve, reject) {
         ufRequest(command, function() {
           var output = ufResponse();
@@ -281,16 +432,25 @@
       });
     }
 
-    // Registration Page functions.
+    //==========================================================================
+    // REGISTRATION PAGE FUNCTIONS
+    //==========================================================================
+    
+    /**
+     * Scans an NFC tag to get its UID
+     * Updates the Band ID field and status display
+     */
     async function handleScanTag() {
       try {
         ufRequest("GetCardIdEx", function() {
           var output = ufResponse();
           if (output && output.Status === "[0x00 (0)] UFR_OK") {
             var uid = output.CardUid || "Unknown UID";
+            // Update Band ID field
             document.getElementById("bandIdInput").value = uid;
             document.getElementById("statusInput").value = "Connected";
-            // Update username fields on Faction and Allegiances pages.
+            
+            // Update username fields on Faction and Allegiances pages
             document.getElementById("factionUsernameField").value = uid;
             document.getElementById("allegiancesUsernameField").value = uid;
           } else {
@@ -303,9 +463,13 @@
       }
     }
 
+    /**
+     * Reads the username from the NFC tag (address 4)
+     * Updates the username input field
+     */
     async function handleReadRegistration() {
       try {
-        // Read username from address 4.
+        // Read username from address 4
         var username = await readField("4");
         document.getElementById("usernameInput").value = username;
         document.getElementById("statusInput").value = "Read OK";
@@ -315,9 +479,15 @@
       }
     }
 
+    /**
+     * Writes the username to the NFC tag (address 4)
+     * Validates input before writing
+     */
     async function handleWriteRegistration() {
       try {
         var username = document.getElementById("usernameInput").value.trim();
+        
+        // Validate inputs
         if (!document.getElementById("bandIdInput").value.trim()) {
           alert("Please scan a band first.");
           return;
@@ -330,6 +500,8 @@
           alert("Username must be 7 characters or less.");
           return;
         }
+        
+        // Write username to address 4
         await writeField("4", username);
         document.getElementById("statusInput").value = "Registered";
         alert("Registration successful!");
@@ -339,6 +511,10 @@
       }
     }
 
+    /**
+     * Resets the NFC tag by clearing the username (address 4)
+     * Confirms with user before proceeding
+     */
     async function handleResetRegistration() {
       try {
         if (!document.getElementById("bandIdInput").value.trim()) {
@@ -348,7 +524,11 @@
         if (!confirm("Are you sure you want to reset this band? This will erase the username.")) {
           return;
         }
+        
+        // Clear username at address 4
         await writeField("4", "");
+        
+        // Reset UI fields
         document.getElementById("usernameInput").value = "";
         document.getElementById("bandIdInput").value = "Waiting for band...";
         document.getElementById("statusInput").value = "Unregistered";
@@ -358,19 +538,32 @@
       }
     }
 
-    // Faction Page functions.
+    //==========================================================================
+    // FACTION PAGE FUNCTIONS
+    //==========================================================================
+    
+    /**
+     * Reads faction data from the NFC tag
+     * - Username from address 4
+     * - Hunter/Bounty from address 8
+     * - Wins from address 9
+     * - Draw Time from address 10
+     */
     async function handleReadFaction() {
       try {
         // Faction username (from registration address 4)
         var factionUser = await readField("4");
         document.getElementById("factionUsernameField").value = factionUser;
-        // Hunter/Bounty at address 8.
+        
+        // Hunter/Bounty at address 8
         var hunterBounty = await readField("8");
         document.getElementById("hunterBountyInput").value = hunterBounty;
-        // Wins at address 9.
+        
+        // Wins at address 9
         var wins = await readField("9");
         document.getElementById("winsInput").value = wins;
-        // Draw Time at address 10.
+        
+        // Draw Time at address 10
         var drawTime = await readField("10");
         document.getElementById("drawTimeInput").value = drawTime;
       } catch (error) {
@@ -378,52 +571,78 @@
       }
     }
 
+    /**
+     * Writes faction data to the NFC tag
+     * - Hunter/Bounty to address 8
+     * - Wins to address 9
+     * - Draw Time to address 10
+     */
     async function handleWriteFaction() {
       try {
         // For faction page, we write only the fields that are editable:
-        // Hunter/Bounty to address 8.
+        // Hunter/Bounty to address 8
         await writeField("8", document.getElementById("hunterBountyInput").value.trim());
-        // Wins to address 9.
+        
+        // Wins to address 9
         await writeField("9", document.getElementById("winsInput").value.trim());
-        // Draw Time to address 10.
+        
+        // Draw Time to address 10
         await writeField("10", document.getElementById("drawTimeInput").value.trim());
+        
         alert("Faction data written successfully!");
       } catch (error) {
         alert("Faction write error: " + error);
       }
     }
 
-    // Allegiances Page functions.
-    // Build the 16 editable allegiance fields dynamically.
+    //==========================================================================
+    // ALLEGIANCES PAGE FUNCTIONS
+    //==========================================================================
+    
+    /**
+     * Dynamically builds the 16 allegiance fields
+     * Creates editable labels and input fields for each allegiance
+     */
     function buildAllegiancesFields() {
       var container = document.getElementById("allegiancesContainer");
-      if (container.childElementCount > 0) return; // Already built.
+      // Only build if not already built
+      if (container.childElementCount > 0) return;
+      
+      // Create 16 allegiance field groups
       for (var i = 1; i <= 16; i++) {
-        // Create a group div.
+        // Create a group div
         var group = document.createElement("div");
         group.className = "allegiance-group";
-        // Create an editable label.
+        
+        // Create an editable label
         var label = document.createElement("div");
         label.className = "editable-label";
         label.contentEditable = "true";
         label.innerText = "TEXT " + i;
-        // Create an input field.
+        
+        // Create an input field
         var input = document.createElement("input");
         input.type = "text";
         input.className = "input";
         input.placeholder = "Enter text";
-        // Set an ID for the input.
+        
+        // Set an ID for the input
         input.id = "allegiance" + i;
-        // Append label and input to the group.
+        
+        // Append label and input to the group
         group.appendChild(label);
         group.appendChild(document.createElement("br"));
         group.appendChild(input);
-        // Append the group to the container.
+        
+        // Append the group to the container
         container.appendChild(group);
       }
     }
 
-    // Mapping of allegiance fields to their preassigned addresses.
+    /**
+     * Mapping of allegiance fields to their preassigned NFC addresses
+     * Each allegiance has a specific address in the NFC memory
+     */
     const allegianceAddresses = {
       1: "12", 2: "13", 3: "14", 4: "16",
       5: "17", 6: "18", 7: "20", 8: "21",
@@ -431,12 +650,18 @@
       13: "28", 14: "29", 15: "30", 16: "32"
     };
 
+    /**
+     * Reads allegiance data from the NFC tag
+     * - Username from address 4
+     * - 16 allegiance fields from their respective addresses
+     */
     async function handleReadAllegiances() {
       try {
-        // Update the Allegiances Username (from address 4).
+        // Update the Allegiances Username (from address 4)
         var allegUser = await readField("4");
         document.getElementById("allegiancesUsernameField").value = allegUser;
-        // Loop through each allegiance field.
+        
+        // Loop through each allegiance field
         for (var i = 1; i <= 16; i++) {
           var address = allegianceAddresses[i];
           var text = await readField(address);
@@ -447,21 +672,28 @@
       }
     }
 
+    /**
+     * Writes allegiance data to the NFC tag
+     * - Username to address 4 (if available)
+     * - 16 allegiance fields to their respective addresses
+     */
     async function handleWriteAllegiances() {
       try {
-        // Write Allegiances Username (if needed, from address 4).
-        // Here we assume it's the same as the registration username.
+        // Write Allegiances Username (if needed, from address 4)
+        // Here we assume it's the same as the registration username
         var regUser = document.getElementById("usernameInput").value.trim();
         if(regUser) {
           await writeField("4", regUser);
           document.getElementById("allegiancesUsernameField").value = regUser;
         }
-        // Loop through each allegiance field.
+        
+        // Loop through each allegiance field
         for (var i = 1; i <= 16; i++) {
           var address = allegianceAddresses[i];
           var text = document.getElementById("allegiance" + i).value.trim();
           await writeField(address, text);
         }
+        
         alert("Allegiances data written successfully!");
       } catch (error) {
         alert("Allegiances write error: " + error);

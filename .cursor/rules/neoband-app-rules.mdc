@@ -1,17 +1,47 @@
 ---
-description: These rules are for the AI Developer of the Neoband App
+description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
+---
+---
+description: These rules the Neoband App
+globs: 
+alwaysApply: True
 ---
 # Your rule content
 
-You are a Junior Developer working on a project called the Neoband App. This App runs off a device hosted webpage on a d-logic "µFR Zero Online LITE: ISO14443 A/B Network NFC RFID Reader Writer". This Main document explaining this app is located here in the notepafe called "Neoband App Doc 21925" . Documentaion for new feature requests are located "@Dev Instrcutions " Always reference these notebooks  as well as the code itself, before makeing any changes or updates to the code. 
+You are working on a project called the Neoband App. You are working on the Neoband NFC App, which usually follows the Clean Code Agile Methodology and is built to be simple and easy to understand, use, edit, and customize. This app needs to be easily customizable for new developers, engineers, and makers. 
 
-Alway follow, use and implement Clean Code Agile Methodology
+The **NeoBand App** is a **web-based interface** designed to work with the **uFR Zero Online Lite ISO 14443 A/B Network NFC RFID Reader/Writer**. It is built specifically for the **Neotropolis event**, a cyberpunk LARPing experience where hacking is part of the game.
 
-Never make changes that lose pre-existing functionality or design unless specifcly requested
+The **full version** of the NeoBand App is a **decentralized** system, designed to function **only** as an interface between the **D-Logic NFC reader and a web browser**. It does **not connect to external databases, servers, or cloud services**, ensuring it remains **self-contained and adaptable** for its intended purpose.
 
-This app in all aspects must be simple and easy to understand, use, edit, and customize. This app needs to be easily customizable for new developers, engineers, and makers. 
+Users interact with the app through a **web browser**, connecting directly to the NFC reader, which hosts the application. The **primary functions** of the app revolve around **reading and writing data to NFC bands, that use Mifair 4k NFC tags,** at the event. The bands are assigned to **event attendees**, while the app is operated by **Staff, Factions, and Allegiances**.
 
-All file references other must start with "app/" , example app/global-headers.js 
-Never create an “app” folder ever, the app/ path is for the d-logic reader. When you try to access a file at “app/” you need to look for it at ”/”, but never change or remove “app/” and never greate an “app” file
+This App runs off a device hosted webpage on a d-logic "µFR Zero Online LITE: ISO14443 A/B Network NFC RFID Reader Writer". This Main document explaining this app is located here in the notepafe called "Neoband App Doc 21925" . Documentaion for new feature requests are the notepads located "HTML Based App Updates" Always reference these notebooks  as well as the code itself, before makeing any changes or updates to the code. 
+
+Never make changes that lose pre-existing functionality or change the design unless specifcly requested.
+
+Very detailed Logging and Error Reporting should always be included in updates or chnages
+Logs should show at a minimum:
+- show what key was used for authtication
+- show that authtication was successful
+- show what sector and block was read from
+- show what sector and block was written to
+- show what data was written to the nfc tag
+
+Important Rememeber! Major Issues with the d-logic ufr reader are: 
+1) it can only hold individual files and can't have folders 
+2) It can't read other files than the index.html file without "app/" being prefixed to the files directory, for example a file at the reader root directory: "/file.js", the file would need to have the app/ directory: "app/file.js" even through there is no actual app folder and there is no way to make or have an app folder. Because of these issues there can not be any folders in this app, so do not create a app folder ever for this app.
+
+Referernce the example apps located here: 
+- https://github.com/nfc-rfid-reader-sdk/ufr-mf-examples-javascript-browser_extensions/tree/master
+- \Ref Files\ufr-mf-examples-javascript-browser_extensions-master
+
+Mifare 4k documention is here:
+- https://www.nxp.com/docs/en/data-sheet/MF1S70YYX_V1.pdf
+- \Mifare Cards\MIFARE Classic EV1 4K - solution development.pdf
+
+Mifare memory allocation:
+- https://upload.wikimedia.org/wikipedia/commons/3/39/MiFare_Byte_Layout.png
+- \Mifare Cards\MiFare_Byte_Layout.png

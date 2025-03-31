@@ -119,16 +119,101 @@
     .editable-label {
       font-size: 18px;
       margin-bottom: 5px;
-      padding: 3px;
+      padding: 3px 6px;
       border: 1px dashed #0BDCF3; /* Dashed border to indicate editability */
       display: inline-block;
       min-width: 80px;
       cursor: text;
+      transition: all 0.3s ease;
+      background-color: rgba(11, 220, 243, 0.05);
+    }
+    
+    .editable-label:hover {
+      background-color: rgba(11, 220, 243, 0.1);
+      border: 1px solid #0BDCF3;
+    }
+    
+    .editable-label:focus {
+      outline: none;
+      background-color: rgba(11, 220, 243, 0.15);
+      border: 1px solid #FFFFFF;
+      box-shadow: 0 0 5px rgba(11, 220, 243, 0.5);
     }
     
     /* Allegiance group container */
     .allegiance-group {
       margin-bottom: 15px;
+    }
+    
+    /* Operation Indicator */
+    .operation-indicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.9);
+      color: #0BDCF3;
+      padding: 20px 40px;
+      border-radius: 10px;
+      border: 2px solid #0BDCF3;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-size: 18px;
+      box-shadow: 0 0 20px rgba(11, 220, 243, 0.5);
+    }
+    
+    .spinner {
+      width: 40px;
+      height: 40px;
+      margin: 15px auto;
+      border: 4px solid rgba(11, 220, 243, 0.3);
+      border-top: 4px solid #0BDCF3;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .operation-status {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    
+    /* Log display styling */
+    .log-display {
+      max-height: 200px;
+      overflow: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      margin-top: 15px;
+      padding: 10px;
+      background-color: #000022;
+      border: 1px solid #0BDCF3;
+      color: #FFFFFF;
+      border-radius: 4px;
+    }
+    
+    /* Scroll bar styling for log displays */
+    .log-display::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .log-display::-webkit-scrollbar-track {
+      background: #000033;
+    }
+    
+    .log-display::-webkit-scrollbar-thumb {
+      background: #0BDCF3;
+      border-radius: 4px;
+    }
+    
+    .log-display::-webkit-scrollbar-thumb:hover {
+      background: #07A8BA;
     }
   </style>
 </head>
@@ -194,17 +279,17 @@
   ============================================================================
   -->
   <div id="registrationPage" class="page active">
-    <h2>User Registration</h2>
+    <h2 contenteditable="true" class="editable-label">User Registration</h2>
     <div>
-      <label>New Username:</label><br>
+      <div contenteditable="true" class="editable-label">New Username:</div>
       <input id="usernameInput" class="input" type="text" maxlength="32" placeholder="Enter new username (up to 32 characters)">
     </div>
     <div>
-      <label>Band ID:</label><br>
+      <div contenteditable="true" class="editable-label">Band ID:</div>
       <input id="bandIdInput" class="input" type="text" readonly placeholder="Waiting for band...">
     </div>
     <div>
-      <label>Status:</label><br>
+      <div contenteditable="true" class="editable-label">Status:</div>
       <input id="statusInput" class="status-display" type="text" readonly placeholder="Unregistered" value="Unregistered">
     </div>
     <div style="margin-top:20px;">
@@ -241,28 +326,41 @@
   ============================================================================
   -->
   <div id="factionPage" class="page">
-    <h2>Factions</h2>
+    <h2 contenteditable="true" class="editable-label">Factions</h2>
     <div>
-      <label>Faction Username:</label><br>
+      <div contenteditable="true" class="editable-label">Faction Title:</div>
+      <div id="factionTitle" class="editable-label" contenteditable="true">ALLEYCAT</div>
+    </div>
+    <div>
+      <div contenteditable="true" class="editable-label">Faction Username:</div>
       <input id="factionUsernameField" class="input" type="text" readonly placeholder="Waiting for scan...">
     </div>
     <div>
-      <label>Hunter/Bounty:</label><br>
+      <div contenteditable="true" class="editable-label">Hunter/Bounty:</div>
       <input id="hunterBountyInput" class="input" type="text" placeholder="Enter Hunter/Bounty">
     </div>
     <div>
-      <label># of Wins:</label><br>
+      <div contenteditable="true" class="editable-label"># of Wins:</div>
       <input id="winsInput" class="input" type="text" placeholder="Enter # of wins">
     </div>
     <div>
-      <label>Best Draw Time:</label><br>
+      <div contenteditable="true" class="editable-label">Best Draw Time:</div>
       <input id="drawTimeInput" class="input" type="text" placeholder="Enter Best Draw Time">
     </div>
     <div>
-      <label>Faction Title:</label><br>
-      <div id="factionTitle" class="editable-label" contenteditable="true">ALLEYCAT</div>
+      <div contenteditable="true" class="editable-label">Faction Field #1:</div>
+      <input id="factionField1" class="input" type="text" placeholder="Faction Field Placeholder">
+    </div>
+    <div>
+      <div contenteditable="true" class="editable-label">Faction Field #2:</div>
+      <input id="factionField2" class="input" type="text" placeholder="Faction Field Placeholder">
+    </div>
+    <div>
+      <div contenteditable="true" class="editable-label">Faction Field #3:</div>
+      <input id="factionField3" class="input" type="text" placeholder="Faction Field Placeholder">
     </div>
     <div style="margin-top:20px;">
+      <button class="read-write-button" onclick="handleScanTag()">SCAN</button>
       <button class="read-write-button" onclick="handleReadFaction()">READ</button>
       <button class="read-write-button" onclick="handleWriteFaction()">WRITE</button>
     </div>
@@ -286,9 +384,9 @@
   ============================================================================
   -->
   <div id="allegiancesPage" class="page">
-    <h2>Allegiances</h2>
+    <h2 contenteditable="true" class="editable-label">Allegiances</h2>
     <div>
-      <label>Allegiances Username:</label><br>
+      <div contenteditable="true" class="editable-label">Allegiances Username:</div>
       <input id="allegiancesUsernameField" class="input" type="text" readonly placeholder="Waiting for scan...">
     </div>
     <!-- Container for 16 dynamically generated allegiance fields -->
@@ -296,6 +394,7 @@
       <!-- We will create 16 groups dynamically in JavaScript -->
     </div>
     <div style="margin-top:20px;">
+      <button class="read-write-button" onclick="handleScanTag()">SCAN</button>
       <button class="read-write-button" onclick="handleReadAllegiances()">READ</button>
       <button class="read-write-button" onclick="handleWriteAllegiances()">WRITE</button>
     </div>
@@ -325,6 +424,167 @@
   ============================================================================
   -->
   <script>
+    // Global variables
+    let tagUID = "";
+    let tagIsValid = false;
+
+    /**
+     * Initialize the D-Logic NFC reader
+     * @returns {Promise<boolean>} - Promise resolving to true if initialization successful
+     */
+    async function initializeReader() {
+      try {
+        // Create a promise for reader initialization
+        const openPromise = new Promise((resolve) => {
+          ufRequest("ReaderOpen", function() {
+            const response = ufResponse();
+            resolve(response);
+          });
+        });
+        
+        const openResponse = await openPromise;
+        console.log("Reader initialization response:", openResponse);
+        
+        if (openResponse.Status === "[0x00 (0)] UFR_OK" || 
+            openResponse.Status.includes("ALREADY_OPEN")) {
+          console.log("Reader initialized successfully");
+          return true;
+        } else {
+          console.error("Reader initialization failed:", openResponse.Status);
+          return false;
+        }
+      } catch (error) {
+        console.error("Error during reader initialization:", error);
+        return false;
+      }
+    }
+
+    /**
+     * Helper function to calculate MIFARE sector and block details
+     * @param {number} linearAddress - The linear address (0-255)
+     * @returns {Object} - Object containing sector, block, and flag info
+     */
+    function calculateMifareAddress(linearAddress) {
+      // Parse input to ensure it's a number
+      const address = parseInt(linearAddress, 10);
+      if (isNaN(address) || address < 0 || address > 255) {
+        throw new Error(`Invalid MIFARE address: ${linearAddress}. Must be between 0-255.`);
+      }
+      
+      let sector, blockInSector, absoluteBlock;
+      
+      // Calculate sector and block
+      if (address < 64) {
+        // Small sectors (0-15): 4 blocks per sector
+        sector = Math.floor(address / 4);
+        blockInSector = address % 4;
+        absoluteBlock = address;
+      } else {
+        // Large sectors (16-39): 16 blocks per sector
+        const remainingAddress = address - 64;
+        sector = 16 + Math.floor(remainingAddress / 16);
+        blockInSector = remainingAddress % 16;
+        absoluteBlock = 64 + (sector - 16) * 16 + blockInSector;
+      }
+      
+      // Check if it's a trailer block (contains keys, not data)
+      // In small sectors (0-15), block 3 of each sector is a trailer block
+      // In large sectors (16-39), block 15 of each sector is a trailer block
+      const isTrailerBlock = 
+        (sector <= 15 && blockInSector === 3) || 
+        (sector > 15 && blockInSector === 15);
+      
+      // Reserved sectors/blocks in MIFARE 4K
+      // Sector 0 Block 0 is manufacturer block (read-only)
+      const isManufacturerBlock = (sector === 0 && blockInSector === 0);
+      
+      return {
+        sector,
+        blockInSector,
+        absoluteBlock,
+        isTrailerBlock,
+        isManufacturerBlock,
+        isReserved: isManufacturerBlock
+      };
+    }
+    
+    /**
+     * Utility function to convert hex string to text
+     */
+    function hexToText(hex) {
+      let result = "";
+      for (let i = 0; i < hex.length; i += 2) {
+        const hexCode = hex.substr(i, 2);
+        const hexValue = parseInt(hexCode, 16);
+        
+        // Only convert printable ASCII characters, ignore padding bytes (0xFF)
+        if (hexValue >= 32 && hexValue < 127) {
+          result += String.fromCharCode(hexValue);
+        } else if (hexValue !== 0xFF) {
+          // For non-printable characters that aren't padding, add placeholder
+          result += ".";
+        }
+      }
+      return result.trim();
+    }
+    
+    /**
+     * Utility function to convert text to hex string
+     */
+    function textToHex(text) {
+      let result = "";
+      for (let i = 0; i < text.length; i++) {
+        const hexCode = text.charCodeAt(i).toString(16).padStart(2, "0");
+        result += hexCode;
+      }
+      return result;
+    }
+    
+    // Function declarations to ensure proper hoisting
+    let readField;
+    let writeField;
+    
+    // Reader initialization flag
+    let isReaderInitialized = false;
+    
+    /**
+     * Initializes the NFC reader hardware
+     * Must be called before any NFC operations
+     * @returns {Promise<boolean>} True if initialization was successful
+     */
+    async function initializeReader() {
+      if (isReaderInitialized) {
+        return true;
+      }
+      
+      try {
+        console.log("[READER] Attempting to initialize NFC reader...");
+        
+        // Create a promise to handle the asynchronous reader initialization
+        return new Promise((resolve) => {
+          // Basic ReaderOpen command with no parameters for default reader
+          ufRequest("ReaderOpen", function() {
+            const response = ufResponse();
+            console.log("[READER] Initialization response:", response);
+            
+            if (response && response.Status === "[0x00 (0)] UFR_OK") {
+              console.log("[READER] Successfully initialized NFC reader");
+              isReaderInitialized = true;
+              resolve(true);
+            } else {
+              console.error("[READER] Failed to initialize NFC reader:", response ? response.Status : "Unknown error");
+              isReaderInitialized = false;
+              resolve(false);
+            }
+          });
+        });
+      } catch (error) {
+        console.error("[READER] Error during initialization:", error);
+        isReaderInitialized = false;
+        return false;
+      }
+    }
+    
     //==========================================================================
     // UTILITY FUNCTIONS
     //==========================================================================
@@ -351,81 +611,120 @@
      * UTILITIES FOR MIFARE MEMORY OPERATIONS
      * ======================================
      */
-    
+
     /**
-     * Converts hexadecimal string to readable text
-     * 
-     * @param {string} hex - Hexadecimal string to convert
-     * @returns {string} - ASCII text representation
-     * 
-     * OPERATION DETAILS:
-     * - Takes a string of hex bytes (e.g., "48656C6C6F")
-     * - Converts each hex pair to its ASCII character equivalent
-     * - Stops at the first "FF" padding character
-     * - Handles both upper and lowercase hex input
-     * - Returns an empty string for invalid hex input
+     * Displays a temporary visual confirmation message that fades out
+     * @param {string} message - The message to display
+     * @param {string} type - The type of message ('success', 'error', or 'warning')
      */
-    function hexToText(hex) {
-      var result = "";
-      // Remove "0x" prefix if present
-      if (hex.startsWith("0x") || hex.startsWith("0X")) {
-        hex = hex.substring(2);
+    function showVisualConfirmation(message, type = 'success') {
+      // Create notification element if it doesn't exist
+      let notification = document.getElementById('visualConfirmation');
+      if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'visualConfirmation';
+        notification.style.position = 'fixed';
+        notification.style.top = '20%';
+        notification.style.left = '50%';
+        notification.style.transform = 'translate(-50%, -50%)';
+        notification.style.padding = '15px 25px';
+        notification.style.borderRadius = '5px';
+        notification.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+        notification.style.zIndex = '1000';
+        notification.style.fontWeight = 'bold';
+        notification.style.fontSize = '18px';
+        notification.style.transition = 'opacity 0.5s ease-in-out';
+        document.body.appendChild(notification);
       }
-      // Process each byte (2 hex chars)
-      for (var i = 0; i < hex.length; i += 2) {
-        if (i + 1 >= hex.length) break; // Incomplete byte
-        var byteStr = hex.substring(i, i + 2);
-        // Stop at the first FF padding
-        if (byteStr.toUpperCase() === "FF") break;
-        var byte = parseInt(byteStr, 16);
-        if (!isNaN(byte)) {
-          result += String.fromCharCode(byte);
-        }
+      
+      // Set styling based on message type
+      if (type === 'success') {
+        notification.style.backgroundColor = '#0BDCF3';
+        notification.style.color = '#000000';
+      } else if (type === 'error') {
+        notification.style.backgroundColor = '#FF3333';
+        notification.style.color = '#FFFFFF';
+      } else if (type === 'warning') {
+        notification.style.backgroundColor = '#FFA500';
+        notification.style.color = '#000000';
       }
-      return result;
+      
+      // Set message and show notification
+      notification.textContent = message;
+      notification.style.opacity = '1';
+      
+      // Hide notification after 3 seconds
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => {
+          notification.remove();
+        }, 500);
+      }, 3000);
     }
 
     /**
-     * Converts text to hexadecimal string
-     * 
-     * @param {string} text - Text to convert to hex
-     * @returns {string} - Hexadecimal representation
-     * 
-     * OPERATION DETAILS:
-     * - Converts each character to its 2-digit hex representation
-     * - Returns uppercase hex for consistency (e.g., "48656C6C6F" for "Hello")
-     * - Returns an empty string for empty input
-     * - Handles all ASCII characters including special characters
-     * - No padding is added (use padHex separately if needed)
+     * Helper function to debug MIFARE card memory structure
+     * Shows the relationship between linear address and sector/block
+     * @param {number} address - Linear address (0-255)
+     * @returns {Object} Object containing sector, block, and other details
+     */
+    function calculateMifareAddress(address) {
+      const addressNum = parseInt(address);
+      
+      // Different calculation for first 32 sectors vs last 8 sectors
+      let sectorNum, blockInSector, blockAddress;
+      
+      if (addressNum < 128) {
+        // First 32 sectors (0-31) with 4 blocks each
+        sectorNum = Math.floor(addressNum / 4);
+        blockInSector = addressNum % 4;
+      } else {
+        // Last 8 sectors (32-39) with 16 blocks each
+        sectorNum = 32 + Math.floor((addressNum - 128) / 16);
+        blockInSector = (addressNum - 128) % 16;
+      }
+      
+      // Return detailed information for debugging
+      return {
+        linearAddress: addressNum,
+        sector: sectorNum,
+        blockInSector: blockInSector,
+        isTrailerBlock: (addressNum < 128 && blockInSector === 3) || 
+                        (addressNum >= 128 && blockInSector === 15),
+        memoryType: addressNum < 128 ? "First 32 sectors (4 blocks each)" : 
+                                      "Last 8 sectors (16 blocks each)"
+      };
+    }
+
+    /**
+     * Converts text to hexadecimal
+     * @param {string} text - Text to convert
+     * @returns {string} - Hexadecimal string
      */
     function textToHex(text) {
-      var result = "";
+      var hex = "";
       for (var i = 0; i < text.length; i++) {
-        var hex = text.charCodeAt(i).toString(16).toUpperCase();
-        // Pad single digit hex values with leading zero
-        result += hex.padStart(2, '0');
+        var charCode = text.charCodeAt(i).toString(16);
+        // Ensure two-digit hex value
+        hex += ("0" + charCode).slice(-2);
       }
-      return result;
+      return hex;
     }
 
     /**
-     * Pads a hexadecimal string with FF bytes to the specified length
-     * 
-     * @param {string} hex - Hexadecimal string to pad
-     * @param {number} length - Target length in characters (must be even)
-     * @returns {string} - Padded hexadecimal string
-     * 
-     * OPERATION DETAILS:
-     * - Used to ensure the exact block size for MIFARE writes (16 bytes = 32 hex chars)
-     * - Appends "FF" padding bytes until the specified length is reached
-     * - Makes no changes if the input is already at or exceeding the target length
-     * - Essential for MIFARE memory operations where exact block size is required
+     * Converts hexadecimal to text
+     * @param {string} hex - Hexadecimal string
+     * @returns {string} - Text
      */
-    function padHex(hex, length) {
-      while (hex.length < length) {
-        hex += "FF"; // Standard MIFARE padding
+    function hexToText(hex) {
+      var text = "";
+      for (var i = 0; i < hex.length; i += 2) {
+        var charCode = parseInt(hex.substr(i, 2), 16);
+        // Stop at null or FF padding
+        if (charCode === 0 || charCode === 255) break;
+        text += String.fromCharCode(charCode);
       }
-      return hex;
+      return text;
     }
 
     /**
@@ -444,200 +743,346 @@
       return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    //==========================================================================
-    // NFC COMMUNICATION FUNCTIONS
-    //==========================================================================
-    
     /**
-     * Read data from a specific address (block) on the NFC tag
-     * 
-     * @param {string} address - The linear block address to read from (0-255)
-     * @returns {Promise<string>} - The data read from the block as a string
-     * @throws {Error} - If reading fails due to authentication or communication issues
-     * 
-     * TECHNICAL DETAILS:
-     * - Performs KEY A authentication with key index 0 before reading
-     * - Uses "LinearRead" action for MIFARE Classic compatibility
-     * - Logs authentication key and mode for debugging
-     * - Records sector and block information derived from address
-     * - Logs both raw and interpreted data
-     * - Handles authentication failures with detailed error messages
-     * - Provides hex representation of the data for debugging
-     * 
-     * AUTHENTICATION FLOW:
-     * 1. Attempts LinearRead with KEY A auth
-     * 2. Records timestamp, block address, and authentication details
-     * 3. Processes data to convert from binary to string format
-     * 4. Strips trailing FF padding (hex FF)
-     * 5. Returns a clean string representation of the data
-     * 
-     * ERROR HANDLING:
-     * - Comprehensive error handling with fallback mechanisms
-     * - Provides descriptive error messages with block addresses
-     * - Logs all operations with timestamps and status
-     * 
-     * USAGE CONTEXTS:
-     * - Registration Page: Reads username from blocks 240-241 (Sector 39, Blocks 0-1)
-     * - Faction Page: Reads username from blocks 240-241 and faction data from blocks 4-6
-     * - Allegiances Page: Reads username from blocks 240-241 and allegiance data from blocks 192-207
+     * Promisified version of ufRequest that uses async/await instead of callbacks
+     * @param {string} command - Command to send to the NFC reader
+     * @returns {Promise<Object>} - Promise that resolves with the response
      */
-    function readField(address) {
-      return new Promise((resolve, reject) => {
-        console.log(`[READ] Attempting to read from address ${address} with KEY A (0x60) authentication`);
-        
-        // Calculate sector and block numbers for logging
-        let sector, blockInSector;
-        if (parseInt(address) < 128) {
-          sector = Math.floor(parseInt(address) / 4);
-          blockInSector = parseInt(address) % 4;
-        } else {
-          sector = Math.floor((parseInt(address) - 128) / 16) + 32;
-          blockInSector = (parseInt(address) - 128) % 16;
-        }
-        console.log(`[READ] Translates to Sector ${sector}, Block ${blockInSector}`);
-        
-        const timestamp = new Date().toISOString();
-        console.log(`[READ ${timestamp}] Using auth KEY A (index 0) for block ${address}`);
-        
-        ufRequest("LinearRead", { 
-          "address": address, 
-          "auth": "0", // KEY A authentication with key index 0
-          "len": "16"  // Each block is 16 bytes
-        }, function() {
-          var output = ufResponse();
-          if (output) {
-            console.log(`[READ] Authentication result: ${output.Status}`);
-            
-            if (output.Status === "[0x00 (0)] UFR_OK") {
-              var blockData = output.Data || "";
-              console.log(`[READ SUCCESS] Raw data from block ${address}: ${blockData}`);
-              
-              // Convert data to hex for logging
-              let hexData = '';
-              for (let i = 0; i < blockData.length; i += 2) {
-                if (blockData.substr(i, 2) !== 'FF') {
-                  hexData += blockData.substr(i, 2) + ' ';
-                }
-              }
-              console.log(`[READ SUCCESS] Data in hex (excluding FF padding): ${hexData.trim()}`);
-              
-              // Convert hex data to string
-              var result = "";
-              for (var i = 0; i < blockData.length; i += 2) {
-                var hex = blockData.substr(i, 2);
-                if (hex === "FF") break; // Stop at the first FF (padding)
-                var decimal = parseInt(hex, 16);
-                result += String.fromCharCode(decimal);
-              }
-              
-              console.log(`[READ SUCCESS] Data as string: "${result}"`);
-              resolve(result);
-            } else {
-              console.error(`[READ ERROR] Failed to read from block ${address}: ${output.Status}`);
-              reject(`Failed to read registration data. Status: ${output.Status}`);
-            }
-          } else {
-            console.error(`[READ ERROR] Unknown error reading from block ${address}`);
-            reject("Unknown error reading registration data.");
-          }
+    function ufRequestAsync(command) {
+      return new Promise((resolve) => {
+        ufRequest(command, function() {
+          const response = ufResponse();
+          resolve(response);
         });
       });
     }
 
     /**
-     * Write data to a specific address (block) on the NFC tag
-     * 
-     * @param {string} address - The linear block address to write to (0-255)
-     * @param {string} data - The data to write to the block (max 16 chars)
-     * @returns {Promise<void>} - Resolves when write is successful
-     * @throws {Error} - If writing fails due to authentication or communication issues
-     * 
-     * TECHNICAL DETAILS:
-     * - Performs KEY A authentication with key index 0 before writing
-     * - Uses "LinearWrite" action for MIFARE Classic compatibility
-     * - Automatically pads data to 16 bytes with FF
-     * - Logs authentication key and mode for debugging
-     * - Records sector and block information derived from address
-     * - Provides detailed operation logging with timestamps
-     * - Shows both string and hex representations of data
-     * 
-     * DATA HANDLING:
-     * - Truncates data if longer than 16 characters
-     * - Converts string data to hex format for MIFARE storage
-     * - Automatically pads with FF to fill the entire 16-byte block
-     * - Handles empty strings by writing a block of FF padding
-     * 
-     * AUTHENTICATION FLOW:
-     * 1. Converts string data to hex format
-     * 2. Pads with FF up to 16 bytes
-     * 3. Attempts LinearWrite with KEY A auth
-     * 4. Records timestamp, block address, and authentication details
-     * 5. Verifies successful write operation
-     * 
-     * ERROR HANDLING:
-     * - Comprehensive error handling with detailed logs
-     * - Provides descriptive error messages with block addresses
-     * - Logs all operations with timestamps and status
+     * Shows an operation indicator with a spinner while a process is running
+     * @param {string} operationName - The name of the operation (e.g., "Scanning", "Reading", etc.)
+     * @returns {HTMLElement} - The created indicator element
      */
-    function writeField(address, data) {
-      return new Promise((resolve, reject) => {
-        console.log(`[WRITE] Attempting to write to address ${address} with KEY A (0x60) authentication`);
+    function showOperationIndicator(operationName) {
+      // Remove any existing indicators
+      hideOperationIndicator();
+      
+      // Create indicator container
+      const indicator = document.createElement("div");
+      indicator.className = "operation-indicator";
+      indicator.id = "operationIndicator";
+      
+      // Add spinner
+      const spinner = document.createElement("div");
+      spinner.className = "spinner";
+      indicator.appendChild(spinner);
+      
+      // Add operation text
+      const operationText = document.createElement("div");
+      operationText.textContent = operationName + "...";
+      operationText.className = "operation-status";
+      indicator.appendChild(operationText);
+      
+      // Add to body
+      document.body.appendChild(indicator);
+      
+      return indicator;
+    }
+    
+    /**
+     * Updates the operation indicator with new status text
+     * @param {string} statusText - The new status text to display
+     */
+    function updateOperationIndicator(statusText) {
+      const indicator = document.getElementById("operationIndicator");
+      if (indicator) {
+        const statusElement = indicator.querySelector(".operation-status");
+        if (statusElement) {
+          statusElement.textContent = statusText;
+        }
+      }
+    }
+    
+    /**
+     * Hides the operation indicator
+     */
+    function hideOperationIndicator() {
+      const existingIndicator = document.getElementById("operationIndicator");
+      if (existingIndicator) {
+        existingIndicator.remove();
+      }
+    }
+
+    //==========================================================================
+    // SHARED USER DATA FUNCTIONS
+    //==========================================================================
+    
+    /**
+     * Reads the username from the band
+     * @returns {Promise<string>} The username
+     */
+    async function readUsernameFromBand() {
+      showOperationIndicator("Reading Username");
+      
+      try {
+        // Check if a valid tag has been scanned
+        if (!tagIsValid || !tagUID) {
+          updateOperationIndicator("Error: No Band Scanned");
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("No Band Scanned", "Please scan a band first", "error");
+          }, 1000);
+          return null;
+        }
         
-        // Calculate sector and block numbers for logging
-        let sector, blockInSector;
-        if (parseInt(address) < 128) {
-          sector = Math.floor(parseInt(address) / 4);
-          blockInSector = parseInt(address) % 4;
+        updateOperationIndicator("Reading username...");
+        
+        // Read the username from address 0
+        const usernameField = await readField(0);
+        
+        if (usernameField) {
+          updateOperationIndicator("Username Found");
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Username Found", usernameField, "success");
+          }, 1000);
+          return usernameField;
         } else {
-          sector = Math.floor((parseInt(address) - 128) / 16) + 32;
-          blockInSector = (parseInt(address) - 128) % 16;
+          updateOperationIndicator("Username Not Found");
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Username Not Found", "No username data on this band", "warning");
+          }, 1000);
+          return null;
         }
-        console.log(`[WRITE] Translates to Sector ${sector}, Block ${blockInSector}`);
-        
-        // Truncate data if needed (each block can only store 16 bytes)
-        if (data.length > 16) {
-          console.warn(`[WRITE WARNING] Data too long (${data.length} chars), truncating to 16 chars`);
-          data = data.substring(0, 16);
+      } catch (error) {
+        console.error("Error reading username:", error);
+        updateOperationIndicator("Error Reading Username");
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Error Reading Username", error.toString(), "error");
+        }, 1000);
+        return null;
+      }
+    }
+
+    //==========================================================================
+    // NFC COMMUNICATION FUNCTIONS
+    //==========================================================================
+    
+    /**
+     * Generic function to read data from an NFC address
+     * @param {string} address - The address to read from
+     * @returns {Promise<string>} - Promise resolving with the text read
+     */
+    async function readField(address) {
+      // Find any existing log display
+      const logDisplay = document.getElementById("registrationLogDisplay") || 
+                         document.getElementById("factionLogDisplay") ||
+                         document.getElementById("allegiancesLogDisplay");
+      
+      // Log operation attempt if log display exists
+      if (logDisplay) {
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading from address ${address}...</div>`;
+      }
+      
+      // Ensure reader is initialized
+      const readerInitialized = await initializeReader();
+      if (!readerInitialized) {
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Reader initialization failed</div>`;
         }
-        
-        // Convert string to hex
-        var hexData = "";
-        for (var i = 0; i < data.length; i++) {
-          var hex = data.charCodeAt(i).toString(16).toUpperCase();
-          hexData += hex.padStart(2, '0');
-        }
-        
-        // Pad with FF to fill the block (16 bytes = 32 hex chars)
-        while (hexData.length < 32) {
-          hexData += "FF";
-        }
-        
-        const timestamp = new Date().toISOString();
-        console.log(`[WRITE ${timestamp}] Using auth KEY A (index 0) for block ${address}`);
-        console.log(`[WRITE] Writing data: "${data}" (Hex: ${hexData})`);
-        
-        ufRequest("LinearWrite", { 
-          "address": address, 
-          "auth": "0", // KEY A authentication with key index 0
-          "data": hexData
-        }, function() {
-          var output = ufResponse();
-          if (output) {
-            console.log(`[WRITE] Authentication result: ${output.Status}`);
-            
-            if (output.Status === "[0x00 (0)] UFR_OK") {
-              console.log(`[WRITE SUCCESS] Successfully wrote to block ${address}`);
-              resolve();
-            } else {
-              console.error(`[WRITE ERROR] Failed to write to block ${address}: ${output.Status}`);
-              reject(`Failed to write data. Status: ${output.Status}`);
-            }
-          } else {
-            console.error(`[WRITE ERROR] Unknown error writing to block ${address}`);
-            reject("Unknown error writing data.");
-          }
+        throw "Reader initialization failed";
+      }
+      
+      // Calculate sector details using helper function
+      const addrInfo = calculateMifareAddress(address);
+      const sectorNum = addrInfo.sector;
+      
+      // Log detailed memory information for debugging
+      console.log(`Memory Structure for address ${address}:`, addrInfo);
+      
+      if (logDisplay) {
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Address ${address} = Sector ${addrInfo.sector}, Block ${addrInfo.blockInSector} ${addrInfo.isTrailerBlock ? '(TRAILER BLOCK)' : ''}</div>`;
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Authenticating sector ${sectorNum} with KEY A...</div>`;
+      }
+      
+      // First authenticate the sector - using explicit promise-based approach
+      const authPromise = new Promise((resolve) => {
+        ufRequest(`BlockAuthenticate ${sectorNum} 0x60 0`, function() {
+          const response = ufResponse();
+          resolve(response);
         });
       });
+      
+      const authResponse = await authPromise;
+      
+      if (authResponse.Status !== "[0x00 (0)] UFR_OK") {
+        console.error(`Authentication error for sector ${sectorNum}: ${authResponse.Status}`);
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Authentication failed for sector ${sectorNum}: ${authResponse.Status}</div>`;
+          // Add detailed error information for debugging
+          logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ Check if KEY A (0x60) is correct for sector ${sectorNum}</div>`;
+        }
+        throw `Authentication failed: ${authResponse.Status}`;
+      }
+      
+      if (logDisplay) {
+        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Successfully authenticated sector ${sectorNum}</div>`;
+      }
+      
+      // After successful authentication, perform the read - using explicit promise-based approach
+      const readPromise = new Promise((resolve) => {
+        ufRequest(`LinearRead h ${address} 16 0x60 0`, function() {
+          const response = ufResponse();
+          resolve(response);
+        });
+      });
+      
+      const output = await readPromise;
+      
+      if (output.Status === "[0x00 (0)] UFR_OK") {
+        let data = output.Data;
+        if (data.startsWith("0x")) {
+          data = data.substring(2);
+        }
+        const text = hexToText(data);
+        console.log("Read from address " + address + ": " + text);
+        
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Successfully read from address ${address}: "${text}" (0x${data})</div>`;
+          logDisplay.scrollTop = logDisplay.scrollHeight;
+        }
+        
+        return text;
+      } else {
+        console.error("Read error at address " + address + ": " + output.Status);
+        
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error reading address ${address}: ${output.Status}</div>`;
+          
+          // Special handling for common errors
+          if (output.Status.includes("AUTH_ERROR")) {
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ Authentication error! This might be due to:</div>`;
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>  - Wrong key used (currently using KEY A)</div>`;
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>  - Key index is incorrect (currently using index 0)</div>`;
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>  - Block is protected with different access rights</div>`;
+          }
+          logDisplay.scrollTop = logDisplay.scrollHeight;
+        }
+        
+        throw "Read failed: " + output.Status;
+      }
+    }
+
+    /**
+     * Generic function to write data to an NFC address
+     * @param {string} address - The address to write to
+     * @param {string} text - The text to write
+     * @returns {Promise<void>} - Promise resolving when write is complete
+     */
+    async function writeField(address, text) {
+      let hexData = textToHex(text);
+      // Pad to 32 chars (16 bytes) with FF
+      while (hexData.length < 32) {
+        hexData += "FF";
+      }
+      
+      // Find any existing log display
+      const logDisplay = document.getElementById("registrationLogDisplay") || 
+                         document.getElementById("factionLogDisplay") ||
+                         document.getElementById("allegiancesLogDisplay");
+      
+      // Log operation attempt if log display exists
+      if (logDisplay) {
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing to address ${address}: "${text}" (0x${hexData})...</div>`;
+      }
+      
+      // Ensure reader is initialized
+      const readerInitialized = await initializeReader();
+      if (!readerInitialized) {
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Reader initialization failed</div>`;
+        }
+        throw "Reader initialization failed";
+      }
+      
+      // Calculate sector details using helper function
+      const addrInfo = calculateMifareAddress(address);
+      const sectorNum = addrInfo.sector;
+      
+      // Log detailed memory information for debugging
+      console.log(`Memory Structure for address ${address}:`, addrInfo);
+      
+      if (logDisplay) {
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Address ${address} = Sector ${addrInfo.sector}, Block ${addrInfo.blockInSector} ${addrInfo.isTrailerBlock ? '(TRAILER BLOCK)' : ''}</div>`;
+        
+        // Warn if attempting to write to a trailer block
+        if (addrInfo.isTrailerBlock) {
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>⚠ WARNING: Writing to a sector trailer block (${address})! This contains access keys and may cause permanent damage if written incorrectly.</div>`;
+        }
+        
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Authenticating sector ${sectorNum} with KEY A...</div>`;
+      }
+      
+      // First authenticate the sector - using explicit promise-based approach
+      const authPromise = new Promise((resolve) => {
+        ufRequest(`BlockAuthenticate ${sectorNum} 0x60 0`, function() {
+          const response = ufResponse();
+          resolve(response);
+        });
+      });
+      
+      const authResponse = await authPromise;
+      
+      if (authResponse.Status !== "[0x00 (0)] UFR_OK") {
+        console.error(`Authentication error for sector ${sectorNum}: ${authResponse.Status}`);
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Authentication failed for sector ${sectorNum}: ${authResponse.Status}</div>`;
+          // Add detailed error information for debugging
+          logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ Check if KEY A (0x60) is correct for sector ${sectorNum}</div>`;
+        }
+        throw `Authentication failed: ${authResponse.Status}`;
+      }
+      
+      if (logDisplay) {
+        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Successfully authenticated sector ${sectorNum}</div>`;
+      }
+      
+      // After successful authentication, perform the write - using explicit promise-based approach
+      const writePromise = new Promise((resolve) => {
+        ufRequest(`LinearWrite 0x${hexData} ${address} 16 0x60 0`, function() {
+          const response = ufResponse();
+          resolve(response);
+        });
+      });
+      
+      const output = await writePromise;
+      
+      if (output.Status === "[0x00 (0)] UFR_OK") {
+        console.log("Write successful to address " + address + ": " + text);
+        
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Successfully wrote to address ${address}: "${text}"</div>`;
+          logDisplay.scrollTop = logDisplay.scrollHeight;
+        }
+      } else {
+        console.error("Write error at address " + address + ": " + output.Status);
+        
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error writing to address ${address}: ${output.Status}</div>`;
+          
+          // Special handling for common errors
+          if (output.Status.includes("AUTH_ERROR")) {
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ Authentication error! This might be due to:</div>`;
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>  - Wrong key used (currently using KEY A)</div>`;
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>  - Key index is incorrect (currently using index 0)</div>`;
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>  - Block is protected with different access rights</div>`;
+          }
+          logDisplay.scrollTop = logDisplay.scrollHeight;
+        }
+        
+        throw "Write failed: " + output.Status;
+      }
     }
 
     //==========================================================================
@@ -653,7 +1098,7 @@
      * - Block Size: 16 bytes per block
      * - Total Blocks: 256 blocks (numbered 0-255)
      * - Sector Organization:
-     *   - Sectors 0-31: 4 blocks per sector (Blocks 0-127)
+     *   - Sectors 0-31: 4 blocks per sector (Blocks 0-127) 
      *   - Sectors 32-39: 16 blocks per sector (Blocks 128-255)
      * 
      * ADDRESSING SCHEMES:
@@ -665,7 +1110,7 @@
      * NEOBAND MEMORY ALLOCATION:
      * - Registration Data (Username): Sector 39, Blocks 0-1 (Linear Blocks 240-241)
      *   - Block 240: First 16 chars of username
-     *   - Block 241: Last 16 chars of username (if needed)
+     *   - Block 241: Last 16 chars of username
      * 
      * AUTHENTICATION:
      * - All operations use KEY A authentication (0x60)
@@ -683,292 +1128,395 @@
      * - Data is read/written as raw strings
      * - Empty fields are written as empty strings (filled with 0xFF padding)
      */
-
+    
     /**
-     * Scans an NFC tag to get its UID
-     * Updates the Band ID field and status display
-     * 
-     * OPERATION DETAILS:
-     * - Uses ufRequest("GetCardIdEx") to communicate with the uFR reader
-     * - Extracts UID from the response when successful
-     * - Updates three UI elements with the detected UID:
-     *   1. bandIdInput - Shows UID in registration page
-     *   2. factionUsernameField - Populates faction page with same UID
-     *   3. allegiancesUsernameField - Populates allegiances page with same UID
-     * - Sets status to "Connected" when successful
-     * - Sets status to "Error" and displays alert on failure
-     * 
-     * ERROR HANDLING:
-     * - Logs detailed error information to console
-     * - Displays user-friendly error messages via alerts
-     * - Preserves error state in status display
+     * Displays the memory allocation for the Mifare 4K card based on the PDD
+     * Useful for debugging purposes
+     */
+    function debugMemoryAllocation() {
+      // Create a log display element if it doesn't exist
+      let logDisplay = document.getElementById("memoryAllocationDebug");
+      if (!logDisplay) {
+        logDisplay = document.createElement("div");
+        logDisplay.id = "memoryAllocationDebug";
+        logDisplay.style.maxHeight = "300px";
+        logDisplay.style.overflow = "auto";
+        logDisplay.style.fontFamily = "monospace";
+        logDisplay.style.fontSize = "12px";
+        logDisplay.style.marginTop = "15px";
+        logDisplay.style.padding = "10px";
+        logDisplay.style.backgroundColor = "#000022";
+        logDisplay.style.border = "1px solid #0BDCF3";
+        
+        // Add it to the active page
+        const activePage = document.querySelector(".page.active");
+        if (activePage) {
+          activePage.appendChild(logDisplay);
+        } else {
+          document.getElementById("registrationPage").appendChild(logDisplay);
+        }
+      }
+      
+      // Clear previous content
+      logDisplay.innerHTML = "<div style='color:#0BDCF3;'>--- MIFARE 4K MEMORY ALLOCATION ---</div>";
+      
+      // Display memory allocation based on PDD
+      logDisplay.innerHTML += `
+        <div style='color:#FFFFFF;'>MIFARE Classic 4K Structure:</div>
+        <div style='color:#FFFFFF;'>- Sectors 0-31: 4 blocks per sector (Blocks 0-127)</div>
+        <div style='color:#FFFFFF;'>- Sectors 32-39: 16 blocks per sector (Blocks 128-255)</div>
+        <div style='color:#FFFFFF;'>- Each block is 16 bytes</div>
+        <div style='color:#FFFFFF;'>- Every sector has a trailer block (Block 3 or Block 15)</div>
+        
+        <div style='color:#0BDCF3;'>Memory Allocation according to PDD:</div>
+        <div style='color:#FFFFFF;'>- Sector 0: Manufacturer (UID - read-only)</div>
+        <div style='color:#FFFFFF;'>- Sectors 1-31: Factions (gameplay data)</div>
+        <div style='color:#FFFFFF;'>- Sectors 16,32-35: Reserved</div>
+        <div style='color:#FFFFFF;'>- Sectors 36-38: Allegiances (gameplay data)</div>
+        <div style='color:#FFFFFF;'>- Sector 39: User Data (registration)</div>
+        
+        <div style='color:#0BDCF3;'>Current App Addressing:</div>
+        <div style='color:#FFFFFF;'>- Username: Blocks 240-241 (Sector 39, Blocks 0-1)</div>
+        <div style='color:#FFFFFF;'>- Faction Data: Blocks 4-6 (Sector 1, Blocks 0-2)</div>
+        <div style='color:#FFFFFF;'>- Allegiances: Blocks 192-207 (Sector 36, Blocks 0-15)</div>
+      `;
+      
+      // Add an example of address calculation
+      logDisplay.innerHTML += `
+        <div style='color:#0BDCF3;'>Examples of Address Calculation:</div>
+      `;
+      
+      // Show examples of address calculations
+      const exampleAddresses = [4, 32, 128, 192, 240, 255];
+      for (const addr of exampleAddresses) {
+        const info = calculateMifareAddress(addr);
+        logDisplay.innerHTML += `
+          <div style='color:#FFFFFF;'>Address ${addr} = Sector ${info.sector}, Block ${info.blockInSector} ${info.isTrailerBlock ? '(TRAILER BLOCK)' : ''}</div>
+        `;
+      }
+      
+      // Add button to close
+      const closeButton = document.createElement("button");
+      closeButton.innerText = "Close";
+      closeButton.className = "read-write-button";
+      closeButton.style.marginTop = "10px";
+      closeButton.onclick = function() {
+        logDisplay.remove();
+      };
+      logDisplay.appendChild(closeButton);
+    }
+    
+    /**
+     * Handles scanning a tag and updating the UI
      */
     async function handleScanTag() {
+      showOperationIndicator("Initializing Reader");
+      
       try {
-        console.log("[SCAN] Attempting to scan NFC tag...");
-        ufRequest("GetCardIdEx", function() {
-          var output = ufResponse();
-          if (output && output.Status === "[0x00 (0)] UFR_OK") {
-            var uid = output.CardUid || "Unknown UID";
-            console.log(`[SCAN SUCCESS] Card detected with UID: ${uid}`);
-            
-            // Update Band ID field
-            document.getElementById("bandIdInput").value = uid;
-            document.getElementById("statusInput").value = "Connected";
-            
-            // Update username fields on Faction and Allegiances pages
-            document.getElementById("factionUsernameField").value = uid;
-            document.getElementById("allegiancesUsernameField").value = uid;
-          } else {
-            console.error(`[SCAN ERROR] Failed to scan tag: ${output ? output.Status : "Unknown error"}`);
-            alert("Failed to scan tag. Status: " + (output ? output.Status : "Unknown"));
-            document.getElementById("statusInput").value = "Error";
+        // Get log display element
+        const logDisplay = document.getElementById("registrationLogDisplay") || 
+                          document.getElementById("factionLogDisplay") ||
+                          document.getElementById("allegiancesLogDisplay");
+        
+        if (logDisplay) {
+          logDisplay.innerHTML = ""; // Clear the log
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Initializing NFC reader...</div>`;
+        }
+        
+        // Initialize reader
+        const readerInitialized = await initializeReader();
+        if (!readerInitialized) {
+          updateOperationIndicator("Reader initialization failed");
+          if (logDisplay) {
+            logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Reader initialization failed. Please ensure reader is connected and working.</div>`;
           }
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Reader initialization failed", "Please ensure the reader is connected and drivers are installed.", "error");
+          }, 1000);
+          return;
+        }
+        
+        // Reader successfully initialized
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Reader initialized successfully</div>`;
+        }
+        
+        updateOperationIndicator("Scanning for card...");
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Waiting for tag...</div>`;
+        }
+        
+        // Get card ID using promise approach
+        const getCardIdPromise = new Promise((resolve) => {
+          ufRequest("GetCardIdEx", function() {
+            const response = ufResponse();
+            resolve(response);
+          });
         });
+        
+        const response = await getCardIdPromise;
+        
+        // Update the UI based on the result
+        if (response.Status === "[0x00 (0)] UFR_OK") {
+          tagUID = response.CardId;
+          tagIsValid = true;
+          
+          updateOperationIndicator("NFC Tag Detected");
+          
+          if (logDisplay) {
+            logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Tag detected with UID: ${tagUID}</div>`;
+          }
+          
+          // Populate UID across all possible pages
+          const uidElements = document.getElementsByClassName("uidvalue");
+          for (let i = 0; i < uidElements.length; i++) {
+            uidElements[i].innerHTML = tagUID;
+          }
+          
+          // Show success confirmation
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Tag Successfully Scanned", `UID: ${tagUID}`, "success");
+          }, 1000);
+          
+          return tagUID;
+        } else {
+          tagUID = "";
+          tagIsValid = false;
+          
+          updateOperationIndicator("No NFC Tag Detected");
+          
+          if (logDisplay) {
+            logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to detect tag: ${response.Status}</div>`;
+            
+            // Add helpful debugging info for common issues
+            if (response.Status.includes("NO_CARD")) {
+              logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ No card on reader. Please place a compatible MIFARE card on the reader.</div>`;
+            } else if (response.Status.includes("TIMEOUT")) {
+              logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ Reader timeout. Please ensure the card is positioned correctly.</div>`;
+            } else if (response.Status.includes("PORT_ERROR")) {
+              logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ Reader connection issue. Try disconnecting and reconnecting the reader.</div>`;
+            }
+          }
+          
+          // Clear UID across all possible pages
+          const uidElements = document.getElementsByClassName("uidvalue");
+          for (let i = 0; i < uidElements.length; i++) {
+            uidElements[i].innerHTML = "NO BAND SCANNED";
+          }
+          
+          // Show error confirmation
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Tag Scan Failed", response.Status, "error");
+          }, 1000);
+          
+          return null;
+        }
       } catch (error) {
-        console.error(`[SCAN ERROR] Exception during scan: ${error.message}`);
-        alert("Error scanning tag: " + error.message);
+        console.error("Error in handleScanTag:", error);
+        updateOperationIndicator("Error scanning tag");
+        
+        const logDisplay = document.getElementById("registrationLogDisplay") || 
+                          document.getElementById("factionLogDisplay") ||
+                          document.getElementById("allegiancesLogDisplay");
+        
+        if (logDisplay) {
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error scanning tag: ${error}</div>`;
+        }
+        
+        // Show error confirmation
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Tag Scan Error", error.toString(), "error");
+        }, 1000);
+        
+        return null;
       }
     }
 
     /**
-     * Reads the username from the NFC tag (address 240-241 - Sector 39, Blocks 0-1)
-     * Updates the username input field
-     * 
-     * OPERATION DETAILS:
-     * - Creates/updates a visual log display in the registration page
-     * - Reads from Block 240 (Sector 39, Block 0) for first 16 chars
-     * - Attempts to read Block 241 (Sector 39, Block 1) for additional 16 chars
-     * - Combines data from both blocks to form the complete username
-     * - Uses KEY A (0x60) authentication with key index 0
-     * - Updates the UI with the retrieved username
-     * - Sets status to "Read OK" when successful
-     * 
-     * ERROR HANDLING:
-     * - Graceful degradation - if Block 241 fails, still uses Block 240 data
-     * - Logs both success and failure of each block read operation
-     * - Provides color-coded visual feedback in the log display
-     * - Sets status to "Read Error" if the primary block read fails
-     * - Displays technical details in console and user-friendly summary in UI
-     * 
-     * MIFARE MEMORY ADDRESSED:
-     * - Primary block: Address 240 (Sector 39, Block 0)
-     * - Secondary block: Address 241 (Sector 39, Block 1)
+     * Reads registration data from the NFC band
      */
     async function handleReadRegistration() {
+      showOperationIndicator("Reading Registration Data");
+      
+      // Create log display for registration page
+      const logDisplay = createLogDisplay("registrationPage", "registration", "READ REGISTRATION DATA");
+      
       try {
-        console.log("[USERNAME READ] Starting username read operation");
-        
-        // Create a log display element if it doesn't exist
-        let logDisplay = document.getElementById("registrationLogDisplay");
-        if (!logDisplay) {
-          logDisplay = document.createElement("div");
-          logDisplay.id = "registrationLogDisplay";
-          logDisplay.style.maxHeight = "150px";
-          logDisplay.style.overflow = "auto";
-          logDisplay.style.fontFamily = "monospace";
-          logDisplay.style.fontSize = "12px";
-          logDisplay.style.marginTop = "15px";
-          logDisplay.style.padding = "10px";
-          logDisplay.style.backgroundColor = "#000022";
-          logDisplay.style.border = "1px solid #0BDCF3";
-          document.getElementById("registrationPage").appendChild(logDisplay);
+        // Check if a valid tag has been scanned
+        if (!tagIsValid || !tagUID) {
+          updateOperationIndicator("Error: No Band Scanned");
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No band scanned. Please scan a band first.</div>`;
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("No Band Scanned", "Please scan a band first", "error");
+          }, 1000);
+          return;
         }
         
-        // Clear previous logs
-        logDisplay.innerHTML = "<div style='color:#0BDCF3;'>--- OPERATION LOGS ---</div>";
+        updateOperationIndicator("Reading username...");
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading username from address 0...</div>`;
         
-        // Read first half of username from address 240 (Sector 39, Block 0)
-        logDisplay.innerHTML += "<div style='color:#FFFFFF;'>Reading username part 1 (Sector 39, Block 0)...</div>";
-        let username = await readField("240");
-        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Successfully read from Block 240: "${username}"</div>`;
-        
-        try {
-          // Try to read second half of username from address 241 (Sector 39, Block 1)
-          logDisplay.innerHTML += "<div style='color:#FFFFFF;'>Reading username part 2 (Sector 39, Block 1)...</div>";
-          const username2 = await readField("241");
-          // Combine the two parts if second part exists
-          if (username2) {
-            username += username2;
-            logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Successfully read from Block 241: "${username2}"</div>`;
-          } else {
-            logDisplay.innerHTML += "<div style='color:#FFA500;'>⚠ Block 241 empty or contains padding only</div>";
-          }
-        } catch (error) {
-          // If there's an error reading the second block, just use the first block
-          console.log("[USERNAME READ] Note: Only reading first block of username:", error);
-          logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ Could not read Block 241: ${error}</div>`;
+        // Read username from address 0
+        const username = await readField(0);
+        if (username) {
+          document.getElementById("usernameInput").value = username;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Username read successfully: ${username}</div>`;
+        } else {
+          document.getElementById("usernameInput").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read username</div>`;
         }
         
-        document.getElementById("usernameInput").value = username;
-        document.getElementById("statusInput").value = "Read OK";
-        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Complete username: "${username}"</div>`;
-        console.log(`[USERNAME READ] Complete username read: "${username}"`);
+        // Continue with other registration fields
+        updateOperationIndicator("Reading additional fields...");
+        
+        // Read the team
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading team from address 1...</div>`;
+        const team = await readField(1);
+        if (team) {
+          document.getElementById("teamInput").value = team;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Team read successfully: ${team}</div>`;
+        } else {
+          document.getElementById("teamInput").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read team</div>`;
+        }
+        
+        // Read the player level
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading player level from address 2...</div>`;
+        const playerLevel = await readField(2);
+        if (playerLevel) {
+          document.getElementById("playerLevelInput").value = playerLevel;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Player level read successfully: ${playerLevel}</div>`;
+        } else {
+          document.getElementById("playerLevelInput").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read player level</div>`;
+        }
+        
+        // Read the email
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading email from address 3...</div>`;
+        const email = await readField(3);
+        if (email) {
+          document.getElementById("emailInput").value = email;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Email read successfully: ${email}</div>`;
+        } else {
+          document.getElementById("emailInput").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read email</div>`;
+        }
+        
+        updateOperationIndicator("Registration Data Read Complete");
+        
+        // Show success message
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Registration Data Read", "All data read successfully", "success");
+        }, 1000);
+        
       } catch (error) {
-        console.error("[USERNAME READ ERROR]", error);
-        document.getElementById("statusInput").value = "Read Error";
+        console.error("Error reading registration data:", error);
+        logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error: ${error.toString()}</div>`;
+        updateOperationIndicator("Error Reading Registration");
         
-        // Update log display with error
-        let logDisplay = document.getElementById("registrationLogDisplay");
-        if (logDisplay) {
-          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ ERROR: ${error}</div>`;
-        }
-        
-        alert(error);
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Error Reading Registration", error.toString(), "error");
+        }, 1000);
       }
     }
 
     /**
-     * Writes the username to the NFC tag (addresses 240-241 - Sector 39, Blocks 0-1)
-     * Validates input before writing
-     * 
-     * OPERATION DETAILS:
-     * - Creates/updates a visual log display in the registration page
-     * - Performs validation checks:
-     *   1. Verifies a band has been scanned
-     *   2. Ensures username is not empty
-     *   3. Confirms username is 32 characters or less
-     * - Splits username into two parts if longer than 16 chars:
-     *   - First 16 chars → Block 240 (Sector 39, Block 0)
-     *   - Remaining chars → Block 241 (Sector 39, Block 1)
-     * - If username is 16 chars or less, writes to Block 240 and clears Block 241
-     * - Uses KEY A (0x60) authentication with key index 0
-     * - Sets status to "Registered" when successful
-     * 
-     * MEMORY HANDLING:
-     * - Each block write is exactly 16 bytes
-     * - Shorter data is padded with FF
-     * - Always clears Block 241 if not needed to avoid data remnants
-     * - Ensures proper null-termination and memory clearing
-     * 
-     * ERROR HANDLING:
-     * - Provides detailed validation feedback before attempting writes
-     * - Logs both success and failure of each block write operation
-     * - Color-coded visual feedback in the log display
-     * - Sets status to "Write Error" if any write operation fails
-     * 
-     * MIFARE MEMORY ADDRESSED:
-     * - Primary block: Address 240 (Sector 39, Block 0)
-     * - Secondary block: Address 241 (Sector 39, Block 1)
+     * Writes registration data to the NFC band
      */
     async function handleWriteRegistration() {
+      showOperationIndicator("Writing Registration Data");
+      
+      // Create log display for registration page
+      const logDisplay = createLogDisplay("registrationPage", "registration", "WRITE REGISTRATION DATA");
+      
       try {
-        console.log("[USERNAME WRITE] Starting username write operation");
-        var username = document.getElementById("usernameInput").value.trim();
-        
-        // Create a log display element if it doesn't exist
-        let logDisplay = document.getElementById("registrationLogDisplay");
-        if (!logDisplay) {
-          logDisplay = document.createElement("div");
-          logDisplay.id = "registrationLogDisplay";
-          logDisplay.style.maxHeight = "150px";
-          logDisplay.style.overflow = "auto";
-          logDisplay.style.fontFamily = "monospace";
-          logDisplay.style.fontSize = "12px";
-          logDisplay.style.marginTop = "15px";
-          logDisplay.style.padding = "10px";
-          logDisplay.style.backgroundColor = "#000022";
-          logDisplay.style.border = "1px solid #0BDCF3";
-          document.getElementById("registrationPage").appendChild(logDisplay);
+        // Check if a valid tag has been scanned
+        if (!tagIsValid || !tagUID) {
+          updateOperationIndicator("Error: No Band Scanned");
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No band scanned. Please scan a band first.</div>`;
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("No Band Scanned", "Please scan a band first", "error");
+          }, 1000);
+          return;
         }
         
-        // Clear previous logs
-        logDisplay.innerHTML = "<div style='color:#0BDCF3;'>--- OPERATION LOGS ---</div>";
+        // Get values from input fields
+        const username = document.getElementById("usernameInput").value.trim();
+        const team = document.getElementById("teamInput").value.trim();
+        const playerLevel = document.getElementById("playerLevelInput").value.trim();
+        const email = document.getElementById("emailInput").value.trim();
         
         // Validate inputs
-        if (!document.getElementById("bandIdInput").value.trim()) {
-          logDisplay.innerHTML += "<div style='color:#FF0000;'>✗ No band detected. Please scan a band first.</div>";
-          alert("Please scan a band first.");
-          return;
-        }
         if (!username) {
-          logDisplay.innerHTML += "<div style='color:#FF0000;'>✗ Username field is empty. Please enter a username.</div>";
-          alert("Please enter a username.");
+          updateOperationIndicator("Error: Missing Username");
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Username is required.</div>`;
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Missing Username", "Username is required", "error");
+          }, 1000);
           return;
         }
-        if (username.length > 32) {
-          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Username too long (${username.length}/32 chars). Must be 32 characters or less.</div>`;
-          alert("Username must be 32 characters or less.");
-          return;
+        
+        // Write username to address 0
+        updateOperationIndicator("Writing username...");
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing username to address 0: "${username}"</div>`;
+        await writeField(0, username);
+        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Username written successfully</div>`;
+        
+        // Write team to address 1
+        if (team) {
+          updateOperationIndicator("Writing team...");
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing team to address 1: "${team}"</div>`;
+          await writeField(1, team);
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Team written successfully</div>`;
         }
         
-        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Validating username: "${username}" (${username.length}/32 chars)</div>`;
-        
-        // Split username into two parts if needed (16 bytes each)
-        let firstHalf = username;
-        let secondHalf = "";
-        
-        if (username.length > 16) {
-          firstHalf = username.substring(0, 16);
-          secondHalf = username.substring(16);
-          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Username split into two parts: "${firstHalf}" + "${secondHalf}"</div>`;
-        } else {
-          logDisplay.innerHTML += "<div style='color:#FFFFFF;'>Username fits in single block</div>";
+        // Write player level to address 2
+        if (playerLevel) {
+          updateOperationIndicator("Writing player level...");
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing player level to address 2: "${playerLevel}"</div>`;
+          await writeField(2, playerLevel);
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Player level written successfully</div>`;
         }
         
-        // Write first half of username to address 240 (Sector 39, Block 0)
-        logDisplay.innerHTML += "<div style='color:#FFFFFF;'>Writing to Block 240 (Sector 39, Block 0)...</div>";
-        await writeField("240", firstHalf);
-        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Successfully wrote to Block 240: "${firstHalf}"</div>`;
-        
-        // Write second half of username to address 241 (Sector 39, Block 1) if needed
-        if (secondHalf) {
-          logDisplay.innerHTML += "<div style='color:#FFFFFF;'>Writing to Block 241 (Sector 39, Block 1)...</div>";
-          await writeField("241", secondHalf);
-          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Successfully wrote to Block 241: "${secondHalf}"</div>`;
-        } else {
-          // Clear the second block if shorter username
-          logDisplay.innerHTML += "<div style='color:#FFFFFF;'>Clearing Block 241 (Sector 39, Block 1)...</div>";
-          await writeField("241", "");
-          logDisplay.innerHTML += "<div style='color:#00FF00;'>✓ Successfully cleared Block 241</div>";
+        // Write email to address 3
+        if (email) {
+          updateOperationIndicator("Writing email...");
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing email to address 3: "${email}"</div>`;
+          await writeField(3, email);
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Email written successfully</div>`;
         }
         
-        document.getElementById("statusInput").value = "Registered";
-        logDisplay.innerHTML += "<div style='color:#00FF00;'>✓ Registration completed successfully!</div>";
-        console.log(`[USERNAME WRITE] Username "${username}" written successfully to blocks 240-241`);
-        alert("Registration successful!");
+        updateOperationIndicator("Registration Data Write Complete");
+        
+        // Show success message
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Registration Data Written", "All data written successfully", "success");
+        }, 1000);
+        
       } catch (error) {
-        console.error("[USERNAME WRITE ERROR]", error);
-        document.getElementById("statusInput").value = "Write Error";
+        console.error("Error writing registration data:", error);
+        logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error: ${error.toString()}</div>`;
+        updateOperationIndicator("Error Writing Registration");
         
-        // Update log display with error
-        let logDisplay = document.getElementById("registrationLogDisplay");
-        if (logDisplay) {
-          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ ERROR: ${error}</div>`;
-        }
-        
-        alert(error);
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Error Writing Registration", error.toString(), "error");
+        }, 1000);
       }
     }
 
     /**
      * Resets the NFC tag by clearing the username (addresses 240-241 - Sector 39, Blocks 0-1)
      * Confirms with user before proceeding
-     * 
-     * OPERATION DETAILS:
-     * - Creates/updates a visual log display in the registration page
-     * - Verifies a band has been scanned before proceeding
-     * - Confirms reset action with the user via confirmation dialog
-     * - Writes empty data to both blocks:
-     *   - Block 240 (Sector 39, Block 0) - Primary username block
-     *   - Block 241 (Sector 39, Block 1) - Secondary username block
-     * - Uses KEY A (0x60) authentication with key index 0
-     * - Resets all UI fields to initial state
-     * - Sets status to "Unregistered" when successful
-     * 
-     * MEMORY HANDLING:
-     * - Writes empty strings which get padded with FF
-     * - Ensures ALL username data is cleared by addressing both blocks
-     * - Follows standard 16-byte block write operations
-     * 
-     * ERROR HANDLING:
-     * - Logs detailed error information to console
-     * - Provides color-coded visual feedback in the log display
-     * - Displays descriptive alerts for user feedback
-     * 
-     * MIFARE MEMORY ADDRESSED:
-     * - Primary block: Address 240 (Sector 39, Block 0)
-     * - Secondary block: Address 241 (Sector 39, Block 1)
      */
     async function handleResetRegistration() {
       try {
@@ -1004,11 +1552,16 @@
           return;
         }
         
+        // Show operation indicator
+        showOperationIndicator("Resetting band data");
+        
         // Clear username at both blocks
+        updateOperationIndicator("Clearing block 240");
         logDisplay.innerHTML += "<div style='color:#FFFFFF;'>Clearing Block 240 (Sector 39, Block 0)...</div>";
         await writeField("240", "");
         logDisplay.innerHTML += "<div style='color:#00FF00;'>✓ Successfully cleared Block 240</div>";
         
+        updateOperationIndicator("Clearing block 241");
         logDisplay.innerHTML += "<div style='color:#FFFFFF;'>Clearing Block 241 (Sector 39, Block 1)...</div>";
         await writeField("241", "");
         logDisplay.innerHTML += "<div style='color:#00FF00;'>✓ Successfully cleared Block 241</div>";
@@ -1018,11 +1571,24 @@
         document.getElementById("bandIdInput").value = "Waiting for band...";
         document.getElementById("statusInput").value = "Unregistered";
         
+        // Update indicator
+        updateOperationIndicator("Reset complete");
+        
         logDisplay.innerHTML += "<div style='color:#00FF00;'>✓ Reset completed successfully!</div>";
         console.log("[USERNAME RESET] Username data cleared successfully from blocks 240-241");
-        alert("Reset successful!");
+        
+        // Hide indicator with a short delay
+        setTimeout(() => {
+          hideOperationIndicator();
+          // Display visual confirmation
+          showVisualConfirmation("Username successfully cleared from band", 'success');
+          alert("Reset successful!");
+        }, 1000);
       } catch (error) {
         console.error("[USERNAME RESET ERROR]", error);
+        
+        // Update indicator
+        updateOperationIndicator("Error during reset");
         
         // Update log display with error
         let logDisplay = document.getElementById("registrationLogDisplay");
@@ -1030,7 +1596,12 @@
           logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ ERROR: ${error}</div>`;
         }
         
-        alert(error);
+        // Hide indicator with a short delay
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Error resetting band data", 'error');
+          alert(error);
+        }, 1000);
       }
     }
 
@@ -1039,162 +1610,251 @@
     //==========================================================================
     
     /**
-     * Reads faction data from the NFC tag
-     * - Username from addresses 240-241 (Sector 39, Blocks 0-1)
-     * - Hunter/Bounty from address 4 (Sector 1, Block 0)
-     * - Wins from address 5 (Sector 1, Block 1)
-     * - Draw Time from address 6 (Sector 1, Block 2)
-     * 
-     * USERNAME HANDLING:
-     * - Reads the full 32-character username across two blocks:
-     *   1. Block 240 (Sector 39, Block 0) - First 16 characters
-     *   2. Block 241 (Sector 39, Block 1) - Last 16 characters (if any)
-     * - Gracefully degrades if Block 241 cannot be read
-     * - Maintains compatibility with older cards that may only use Block 240
+     * Creates or gets a log display for the current page
+     * @param {string} pageId - The ID of the page containing the log
+     * @param {string} logType - The type of log (e.g., 'registration', 'faction', 'allegiances')
+     * @param {string} headerText - The header text to display at the top of the log
+     * @returns {HTMLElement} - The log display element
+     */
+    function createLogDisplay(pageId, logType, headerText) {
+      // Determine log ID based on type
+      const logId = `${logType}LogDisplay`;
+      
+      // Check if log display already exists
+      let logDisplay = document.getElementById(logId);
+      
+      // Create log display if it doesn't exist
+      if (!logDisplay) {
+        logDisplay = document.createElement("div");
+        logDisplay.id = logId;
+        logDisplay.className = "log-display";
+        
+        // Find the container to append the log display to
+        const container = document.getElementById(pageId);
+        if (container) {
+          container.appendChild(logDisplay);
+        } else {
+          console.error(`Container with ID ${pageId} not found`);
+        }
+      }
+      
+      // Clear and initialize the log display with header
+      if (headerText) {
+        logDisplay.innerHTML = `<div style='color:#0BDCF3;'>--- ${headerText} ---</div>`;
+      } else {
+        logDisplay.innerHTML = "";
+      }
+      
+      return logDisplay;
+    }
+    
+    /**
+     * Reads faction data from the NFC band
      */
     async function handleReadFaction() {
+      showOperationIndicator("Reading Faction Data");
+      
+      // Create log display for faction page
+      const logDisplay = createLogDisplay("factionPage", "faction", "READ FACTION DATA");
+      
       try {
-        // Check if we have a scanned band or need to scan one
-        if (!document.getElementById("bandIdInput").value.trim()) {
-          alert("Please scan a band first.");
+        // Check if a valid tag has been scanned
+        if (!tagIsValid || !tagUID) {
+          updateOperationIndicator("Error: No Band Scanned");
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No band scanned. Please scan a band first.</div>`;
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("No Band Scanned", "Please scan a band first", "error");
+          }, 1000);
           return;
         }
         
-        // Status update for visibility
-        const statusElement = document.createElement("div");
-        statusElement.id = "factionStatusMessage";
-        statusElement.style.color = "#0BDCF3";
-        statusElement.style.textAlign = "center";
-        statusElement.style.marginTop = "10px";
+        // First read the username to populate that field
+        updateOperationIndicator("Reading username...");
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading username from address 0...</div>`;
         
-        // If it already exists, remove it
-        const existingStatus = document.getElementById("factionStatusMessage");
-        if (existingStatus) {
-          existingStatus.remove();
+        const username = await readField(0);
+        if (username) {
+          document.getElementById("factionUsernameField").value = username;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Username read successfully: ${username}</div>`;
+        } else {
+          document.getElementById("factionUsernameField").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read username</div>`;
         }
         
-        // Add the status element to the faction page
-        document.getElementById("factionPage").appendChild(statusElement);
-        statusElement.textContent = "Reading username data...";
+        // Read faction data from addresses 4-6
+        updateOperationIndicator("Reading faction data...");
         
-        // First, read the username from address 240 (Sector 39, Block 0)
-        let factionUser = await readField("240");
-        
-        try {
-          // Try to read second half of username from address 241 (Sector 39, Block 1)
-          const username2 = await readField("241");
-          // Combine the two parts if second part exists
-          if (username2) {
-            factionUser += username2;
-            console.log(`[FACTION READ] Complete username read from blocks 240-241: "${factionUser}"`);
-          }
-        } catch (error) {
-          // If there's an error reading the second block, just use the first block
-          console.log("[FACTION READ] Note: Only reading first block of username:", error);
+        // Read hunter/bounty field from address 4
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading Hunter/Bounty from address 4...</div>`;
+        const hunterBounty = await readField(4);
+        if (hunterBounty) {
+          document.getElementById("hunterBountyField").value = hunterBounty;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Hunter/Bounty read successfully: ${hunterBounty}</div>`;
+        } else {
+          document.getElementById("hunterBountyField").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read Hunter/Bounty field</div>`;
         }
         
-        document.getElementById("factionUsernameField").value = factionUser;
-        statusElement.textContent = "Reading faction data...";
-        
-        try {
-          // Read Hunter/Bounty from block 4 (Sector 1, Block 0)
-          const hunterBounty = await readField("4");
-          document.getElementById("hunterBountyInput").value = hunterBounty;
-          
-          // Read Wins from Block 5 (Sector 1, Block 1)
-          const wins = await readField("5");
-          document.getElementById("winsInput").value = wins;
-          
-          // Read Draw Time from Block 6 (Sector 1, Block 2)
-          const drawTime = await readField("6");
-          document.getElementById("drawTimeInput").value = drawTime;
-          
-          statusElement.textContent = "Faction data read successfully";
-          statusElement.style.color = "#00FF00"; // Green for success
-        } catch (sectorError) {
-          console.error("Error reading faction data:", sectorError);
-          statusElement.textContent = "Error reading faction data. Card may need to be formatted.";
-          statusElement.style.color = "#FF0000"; // Red for error
-          
-          // Still allow the username to be shown even if faction data fails
-          document.getElementById("hunterBountyInput").value = "";
-          document.getElementById("winsInput").value = "";
-          document.getElementById("drawTimeInput").value = "";
+        // Read wins field from address 5
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading Wins from address 5...</div>`;
+        const wins = await readField(5);
+        if (wins) {
+          document.getElementById("winsField").value = wins;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Wins read successfully: ${wins}</div>`;
+        } else {
+          document.getElementById("winsField").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read Wins field</div>`;
         }
+        
+        // Read draw time field from address 6
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading Draw Time from address 6...</div>`;
+        const drawTime = await readField(6);
+        if (drawTime) {
+          document.getElementById("drawTimeField").value = drawTime;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Draw Time read successfully: ${drawTime}</div>`;
+        } else {
+          document.getElementById("drawTimeField").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read Draw Time field</div>`;
+        }
+        
+        // Read faction custom fields from addresses 7-9
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading Faction Field #1 from address 7...</div>`;
+        const factionField1 = await readField(7);
+        if (factionField1) {
+          document.getElementById("factionField1").value = factionField1;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Faction Field #1 read successfully: ${factionField1}</div>`;
+        } else {
+          document.getElementById("factionField1").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read Faction Field #1</div>`;
+        }
+        
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading Faction Field #2 from address 8...</div>`;
+        const factionField2 = await readField(8);
+        if (factionField2) {
+          document.getElementById("factionField2").value = factionField2;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Faction Field #2 read successfully: ${factionField2}</div>`;
+        } else {
+          document.getElementById("factionField2").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read Faction Field #2</div>`;
+        }
+        
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading Faction Field #3 from address 9...</div>`;
+        const factionField3 = await readField(9);
+        if (factionField3) {
+          document.getElementById("factionField3").value = factionField3;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Faction Field #3 read successfully: ${factionField3}</div>`;
+        } else {
+          document.getElementById("factionField3").value = "";
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read Faction Field #3</div>`;
+        }
+        
+        updateOperationIndicator("Faction Data Read Complete");
+        
+        // Show success message
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Faction Data Read", "All faction data read successfully", "success");
+        }, 1000);
         
       } catch (error) {
-        console.error("Faction read error:", error);
-        alert("Could not read username data. Please scan your band again.");
+        console.error("Error reading faction data:", error);
+        logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error: ${error.toString()}</div>`;
+        updateOperationIndicator("Error Reading Faction Data");
+        
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Error Reading Faction Data", error.toString(), "error");
+        }, 1000);
       }
     }
 
     /**
-     * Writes faction data to the NFC tag
-     * - Hunter/Bounty to address 4 (Sector 1, Block 0)
-     * - Wins to address 5 (Sector 1, Block 1)
-     * - Draw Time to address 6 (Sector 1, Block 2)
+     * Writes faction data to the NFC band
      */
     async function handleWriteFaction() {
+      showOperationIndicator("Writing Faction Data");
+      
+      // Create log display for faction page
+      const logDisplay = createLogDisplay("factionPage", "faction", "WRITE FACTION DATA");
+      
       try {
-        // Validate that we have scanned a band first
-        if (!document.getElementById("factionUsernameField").value.trim()) {
-          alert("Please scan a band or read the faction data first.");
+        // Check if a valid tag has been scanned
+        if (!tagIsValid || !tagUID) {
+          updateOperationIndicator("Error: No Band Scanned");
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No band scanned. Please scan a band first.</div>`;
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("No Band Scanned", "Please scan a band first", "error");
+          }, 1000);
           return;
         }
         
-        // Get the values to write
-        const hunterBounty = document.getElementById("hunterBountyInput").value.trim();
-        const wins = document.getElementById("winsInput").value.trim();
-        const drawTime = document.getElementById("drawTimeInput").value.trim();
+        // Get values from input fields
+        const hunterBounty = document.getElementById("hunterBountyField").value.trim();
+        const wins = document.getElementById("winsField").value.trim();
+        const drawTime = document.getElementById("drawTimeField").value.trim();
+        const factionField1 = document.getElementById("factionField1").value.trim();
+        const factionField2 = document.getElementById("factionField2").value.trim();
+        const factionField3 = document.getElementById("factionField3").value.trim();
         
-        // Status update for visibility
-        const statusElement = document.createElement("div");
-        statusElement.id = "factionStatusMessage";
-        statusElement.style.color = "#0BDCF3";
-        statusElement.style.textAlign = "center";
-        statusElement.style.marginTop = "10px";
+        // Write hunter/bounty to address 4
+        updateOperationIndicator("Writing Hunter/Bounty...");
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing Hunter/Bounty to address 4: "${hunterBounty}"</div>`;
+        await writeField(4, hunterBounty);
+        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Hunter/Bounty written successfully</div>`;
         
-        // If it already exists, remove it
-        const existingStatus = document.getElementById("factionStatusMessage");
-        if (existingStatus) {
-          existingStatus.remove();
+        // Write wins to address 5
+        updateOperationIndicator("Writing Wins...");
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing Wins to address 5: "${wins}"</div>`;
+        await writeField(5, wins);
+        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Wins written successfully</div>`;
+        
+        // Write draw time to address 6
+        updateOperationIndicator("Writing Draw Time...");
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing Draw Time to address 6: "${drawTime}"</div>`;
+        await writeField(6, drawTime);
+        logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Draw Time written successfully</div>`;
+        
+        // Write custom faction fields
+        if (factionField1) {
+          updateOperationIndicator("Writing Faction Field #1...");
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing Faction Field #1 to address 7: "${factionField1}"</div>`;
+          await writeField(7, factionField1);
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Faction Field #1 written successfully</div>`;
         }
         
-        // Add the status element to the faction page
-        document.getElementById("factionPage").appendChild(statusElement);
-        statusElement.textContent = "Writing faction data...";
-        
-        // Track success/failure
-        let success = true;
-        
-        try {
-          // Write Hunter/Bounty to address 4 (Sector 1, Block 0)
-          await writeField("4", hunterBounty);
-          
-          // Write Wins to address 5 (Sector 1, Block 1)
-          await writeField("5", wins);
-          
-          // Write Draw Time to address 6 (Sector 1, Block 2)
-          await writeField("6", drawTime);
-          
-          statusElement.textContent = "Faction data written successfully!";
-          statusElement.style.color = "#00FF00"; // Green for success
-        } catch (writeError) {
-          console.error("Faction write error:", writeError);
-          statusElement.textContent = "Error writing faction data. Card may need to be formatted.";
-          statusElement.style.color = "#FF0000"; // Red for error
-          success = false;
+        if (factionField2) {
+          updateOperationIndicator("Writing Faction Field #2...");
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing Faction Field #2 to address 8: "${factionField2}"</div>`;
+          await writeField(8, factionField2);
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Faction Field #2 written successfully</div>`;
         }
         
-        if (success) {
-          // Only show alert if everything was successful
-          setTimeout(() => {
-            alert("Faction data written successfully!");
-          }, 100);
+        if (factionField3) {
+          updateOperationIndicator("Writing Faction Field #3...");
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing Faction Field #3 to address 9: "${factionField3}"</div>`;
+          await writeField(9, factionField3);
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Faction Field #3 written successfully</div>`;
         }
+        
+        updateOperationIndicator("Faction Data Write Complete");
+        
+        // Show success message
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Faction Data Written", "All faction data written successfully", "success");
+        }, 1000);
+        
       } catch (error) {
-        console.error("Faction operation error:", error);
-        alert("An unexpected error occurred. Please try again.");
+        console.error("Error writing faction data:", error);
+        logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error: ${error.toString()}</div>`;
+        updateOperationIndicator("Error Writing Faction Data");
+        
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Error Writing Faction Data", error.toString(), "error");
+        }, 1000);
       }
     }
 
@@ -1204,45 +1864,38 @@
     
     /**
      * Dynamically builds the 16 allegiance fields
-     * Creates editable labels and input fields for each allegiance
      */
     function buildAllegiancesFields() {
-      var container = document.getElementById("allegiancesContainer");
+      const container = document.getElementById("allegiancesContainer");
       // Only build if not already built
       if (container.childElementCount > 0) return;
       
       // Create 16 allegiance field groups
-      for (var i = 1; i <= 16; i++) {
+      for (let i = 1; i <= 16; i++) {
         // Create a group div
-        var group = document.createElement("div");
+        const group = document.createElement("div");
         group.className = "allegiance-group";
         
         // Create an editable label
-        var label = document.createElement("div");
+        const label = document.createElement("div");
         label.className = "editable-label";
         label.contentEditable = "true";
         label.id = "allegianceLabel" + i;
         
-        // Set default label text based on known allegiance names from CSV
-        if (i <= 16) {
-          if (i <= 8) {
-            label.innerText = "ENDLINE " + i;
-          } else if (i <= 12) {
-            label.innerText = "HELIX " + (i-8);
-          } else {
-            label.innerText = "RESISTANCE " + (i-12);
-          }
+        // Set default label text based on known allegiance names
+        if (i <= 8) {
+          label.innerText = "ENDLINE " + i;
+        } else if (i <= 12) {
+          label.innerText = "HELIX " + (i-8);
         } else {
-          label.innerText = "TEXT " + i;
+          label.innerText = "RESISTANCE " + (i-12);
         }
         
         // Create an input field
-        var input = document.createElement("input");
+        const input = document.createElement("input");
         input.type = "text";
         input.className = "input";
-        input.placeholder = "Enter text";
-        
-        // Set an ID for the input
+        input.placeholder = "Enter value";
         input.id = "allegiance" + i;
         
         // Append label and input to the group
@@ -1254,186 +1907,219 @@
         container.appendChild(group);
       }
     }
-
+    
     /**
-     * Mapping of allegiance fields to their preassigned NFC addresses
-     * Each allegiance has a specific address in the NFC memory for MIFARE 4K cards:
-     * Sector 36, Blocks 0-15 (addresses 192-207)
-     */
-    const allegianceAddresses = {
-      1: "192", 2: "193", 3: "194", 4: "195",
-      5: "196", 6: "197", 7: "198", 8: "199",
-      9: "200", 10: "201", 11: "202", 12: "203",
-      13: "204", 14: "205", 15: "206", 16: "207"
-    };
-
-    /**
-     * Reads allegiance data from the NFC tag
-     * - Username from addresses 240-241 (Sector 39, Blocks 0-1)
-     * - 16 allegiance fields from their respective addresses (Sector 36, Blocks 0-15)
-     * 
-     * USERNAME HANDLING:
-     * - Reads the full 32-character username across two blocks:
-     *   1. Block 240 (Sector 39, Block 0) - First 16 characters
-     *   2. Block 241 (Sector 39, Block 1) - Last 16 characters (if any)
-     * - Gracefully degrades if Block 241 cannot be read
-     * - Maintains compatibility with older cards that may only use Block 240
-     * 
-     * ALLEGIANCE DATA:
-     * - Reads 16 separate allegiance fields from Sector 36 (Blocks 0-15)
-     * - Uses authentication key index 2 for these sectors
-     * - Continues reading even if some fields fail
-     * - Reports success/failure count for transparency
+     * Reads allegiance data from the NFC band
      */
     async function handleReadAllegiances() {
+      showOperationIndicator("Reading Allegiance Data");
+      
+      // Ensure allegiance fields are built
+      buildAllegiancesFields();
+      
+      // Create log display for allegiances page
+      const logDisplay = createLogDisplay("allegiancesPage", "allegiances", "READ ALLEGIANCE DATA");
+      
       try {
-        // Check if we have a scanned band or need to scan one
-        if (!document.getElementById("bandIdInput").value.trim()) {
-          alert("Please scan a band first.");
+        // Check if a valid tag has been scanned
+        if (!tagIsValid || !tagUID) {
+          updateOperationIndicator("Error: No Band Scanned");
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No band scanned. Please scan a band first.</div>`;
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("No Band Scanned", "Please scan a band first", "error");
+          }, 1000);
           return;
         }
         
-        // Status update for visibility
-        const statusElement = document.createElement("div");
-        statusElement.id = "allegiancesStatusMessage";
-        statusElement.style.color = "#0BDCF3";
-        statusElement.style.textAlign = "center";
-        statusElement.style.marginTop = "10px";
+        // First read the username to populate that field
+        updateOperationIndicator("Reading username...");
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading username from address 0...</div>`;
         
-        // If it already exists, remove it
-        const existingStatus = document.getElementById("allegiancesStatusMessage");
-        if (existingStatus) {
-          existingStatus.remove();
-        }
-        
-        // Add the status element to the allegiances page
-        document.getElementById("allegiancesPage").appendChild(statusElement);
-        statusElement.textContent = "Reading username data...";
-        
-        // First read the username from both blocks 240-241 (Sector 39, Blocks 0-1)
-        try {
-          // Read first half of username from address 240 (Sector 39, Block 0)
-          let allegUser = await readField("240");
-          
-          try {
-            // Try to read second half of username from address 241 (Sector 39, Block 1)
-            const username2 = await readField("241");
-            // Combine the two parts if second part exists
-            if (username2) {
-              allegUser += username2;
-              console.log(`[ALLEGIANCES READ] Complete username read from blocks 240-241: "${allegUser}"`);
-            }
-          } catch (secondBlockError) {
-            // If there's an error reading the second block, just use the first block
-            console.log("[ALLEGIANCES READ] Note: Only reading first block of username:", secondBlockError);
-          }
-          
-          document.getElementById("allegiancesUsernameField").value = allegUser;
-          statusElement.textContent = "Reading allegiances data...";
-          
-          // Loop through each allegiance field
-          let successCount = 0;
-          for (var i = 1; i <= 16; i++) {
-            var address = allegianceAddresses[i];
-            
-            try {
-              var text = await readField(address);
-              document.getElementById("allegiance" + i).value = text;
-              successCount++;
-            } catch (fieldError) {
-              console.error(`Error reading allegiance field ${i}:`, fieldError);
-              // Continue with other fields even if one fails
-            }
-          }
-          
-          if (successCount === 16) {
-            statusElement.textContent = "All allegiance data read successfully!";
-            statusElement.style.color = "#00FF00"; // Green for success
-          } else if (successCount > 0) {
-            statusElement.textContent = `Read ${successCount} out of 16 allegiance fields. Some fields may be empty or unreadable.`;
-            statusElement.style.color = "#FFA500"; // Orange for partial success
-          } else {
-            statusElement.textContent = "Could not read any allegiance data. Card may need to be formatted.";
-            statusElement.style.color = "#FF0000"; // Red for error
-          }
-        } catch (error) {
-          console.error("Error reading username:", error);
-          statusElement.textContent = "Error reading username data.";
-          statusElement.style.color = "#FF0000"; // Red for error
+        const username = await readField(0);
+        if (username) {
+          document.getElementById("allegiancesUsernameField").value = username;
+          logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Username read successfully: ${username}</div>`;
+        } else {
           document.getElementById("allegiancesUsernameField").value = "";
-        }
-      } catch (error) {
-        console.error("Allegiances operation error:", error);
-        alert("An unexpected error occurred. Please try again.");
-      }
-    }
-
-    /**
-     * Writes allegiance data to the NFC tag
-     * - 16 allegiance fields to their respective addresses (Sector 36, Blocks 0-15)
-     */
-    async function handleWriteAllegiances() {
-      try {
-        // Validate that we have scanned a band
-        if (!document.getElementById("allegiancesUsernameField").value.trim()) {
-          alert("Please scan a band or read the allegiance data first.");
-          return;
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to read username</div>`;
         }
         
-        // Status update for visibility
-        const statusElement = document.createElement("div");
-        statusElement.id = "allegiancesStatusMessage";
-        statusElement.style.color = "#0BDCF3";
-        statusElement.style.textAlign = "center";
-        statusElement.style.marginTop = "10px";
+        // Read allegiance fields 
+        updateOperationIndicator("Reading allegiance fields");
         
-        // If it already exists, remove it
-        const existingStatus = document.getElementById("allegiancesStatusMessage");
-        if (existingStatus) {
-          existingStatus.remove();
-        }
-        
-        // Add the status element to the allegiances page
-        document.getElementById("allegiancesPage").appendChild(statusElement);
-        statusElement.textContent = "Writing allegiance data...";
+        // Mapping of allegiance fields to their addresses
+        const allegianceAddresses = {
+          1: 192, 2: 193, 3: 194, 4: 195,
+          5: 196, 6: 197, 7: 198, 8: 199,
+          9: 200, 10: 201, 11: 202, 12: 203,
+          13: 204, 14: 205, 15: 206, 16: 207
+        };
         
         // Loop through each allegiance field
         let successCount = 0;
-        for (var i = 1; i <= 16; i++) {
-          var address = allegianceAddresses[i];
-          var text = document.getElementById("allegiance" + i).value.trim();
+        
+        for (let i = 1; i <= 16; i++) {
+          const address = allegianceAddresses[i];
+          const label = document.getElementById("allegianceLabel" + i).innerText.trim();
+          
+          updateOperationIndicator(`Reading ${label} (${i}/16)`);
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading ${label} from address ${address}...</div>`;
           
           try {
-            await writeField(address, text);
-            successCount++;
+            const value = await readField(address);
+            if (value) {
+              document.getElementById("allegiance" + i).value = value;
+              logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ ${label} read successfully: ${value}</div>`;
+              successCount++;
+            } else {
+              document.getElementById("allegiance" + i).value = "";
+              logDisplay.innerHTML += `<div style='color:#FFA500;'>⚠ No data found for ${label}</div>`;
+            }
           } catch (fieldError) {
-            console.error(`Error writing allegiance field ${i}:`, fieldError);
-            // Continue with other fields even if one fails
+            console.error(`Error reading allegiance field ${i} (${label}):`, fieldError);
+            logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error reading ${label}: ${fieldError}</div>`;
           }
         }
         
+        // Display appropriate completion message based on success count
         if (successCount === 16) {
-          statusElement.textContent = "All allegiance data written successfully!";
-          statusElement.style.color = "#00FF00"; // Green for success
+          updateOperationIndicator("All Allegiance Data Read Successfully");
+          
           setTimeout(() => {
-            alert("All allegiance data written successfully!");
-          }, 100);
+            hideOperationIndicator();
+            showVisualConfirmation("All Allegiance Data Read", "All 16 allegiance fields read successfully", "success");
+          }, 1000);
         } else if (successCount > 0) {
-          statusElement.textContent = `Successfully wrote ${successCount} out of 16 allegiance fields. Some fields may have failed.`;
-          statusElement.style.color = "#FFA500"; // Orange for partial success
+          updateOperationIndicator(`${successCount}/16 Allegiance Fields Read`);
+          
           setTimeout(() => {
-            alert(`Successfully wrote ${successCount} out of 16 allegiance fields. Some fields may have failed.`);
-          }, 100);
+            hideOperationIndicator();
+            showVisualConfirmation("Partial Read Complete", `${successCount} of 16 allegiance fields read successfully`, "warning");
+          }, 1000);
         } else {
-          statusElement.textContent = "Failed to write any allegiance data. Please check the card and try again.";
-          statusElement.style.color = "#FF0000"; // Red for error
+          updateOperationIndicator("Failed to Read Allegiance Data");
+          
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Read Failed", "Failed to read any allegiance data", "error");
+          }, 1000);
         }
+        
       } catch (error) {
-        console.error("Allegiances operation error:", error);
-        alert("An unexpected error occurred. Please try again.");
+        console.error("Error reading allegiance data:", error);
+        logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error: ${error.toString()}</div>`;
+        updateOperationIndicator("Error Reading Allegiance Data");
+        
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Error Reading Allegiance Data", error.toString(), "error");
+        }, 1000);
+      }
+    }
+    
+    /**
+     * Writes allegiance data to the NFC band
+     */
+    async function handleWriteAllegiances() {
+      showOperationIndicator("Writing Allegiance Data");
+      
+      // Ensure allegiance fields are built
+      buildAllegiancesFields();
+      
+      // Create log display for allegiances page
+      const logDisplay = createLogDisplay("allegiancesPage", "allegiances", "WRITE ALLEGIANCE DATA");
+      
+      try {
+        // Check if a valid tag has been scanned
+        if (!tagIsValid || !tagUID) {
+          updateOperationIndicator("Error: No Band Scanned");
+          logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No band scanned. Please scan a band first.</div>`;
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("No Band Scanned", "Please scan a band first", "error");
+          }, 1000);
+          return;
+        }
+        
+        // Mapping of allegiance fields to their addresses
+        const allegianceAddresses = {
+          1: 192, 2: 193, 3: 194, 4: 195,
+          5: 196, 6: 197, 7: 198, 8: 199,
+          9: 200, 10: 201, 11: 202, 12: 203,
+          13: 204, 14: 205, 15: 206, 16: 207
+        };
+        
+        // Loop through each allegiance field
+        let successCount = 0;
+        
+        for (let i = 1; i <= 16; i++) {
+          const address = allegianceAddresses[i];
+          const text = document.getElementById("allegiance" + i).value.trim();
+          const label = document.getElementById("allegianceLabel" + i).innerText.trim();
+          
+          updateOperationIndicator(`Writing ${label} (${i}/16)`);
+          logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing ${label} to address ${address}: "${text}"</div>`;
+          
+          try {
+            await writeField(address, text);
+            logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ ${label} written successfully</div>`;
+            successCount++;
+          } catch (fieldError) {
+            console.error(`Error writing allegiance field ${i} (${label}):`, fieldError);
+            logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error writing ${label}: ${fieldError}</div>`;
+          }
+        }
+        
+        // Display appropriate completion message based on success count
+        if (successCount === 16) {
+          updateOperationIndicator("All Allegiance Data Written Successfully");
+          
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("All Allegiance Data Written", "All 16 allegiance fields written successfully", "success");
+          }, 1000);
+        } else if (successCount > 0) {
+          updateOperationIndicator(`${successCount}/16 Allegiance Fields Written`);
+          
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Partial Write Complete", `${successCount} of 16 allegiance fields written successfully`, "warning");
+          }, 1000);
+        } else {
+          updateOperationIndicator("Failed to Write Allegiance Data");
+          
+          setTimeout(() => {
+            hideOperationIndicator();
+            showVisualConfirmation("Write Failed", "Failed to write any allegiance data", "error");
+          }, 1000);
+        }
+        
+      } catch (error) {
+        console.error("Error writing allegiance data:", error);
+        logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Error: ${error.toString()}</div>`;
+        updateOperationIndicator("Error Writing Allegiance Data");
+        
+        setTimeout(() => {
+          hideOperationIndicator();
+          showVisualConfirmation("Error Writing Allegiance Data", error.toString(), "error");
+        }, 1000);
       }
     }
   </script>
-
+  
+  <!-- Make handler functions globally available for HTML elements -->
+  <script>
+    // Expose handler functions to window object for HTML access
+    window.showPage = showPage;
+    window.handleScanTag = handleScanTag;
+    window.handleReadRegistration = handleReadRegistration;
+    window.handleWriteRegistration = handleWriteRegistration;
+    window.handleResetRegistration = handleResetRegistration;
+    window.handleReadFaction = handleReadFaction;
+    window.handleWriteFaction = handleWriteFaction;
+    window.handleReadAllegiances = handleReadAllegiances;
+    window.handleWriteAllegiances = handleWriteAllegiances;
+  </script>
 </body>
 </html>

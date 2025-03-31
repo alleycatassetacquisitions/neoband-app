@@ -21,6 +21,14 @@
 	],
 	"settings": {
 		"editor.acceptSuggestionOnEnter": "on",
-		"pieces.autocomplete": true
+		"pieces.autocomplete": true,
+		"cSpell.customDictionaries": {
+			"custom-dictionary-workspace": {
+				"name": "custom-dictionary-workspace",
+				"path": "${workspaceFolder:Neoband App 25}/.cspell/custom-dictionary-workspace.txt",
+				"addWords": true,
+				"scope": "workspace"
+			}
+		}
 	}
 }

@@ -1,17 +1,45 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: These rules are for the AI Developer of the Neoband App
 globs: 
 alwaysApply: false
 ---
 # Your rule content
 
-You are a Junior Developer working on a project called the Neoband App. This App runs off a device hosted webpage on a d-logic "µFR Zero Online LITE: ISO14443 A/B Network NFC RFID Reader Writer". This Main document explaining this app is located here in the notepafe called "Neoband App Doc 21925" . Documentaion for new feature requests are located "@Dev Instrcutions " Always reference these notebooks  as well as the code itself, before makeing any changes or updates to the code. 
+You are an expert in HTML, Javascript, Mifare Classic 1k-4K NFC Tags, and uFR Zero Online Lite ISO 14443 A/B Network NFC RFID Reader/Writers. You are working on a project called the Neoband App (Project Design Doc: [PDD-Neoband-App](mdc:Neoband App 25/Neoband App 25/PDD-Neoband-App))& (App Repo: @https://github.com/alleycatassetacquisitions/neoband-app/tree/main), a browser based offline decentralized MiFare Classic 4k NFC tag reading and writing app, designed to run on and from an uFR Zero Online Lite ISO 14443 A/B Network NFC RFID Reader/Writer.
 
-Alway follow, use and implement Clean Code Agile Methodology
+Key Principles:
+- Use Clean Code Agile Methodology.
+- Follow best practices for HTML and Javascript.
+- Write concise, technical JavaScript code with accurate examples.
+- Prefer iteration and modularization over code duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
+- Track all updates and changes in the @neonand-app-changelog.md .
+- Use very detailed comments, logging, and error reporting within the code.
+- Review project Project Design Doc (PDD) and Project Repo for important info and project history.
 
-Never make changes that lose pre-existing functionality or design unless specifcly requested
+Logs should show at a minimum:
+- show what key was used for authentication
+- show that authentication was successful
+- show what sector and block was read from
+- show what sector and block was written to
+- show what data was written to the nfc tag
+- show that and when each process os complete
 
-This app in all aspects must be simple and easy to understand, use, edit, and customize. This app needs to be easily customizable for new developers, engineers, and makers. 
+Major Issues with the d-logic ufr reader to work around:
+1) It can only hold individual files and can't have folders.
+2) It can't read other files than the index.html file without "app/" being prefixed to the files directory, for example a file at the reader root directory: "/file.js", the file would need to have the app/ directory: "app/file.js" even through there is no actual app folder and there is no way to make or have an app folder. Because of these issues there can not be any folders in this app, so do not create a app folder ever for this app.
 
-All file references other must start with "app/" , example app/global-headers.js 
-Never create an “app” folder ever, the app/ path is for the d-logic reader. When you try to access a file at “app/” you need to look for it at ”/”, but never change or remove “app/” and never greate an “app” file
+Reference the example apps located here:
+- https://github.com/nfc-rfid-reader-sdk/ufr-mf-examples-javascript-browser_extensions/tree/master
+- @folder /ufr-mf-examples-javascript-browser_extensions-master
+
+Mifare 4k documentation is here:
+- https://www.nxp.com/docs/en/data-sheet/MF1S70YYX_V1.pdf
+- @Mifare Cards\MIFARE Classic EV1 4K - solution development.pdf
+- https://upload.wikimedia.org/wikipedia/commons/3/39/MiFare_Byte_Layout.png
+- \Mifare Cards\MiFare_Byte_Layout.png

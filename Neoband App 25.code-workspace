@@ -4,23 +4,17 @@
 			"path": "."
 		},
 		{
-			"path": "../neoband_credential_generator"
-		},
-		{
-			"path": "../../D-Logic Files"
-		},
-		{
 			"path": "../Ref Files"
 		},
 		{
-			"path": "../../Mifare Cards"
+			"path": "C:/Users/Orunmila/OneDrive - Hartable Solutions/HS Team Folder/Clients/Elli-FF/D-Logic Files"
 		},
 		{
-			"path": "../Neoband App 25 -JS"
+			"path": "C:/Users/Orunmila/OneDrive - Hartable Solutions/HS Team Folder/Clients/Elli-FF/Mifare Cards"
+		},
+		{
+			"path": "../R-App"
 		}
 	],
-	"settings": {
-		"editor.acceptSuggestionOnEnter": "on",
-		"pieces.autocomplete": true
-	}
+	"settings": {}
 }

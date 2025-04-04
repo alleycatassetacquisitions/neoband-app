@@ -1,11 +1,3 @@
-# Ignore everything
-*
-
-# Don't ignore the Neoband App directory
-!Neoband App 25/
-
-# Don't ignore .gitignore itself
-!.gitignore
 
 # Ignore all files in cursor rules but keep the directory
 .cursor/rules/*

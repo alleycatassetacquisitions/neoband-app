@@ -1,0 +1,191 @@
+
+<!DOCTYPE html>
+<html lang="en"><!-- This attribute might be important for the uFR browser extension --><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" type="text/css" href="app/style.css">
+
+    <!-- IMPORTANT: Scripts must be referenced with "app/" prefix for uFR Zero device -->
+    <!-- Correct Load order: map -> utils -> ui -> core -> operations -> admin -->
+    <script src="app/map.js"></script>        <!-- Load map FIRST -->
+    <script src="app/utils.js"></script>
+    <script src="app/ui.js"></script>
+    <script src="app/core.js"></script>
+    <script src="app/operations.js"></script>
+    <script src="app/admin.js"></script>
+
+
+    <!-- Removed inline <style> block -->
+    <title>Neoband App- NeoBand Interface</title> <!-- for the reader the title needs be under the script references-->
+<script src="shell.js"></script></head>
+<body>
+
+    <header>
+        <h1>Neoband App</h1>
+        <nav class="nav-menu">
+            <ul>
+                <li><a href="#" id="nav-reg" class="active-nav">Registration</a></li>
+                <li><a href="#" id="nav-faction">Factions</a></li>
+                <li><a href="#" id="nav-allegiance">Allegiances</a></li>
+                <li><a href="#" id="nav-admin">Admin</a></li> <!-- Added Admin link -->
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <!-- ======================= REGISTRATION PAGE ======================= -->
+        <div id="registrationPage" class="page active">
+            <h2>Neoband Registration</h2>
+
+            <div class="form-group">
+                <label for="reg-username">New Username (Max 16 Chars):</label>
+                <input id="reg-username" class="input" type="text" maxlength="16" placeholder="Enter desired username">
+            </div>
+
+             <div class="form-group">
+                <label for="reg-allegiance-select">Assign Allegiance:</label>
+                <select id="reg-allegiance-select" class="input">
+                    <option value="">-- Select Allegiance --</option>
+                    <!-- Options populated by ui.js -->
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Band ID:</label>
+                <input id="reg-band-id" class="input" type="text" readonly="" placeholder="Scan Tag...">
+            </div>
+
+            <div class="form-group">
+                 <label>Current Username:</label>
+                 <input id="reg-current-username" class="input" type="text" readonly="" placeholder="(Not Read)">
+             </div>
+             <div class="form-group">
+                 <label>Current Allegiance:</label>
+                 <input id="reg-current-allegiance" class="input" type="text" readonly="" placeholder="(Not Read)">
+             </div>
+
+            <div class="form-group">
+                <label for="reg-status">Band Status:</label>
+                <input id="reg-status" class="status-display" type="text" readonly="" value="Unknown" title="Band Status">
+            </div>
+
+            <div class="button-group">
+                <button id="reg-scan-btn" class="btn">Scan Tag</button>
+                <button id="reg-read-btn" class="btn btn-secondary" disabled="">Read Tag</button>
+                <button id="reg-write-btn" class="btn" disabled="">Register / Update</button>
+                <button id="reg-reset-btn" class="btn btn-danger" disabled="">!!! Clear User Data !!!</button>
+            </div>
+        </div>
+
+        <!-- ======================= FACTION PAGE ======================= -->
+        <div id="factionPage" class="page">
+            <h2>Faction Data Management</h2>
+
+            <div class="form-group">
+                 <label>Current User:</label>
+                 <input id="faction-current-username" class="input" type="text" readonly="" placeholder="Scan Tag...">
+             </div>
+
+            <div class="form-group">
+                <label for="faction-select">Select Faction:</label>
+                <select id="faction-select" class="input">
+                    <option value="">-- Select Faction --</option>
+                    <!-- Options populated by ui.js -->
+                </select>
+            </div>
+
+            <!-- Faction Details Section (Initially Hidden) -->
+            <div id="faction-details" class="details-section">
+                 <h3 id="faction-name-display">Faction Fields</h3>
+                 <div id="faction-fields-container" class="fields-grid">
+                     <!-- Faction-specific fields will be generated here by ui.js -->
+                 </div>
+             </div>
+
+            <div class="button-group">
+                 <button id="faction-scan-btn" class="btn">Scan Tag</button>
+                 <button id="faction-read-btn" class="btn btn-secondary" disabled="">Read Faction Data</button>
+                 <button id="faction-write-btn" class="btn" disabled="">Write Faction Data</button>
+            </div>
+        </div>
+
+        <!-- ======================= ALLEGIANCES PAGE ======================= -->
+        <div id="allegiancesPage" class="page">
+            <h2>Allegiance Data Management</h2>
+
+            <div class="form-group">
+                <label>Current User:</label>
+                <input id="allegiance-current-username" class="input" type="text" readonly="" placeholder="Scan Tag...">
+            </div>
+
+            <div class="form-group">
+                <label for="allegiance-select">Select Allegiance:</label>
+                <select id="allegiance-select" class="input">
+                    <option value="">-- Select Allegiance --</option>
+                    <!-- Options populated by ui.js -->
+                </select>
+            </div>
+
+             <!-- Allegiance Details Section (Initially Hidden) -->
+             <div id="allegiance-details" class="details-section">
+                 <h3 id="allegiance-name-display">Allegiance Fields</h3>
+                 <div id="allegiance-fields-container" class="fields-grid">
+                     <!-- Allegiance-specific fields (15) will be generated here by ui.js -->
+                 </div>
+             </div>
+
+            <div class="button-group">
+                 <button id="allegiance-scan-btn" class="btn">Scan Tag</button>
+                 <button id="allegiance-read-btn" class="btn btn-secondary" disabled="">Read Allegiance Data</button>
+                 <button id="allegiance-write-btn" class="btn" disabled="">Write Allegiance Data</button>
+            </div>
+        </div>
+
+        <!-- ======================= ADMIN PAGE ======================= -->
+        <div id="adminPage" class="page">
+            <h2>Admin Data Control</h2>
+            <p>Full Faction/Allegiance memory map control.</p>
+            <div id="adminContainer">
+                <!-- Admin interface will be generated here by admin.js -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ======================= SHARED UI ELEMENTS ======================= -->
+
+    <!-- Operation Indicator -->
+    <div id="operationIndicator">
+        <div id="operationMessage">Processing...</div>
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Visual Confirmation Modal -->
+    <div id="visualConfirmation">
+        <div id="confirmIcon">✓</div>
+        <div id="confirmTitle">Success</div>
+        <div id="confirmMessage">Operation completed successfully.</div>
+        <button id="confirmButton" class="btn">OK</button>
+    </div>
+
+    <!-- Log Display Area -->
+    <div id="logContainer">
+        <div id="logHeader">
+            <span>OPERATION LOG</span>
+            <button id="log-toggle" aria-label="Toggle Log Display Visibility" title="Toggle Log Display Visibility">Hide</button>
+        </div>
+         <div id="logDisplay">
+             <!-- Log messages will appear here -->
+         </div>
+     </div>
+
+    <!-- Ensure Core logic runs after the DOM is fully parsed -->
+    <!-- <script>
+        // Moved initialization to core.js using DOMContentLoaded
+        // document.addEventListener('DOMContentLoaded', core.init);
+    </script> -->
+
+ </body></html>

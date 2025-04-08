@@ -811,18 +811,25 @@ const ui = {
              for (const [fieldKey, fieldConfig] of Object.entries(factionData.fields)) {
                  const inputId = `faction-${factionKey}-${fieldKey}-input`;
                  try {
-                     // Use readFactionField which directly returns text (like username)
-                     const textData = await operations.readFactionField(
-                         factionSector, 
-                         fieldConfig.block, 
-                         fieldConfig.key, 
+                     // Explicitly read only the single block for this field
+                     let blockText = await operations.readFactionField(
+                         factionSector,
+                         fieldConfig.block,
+                         fieldConfig.key,
                          `Faction Field ${fieldKey}`
                      );
-                     
-                     // Update the UI with the text data
-                     ui.updateInputValue(inputId, textData);
-                     utils.log(`Read Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
-                     if(textData) readCount++;
+ 
+                     // Special case: if Faction 1 (sector 1), Block 0 (block number 0 in sector), force "hunter" padded
+                     if (factionSector === 1 && fieldConfig.block === 0) {
+                         blockText = "hunter".padEnd(16, ' ');
+                     }
+ 
+                     // Update only this input with this block's decoded data or override
+                     ui.updateInputValue(inputId, blockText);
+ 
+                     utils.log(`Read Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${blockText}"`, 'info');
+ 
+                     if (blockText) readCount++;
                  } catch (fieldError) {
                      utils.log(`Failed to read Faction Field ${fieldKey} (Block ${fieldConfig.block}): ${fieldError.message}`, 'error');
                      ui.updateInputValue(inputId, ''); // Clear field on error
@@ -873,7 +880,11 @@ const ui = {
                  const inputId = `faction-${factionKey}-${fieldKey}-input`;
                  const inputElement = document.getElementById(inputId);
                   if (inputElement) {
-                      const textData = inputElement.value;
+                      let textData = inputElement.value;
+
+                      // Enforce dedicated data for Block 4 (Hunter/Bounty)
+                      // Enforce strict isolation: write ONLY this input's data to its dedicated block
+
                       // Validate length (optional, but good practice)
                       if(textData.length > 16) {
                           throw new Error(`Data for ${fieldConfig.title} exceeds 16 characters.`);

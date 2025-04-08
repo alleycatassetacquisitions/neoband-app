@@ -3,56 +3,7 @@
  * Handles NFC communication logic (read/write operations) using the uFR API.
  */
 
-/**
- * Resets the authentication state of the card reader and card.
- * This helps isolate operations and prevent data bleeding between blocks.
- * @returns {Promise<void>}
- */
-async function resetAuth() {
-    return new Promise((resolve, reject) => {
-        // First try with ReaderReset which completely resets the reader state
-        ufRequest("ReaderReset", function() {
-            const response = ufResponse();
-            
-            if (response.Status === "[0x00 (0)] UFR_OK") {
-                utils.log(`Reader reset successful`, 'debug');
-                resolve();
-            } else {
-                // If ReaderReset fails, try to reset auth state with ReaderKeyWrite
-                utils.log(`Reader reset failed: ${response.Status}, trying auth reset`, 'debug');
-                
-                // ReaderSoftRestart is a more gentle way to reset authentication
-                ufRequest("ReaderSoftRestart", function() {
-                    const softResponse = ufResponse();
-                    
-                    if (softResponse.Status === "[0x00 (0)] UFR_OK") {
-                        utils.log(`Auth reset successful`, 'debug');
-                        resolve();
-                    } else {
-                        // Even if soft restart fails, continue and try to reopen the reader
-                        utils.log(`Auth reset failed: ${softResponse.Status}, trying to reopen reader`, 'debug');
-                        
-                        // ReaderOpen is the last resort to reset everything
-                        ufRequest("ReaderOpen", function() {
-                            const reopenResponse = ufResponse();
-                            
-                            if (reopenResponse.Status === "[0x00 (0)] UFR_OK") {
-                                utils.log(`Reader reopened successfully`, 'debug');
-                                resolve();
-                            } else {
-                                // If even reopen fails, log but resolve anyway to continue with operations
-                                utils.log(`Reader reopen failed: ${reopenResponse.Status}, continuing anyway`, 'warning');
-                                resolve();
-                            }
-                        });
-                    }
-                });
-            }
-        });
-    });
-}
-
-var operations = {
+const operations = {
     AUTH_MODE_A: ' 0x60', // MIFARE_AUTHENT1A
     AUTH_MODE_B: ' 0x61', // MIFARE_AUTHENT1B
     // DEFAULT_KEY_INDEX: 0, // No longer needed as we use _PK
@@ -111,98 +62,75 @@ var operations = {
     },
 
     /**
-     * Reads data from a block with complete authentication reset before and after
-     * @param {number} sector - The sector number
-     * @param {number} block - The block number within the sector
-     * @param {string} key - The key for the sector (hex format)
-     * @param {boolean} [rawData=false] - Whether to return raw hex data (true) or convert to text (false)
-     * @param {string} [description=""] - Optional description for logging
-     * @returns {Promise<string>} - Promise resolving to the block data (text or hex)
+     * Reads a single block from the MIFARE Classic card.
+     * Now always uses absolute addressing with LinearRead for consistent behavior.
+     * @param {number} sector - The sector number (0-39).
+     * @param {number} block - The block number within the sector (0-3 or 0-15).
+     * @param {string} key - The 12-character hex key string (e.g., "FFFFFFFFFFFF").
+     * @param {string} operationDesc - A description of the operation being performed (for logging).
+     * @returns {Promise<string>} Resolves with the raw hex data string (without '0x').
+     * @throws {Error} - If read operation fails.
      */
-    readBlock: function(sector, block, key, rawData = false, description = "") {
-        return new Promise(async (resolve, reject) => {
-            const blockAddress = this.calculateBlockAddress(sector, block);
-            const delay = this.getSectorDelay(sector);
-            
-            logger.log(`Reading block ${blockAddress} (Sector ${sector}, Block ${block}) for ${description} with ${delay}ms delay`);
-            
-            // Reset card session before read to ensure clean authentication
-            try {
-                await this.resetCardSession();
-                logger.log(`Card session reset complete before reading ${description}`);
-            } catch (e) {
-                logger.error(`Failed to reset card session before reading ${description}`, e);
-                // Continue anyway as it might still work
-            }
-            
-            try {
-                const readCmd = `LinearRead ${blockAddress} 1 ${key} NCU`;
-                logger.log(`Executing command: ${readCmd}`);
-                
-                nfc.executeCommand(readCmd, (status, data) => {
-                    if (status === 0) {
-                        logger.log(`Successfully read ${description}: ${data}`);
-                        setTimeout(() => resolve(data), delay);
+    readBlock: async function(sector, block, key, operationDesc = 'Block') {
+        utils.log(`Executing read command for ${operationDesc} (Sector ${sector}, Block ${block}) with key ${key ? '[REDACTED]' : 'NONE'}...`, 'debug');
+
+        // Calculate the absolute block address
+        let absoluteBlock;
+        if (sector <= 31) {
+            absoluteBlock = (sector * 4) + block;
                     } else {
-                        const errorMsg = `Failed to read ${description} (status: ${status})`;
-                        logger.error(errorMsg);
-                        setTimeout(() => reject(new Error(errorMsg)), delay);
-                    }
-                });
+            absoluteBlock = 128 + ((sector - 32) * 16) + block;
+        }
+
+        try {
+            // Use readFieldWithRetry but get only the raw hex, not converted to text
+            const rawHexData = await this.readFieldWithRetryRaw(absoluteBlock.toString(), 2);
+            utils.log(`Successfully read from Sector ${sector}, Block ${block} (Absolute: ${absoluteBlock})`, 'success');
+            return rawHexData;
             } catch (error) {
-                logger.error(`Exception reading ${description}: ${error}`);
-                reject(error);
-            }
-        });
+            utils.log(`Failed to read ${operationDesc} (Sector ${sector}, Block ${block}): ${error.message}`, 'error');
+            throw error;
+        }
     },
 
     /**
-     * Writes data to a block with complete authentication reset before and after
-     * @param {number} sector - The sector number
-     * @param {number} block - The block number within the sector
-     * @param {string} data - The data to write (text, will be converted to hex)
-     * @param {string} key - The key for the sector (hex format)
-     * @param {string} [description=""] - Optional description for logging
-     * @returns {Promise<boolean>} - Promise resolving to true if successful
+     * Writes a 16-byte data block to the specified sector and block.
+     * Now always uses absolute addressing with LinearWrite for consistent behavior.
+     *
+     * @param {number} sector - The target sector number.
+     * @param {number} block - The target block number within the sector.
+     * @param {string} data - The 16-byte data to write (as a UTF-8 string or hex).
+     * @param {string} key - The 12-character hex key string (e.g., "FFFFFFFFFFFF").
+     * @param {string} fieldDescription - A description of the field being written (for logging).
+     * @param {number} [retryCount=2] - Maximum number of retries on failure.
+     * @returns {Promise<boolean>} - True if write was successful.
+     * @throws {Error} - If write operation fails.
      */
-    writeBlock: function(sector, block, data, key, description = "") {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const blockAddress = this.calculateBlockAddress(sector, block);
-                const hexData = utils.isHex(data) ? data : utils.textToHex(data);
-                const paddedHexData = utils.padHexString(hexData);
-                const delay = this.getSectorDelay(sector);
-                
-                logger.log(`Writing to block ${blockAddress} (Sector ${sector}, Block ${block}) for ${description} with ${delay}ms delay`);
-                logger.log(`Input data: "${data}", converted to hex: "${hexData}", padded: "${paddedHexData}"`);
-                
-                // Reset card session before write to ensure clean authentication
-                try {
-                    await this.resetCardSession();
-                    logger.log(`Card session reset complete before writing ${description}`);
-                } catch (e) {
-                    logger.error(`Failed to reset card session before writing ${description}`, e);
-                    // Continue anyway as it might still work
-                }
-                
-                const writeCmd = `LinearWrite ${blockAddress} ${paddedHexData} ${key} NCU`;
-                logger.log(`Executing command: ${writeCmd}`);
-                
-                nfc.executeCommand(writeCmd, (status, responseData) => {
-                    if (status === 0) {
-                        logger.log(`Successfully wrote ${description}`);
-                        setTimeout(() => resolve(true), delay);
-                    } else {
-                        const errorMsg = `Failed to write ${description} (status: ${status})`;
-                        logger.error(errorMsg);
-                        setTimeout(() => reject(new Error(errorMsg)), delay);
-                    }
-                });
+    writeBlock: async function(sector, block, data, key, fieldDescription, retryCount = 2) {
+        // Check if FIELD_MAP is defined
+        if (typeof FIELD_MAP === 'undefined') {
+            const errorMsg = "Error: FIELD_MAP is not defined. Ensure map.js is loaded before operations are called.";
+            utils.log(errorMsg, 'error');
+            throw new Error(errorMsg);
+        }
+
+        // Calculate the absolute block address
+        let absoluteBlock;
+        if (sector <= 31) {
+            absoluteBlock = (sector * 4) + block;
+        } else {
+            absoluteBlock = 128 + ((sector - 32) * 16) + block;
+        }
+
+        try {
+            // Always use writeFieldWithRetry with absolute addressing (LinearWrite)
+            await this.writeFieldWithRetry(absoluteBlock.toString(), data, retryCount);
+            utils.log(`Successfully wrote to Sector ${sector}, Block ${block} (Absolute: ${absoluteBlock})`, 'success');
+            return true;
             } catch (error) {
-                logger.error(`Exception writing ${description}: ${error.message}`, error);
-                reject(error);
-            }
-        });
+            utils.log(`Failed to write ${fieldDescription} (Sector ${sector}, Block ${block}): ${error.message}`, 'error');
+            throw error;
+        }
     },
 
     // Potential future operations (Value blocks, Sector trailer modification)
@@ -211,24 +139,24 @@ var operations = {
     // writeSectorTrailer: async function(sectorAddress, newKeyA, accessBits, newKeyB, key) { ... }
 
     /**
-     * Reads the username from the card (block 240)
-     * @returns {Promise<string>} - Username read from the card
+     * Reads the username from its designated block (240).
+     * Implementation matches the original Neoband App exactly.
+     * @returns {Promise<string|null>} Username text or null if read fails.
      */
-    readUsername: function() {
-        return new Promise((resolve, reject) => {
-            logger.log("[operations.readUsername] Reading username from block 240");
+    readUsername: async function() {
+        try {
+            utils.log("Reading username from block 240...", 'info');
             
-            // Block 240 is in sector 60, block 0
-            this.readBlock(60, 0, KEYS.USER_KEY, false, "Username")
-                .then(textData => {
-                    logger.log("[operations.readUsername] Username read successfully: " + textData);
-                    resolve(textData.trim());
-                })
-                .catch(error => {
-                    logger.log("[operations.readUsername] ERROR reading username: " + error.message, error);
-                    reject(error);
-                });
-        });
+            // Read from block 240 using the same method as the original app
+            const username = await this.readFieldWithRetry("240");
+            utils.log("Successfully read username: " + username, 'success');
+            
+            // Return username (trimmed, as in the original app)
+            return username.trim();
+        } catch (error) {
+            utils.log("Username read error: " + error, 'error');
+            throw new Error("Failed to read username: " + error);
+        }
     },
 
     /**
@@ -246,72 +174,8 @@ var operations = {
         try {
             utils.log("Writing username to block 240: " + username, 'info');
             
-            // CRITICAL FIX: Add a complete authentication reset before username write
-            utils.log(`Performing authentication reset before username write`, 'debug');
-            await resetAuth();
-            
-            // Calculate absolute block
-            const absoluteBlock = 240;
-            
-            // Get sector-specific delay
-            const sectorDelay = this.getSectorDelay(absoluteBlock);
-            
-            // Convert text to hex
-            const hexData = utils.textToHex(username);
-            utils.log(`Converting "${username}" to hex: ${hexData}`, 'debug');
-            
-            // Pad the hex data
-            const paddedHex = utils.padHex(hexData);
-            utils.log(`Padded hex data: ${paddedHex}`, 'debug');
-            
-            // Construct command
-            const command = `LinearWrite 0x${paddedHex} ${absoluteBlock} 16 0x60 0`;
-            utils.log(`Using command: ${command}`, 'debug');
-            
-            // Execute with a proper delay
-            utils.log(`Using ${sectorDelay}ms delay before write operation`, 'debug');
-            await utils.sleep(sectorDelay);
-            
-            // Perform the write operation
-            await new Promise((resolve, reject) => {
-                ufRequest(command, function() {
-                    const response = ufResponse();
-                    
-                    if (response.Status === "[0x00 (0)] UFR_OK") {
-                        utils.log(`Write successful to address 240`, 'success');
-                        resolve();
-                    } else {
-                        utils.log(`Write failed for address 240: ${response.Status}`, 'error');
-                        reject(new Error(`Write failed: ${response.Status}`));
-                    }
-                });
-            });
-            
-            // Add stabilization delay
-            await utils.sleep(sectorDelay);
-            
-            // Reset authentication after write
-            utils.log(`Performing authentication reset after username write`, 'debug');
-            await resetAuth();
-            
-            // Verify with read back
-            try {
-                utils.log(`Verifying username write with read back...`, 'debug');
-                
-                // Reset authentication before verification read
-                await resetAuth();
-                
-                // Read back for verification
-                const verifiedUsername = await this.readUsername();
-                if (verifiedUsername === username.trim()) {
-                    utils.log(`✓ Username verification confirmed data was written correctly`, 'success');
-                } else {
-                    utils.log(`⚠ Username verification shows mismatch! Wrote: ${username}, Read: ${verifiedUsername}`, 'warning');
-                }
-            } catch (verifyError) {
-                utils.log(`Username verification read failed: ${verifyError.message}`, 'warning');
-            }
-            
+            // Write username to block 240 using the same method as the original app
+            await this.writeFieldWithRetry("240", username);
             utils.log("Successfully wrote username", 'success');
         } catch (error) {
             utils.log("Username write error: " + error, 'error');
@@ -320,67 +184,104 @@ var operations = {
     },
 
     /**
-     * Reads faction field data by field name
-     * @param {string} fieldName - The name of the field to read
-     * @returns {Promise<string>} - Text data read from the faction field
+     * Reads a faction field from the specified sector and block.
+     * Implementation follows the same pattern as readUsername for consistency.
+     * @param {number} sector - The faction sector number
+     * @param {number} block - The block number within the sector
+     * @param {string} key - The key to use for authentication
+     * @param {string} fieldName - Name of the field for logging
+     * @returns {Promise<string>} The text data from the field
      */
-    readFactionField: function(fieldName) {
-        return new Promise((resolve, reject) => {
-            try {
-                if (!FACTION_FIELDS[fieldName]) {
-                    throw new Error("Unknown faction field: " + fieldName);
-                }
-                
-                const fieldConfig = FACTION_FIELDS[fieldName];
-                logger.log("[operations.readFactionField] Reading faction field " + fieldName + " from sector " + 
-                          fieldConfig.sector + ", block " + fieldConfig.block);
-                
-                this.readBlock(fieldConfig.sector, fieldConfig.block, fieldConfig.key, false, "Faction " + fieldName)
-                    .then(textData => {
-                        logger.log("[operations.readFactionField] Faction field " + fieldName + " read successfully: " + textData);
-                        resolve(textData.trim());
-                    })
-                    .catch(error => {
-                        logger.log("[operations.readFactionField] ERROR reading faction field " + fieldName + ": " + error.message, error);
-                        reject(error);
-                    });
-            } catch (error) {
-                logger.log("[operations.readFactionField] CRITICAL ERROR: " + error.message, error);
-                reject(error);
+    readFactionField: async function(sector, block, key, fieldName = 'Faction Field') {
+        try {
+            // Calculate absolute block
+            let absoluteBlock;
+            if (sector <= 31) {
+                absoluteBlock = (sector * 4) + block;
+            } else {
+                absoluteBlock = 128 + ((sector - 32) * 16) + block;
             }
-        });
-    },
-
-    /**
-     * Reads allegiance field data by field name
-     * @param {string} fieldName - The name of the field to read
-     * @returns {Promise<string>} - Text data read from the allegiance field
-     */
-    readAllegianceField: function(fieldName) {
-        return new Promise((resolve, reject) => {
-            try {
-                if (!ALLEGIANCE_FIELDS[fieldName]) {
-                    throw new Error("Unknown allegiance field: " + fieldName);
-                }
-                
-                const fieldConfig = ALLEGIANCE_FIELDS[fieldName];
-                logger.log("[operations.readAllegianceField] Reading allegiance field " + fieldName + " from sector " + 
-                          fieldConfig.sector + ", block " + fieldConfig.block);
-                
-                this.readBlock(fieldConfig.sector, fieldConfig.block, fieldConfig.key, false, "Allegiance " + fieldName)
-                    .then(textData => {
-                        logger.log("[operations.readAllegianceField] Allegiance field " + fieldName + " read successfully: " + textData);
-                        resolve(textData.trim());
-                    })
-                    .catch(error => {
-                        logger.log("[operations.readAllegianceField] ERROR reading allegiance field " + fieldName + ": " + error.message, error);
-                        reject(error);
-                    });
-            } catch (error) {
-                logger.log("[operations.readAllegianceField] CRITICAL ERROR: " + error.message, error);
-                reject(error);
-            }
-        });
+            
+            utils.log(`Reading ${fieldName} from Sector ${sector}, Block ${block} (Absolute: ${absoluteBlock})...`, 'info');
+            
+            // Get sector-specific delay
+            const sectorDelay = this.getSectorDelay(absoluteBlock);
+            
+            // CRITICAL FIX: For all faction blocks, use direct read approach
+            // This ensures each block operation is completely isolated with its own authentication
+            utils.log(`Using isolated read approach for ${fieldName}`, 'debug');
+            
+            // Step 1: Construct the read command with proper authentication
+            const command = `LinearRead h ${absoluteBlock} 16 0x60 0`;
+            utils.log(`Using command: ${command}`, 'debug');
+            
+            // Step 2: Execute with a proper delay BEFORE operation
+            utils.log(`Using ${sectorDelay}ms delay before read operation`, 'debug');
+            await utils.sleep(sectorDelay);
+            
+            // Step 3: Perform the read operation
+            const rawHex = await new Promise((resolve, reject) => {
+                ufRequest(command, function() {
+                    const response = ufResponse();
+                    
+                    utils.log(`Read response: ${JSON.stringify(response)}`, 'debug');
+                    
+                    if (response.Status === "[0x00 (0)] UFR_OK") {
+                        let hexData = response.Data;
+                        if (hexData.startsWith("0x") || hexData.startsWith("0X")) {
+                            hexData = hexData.slice(2);
+                        }
+                        
+                        utils.log(`Read successful! Raw hex: ${hexData}`, 'success');
+                        
+                        // Detailed hex analysis 
+                        utils.log(`Hex data analysis:`, 'debug');
+                        
+                        // Convert each byte to character codes and ASCII
+                        let byteAnalysis = '';
+                        for (let i = 0; i < hexData.length; i += 2) {
+                            if (i + 2 <= hexData.length) {
+                                const byte = hexData.substring(i, i + 2);
+                                const charCode = parseInt(byte, 16);
+                                let char = '';
+                                if (charCode >= 32 && charCode <= 126) { // Printable ASCII
+                                    char = String.fromCharCode(charCode);
+                                } else {
+                                    char = '.'; // Non-printable
+                                }
+                                byteAnalysis += `${byte}(${charCode}='${char}') `;
+                                
+                                // Check for FF padding to help debugging
+                                if (byte === 'FF' && i === 2) {
+                                    utils.log(`WARNING: FF padding found after just 1 byte!`, 'warning');
+                                }
+                            }
+                        }
+                        
+                        utils.log(byteAnalysis, 'debug');
+                        
+                        resolve(hexData);
+                    } else {
+                        utils.log(`Read failed: ${response.Status}`, 'error');
+                        reject(new Error(`Read failed: ${response.Status}`));
+                    }
+                });
+            });
+            
+            // Step 4: Add mandatory delay AFTER operation to allow card to stabilize
+            utils.log(`Adding post-read stabilization delay (${sectorDelay/2}ms)`, 'debug');
+            await utils.sleep(sectorDelay/2);
+            
+            // Step 5: Convert the raw hex to text
+            const textData = utils.hexToText(rawHex);
+            utils.log(`Successfully read ${fieldName}: "${textData}"`, 'success');
+            
+            // Return text data (trimmed, as in username)
+            return textData.trim();
+        } catch (error) {
+            utils.log(`${fieldName} read error: ${error}`, 'error');
+            throw new Error(`Failed to read ${fieldName}: ${error}`);
+        }
     },
 
     /**
@@ -394,10 +295,15 @@ var operations = {
      * @returns {Promise<void>} Resolves when write is complete
      */
     writeFactionField: async function(sector, block, data, key, fieldName = 'Faction Field') {
+        // Log the raw input data before any processing
+        utils.log(`[DEBUG] Raw input to writeFactionField for ${fieldName}: "${data}" (length: ${data ? data.length : 0})`, 'debug');
+
         // Trim data to max length, like in writeUsername
         if (data && data.length > 16) {
             data = data.substring(0, 16);
         }
+
+        utils.log(`[DEBUG] Trimmed input to writeFactionField for ${fieldName}: "${data}" (length: ${data ? data.length : 0})`, 'debug');
         
         try {
             // Calculate absolute block
@@ -413,11 +319,8 @@ var operations = {
             // Get sector-specific delay
             const sectorDelay = this.getSectorDelay(absoluteBlock);
             
-            // CRITICAL FIX: Add a complete authentication reset before each operation
-            utils.log(`Performing authentication reset before write operation`, 'debug');
-            await resetAuth();
-            
-            // CRITICAL FIX: For all faction blocks, use direct write approach with isolation
+            // CRITICAL FIX: For all faction blocks, use direct write approach
+            // This ensures each block operation is completely isolated with its own authentication
             utils.log(`Using isolated write approach for ${fieldName}`, 'debug');
             
             // Step 1: Convert text data to hex
@@ -457,19 +360,12 @@ var operations = {
             utils.log(`Adding post-write stabilization delay (${sectorDelay}ms)`, 'debug');
             await utils.sleep(sectorDelay);
             
-            // CRITICAL FIX: Add another authentication reset after the operation
-            utils.log(`Performing authentication reset after write operation`, 'debug');
-            await resetAuth();
-            
-            // Step 7: Verify write with read back (with its own auth cycle)
+            // Step 7: Verify write with read back
             try {
                 utils.log(`Verifying write with read back...`, 'debug');
                 
                 // Wait again before reading to ensure card stability
                 await utils.sleep(sectorDelay / 2);
-                
-                // CRITICAL FIX: Reset authentication again before verification read
-                await resetAuth();
                 
                 // Construct a fresh read command with new authentication
                 const readCommand = `LinearRead h ${absoluteBlock} 16 0x60 0`;
@@ -500,9 +396,6 @@ var operations = {
                     utils.log(`  Wrote: ${paddedHex.toUpperCase()}`, 'warning');
                     utils.log(`  Read: ${readHex.substring(0, paddedHex.length).toUpperCase()}`, 'warning');
                 }
-                
-                // CRITICAL FIX: Reset authentication again after verification read
-                await resetAuth();
             } catch (verifyError) {
                 // Log but don't fail the operation if verification fails
                 utils.log(`Verification read failed: ${verifyError.message}`, 'warning');
@@ -539,11 +432,7 @@ var operations = {
             // Get sector-specific delay
             const sectorDelay = this.getSectorDelay(absoluteBlock);
             
-            // CRITICAL FIX: Add a complete authentication reset before each operation
-            utils.log(`Performing authentication reset before allegiance read operation`, 'debug');
-            await resetAuth();
-            
-            // Use isolated read approach with authentication reset
+            // Use isolated read approach, same as faction fields
             utils.log(`Using isolated read approach for ${fieldName}`, 'debug');
             
             // Step 1: Construct the read command with proper authentication
@@ -592,17 +481,6 @@ var operations = {
                         }
                         utils.log(byteAnalysis, 'debug');
                         
-                        // DEBUGGING: Check if we got truncated data
-                        if (hexData.length < 32) {
-                            utils.log(`WARNING: Read data is shorter than expected (${hexData.length} chars)`, 'warning');
-                        }
-                        
-                        // Check for unusual patterns
-                        if (hexData.indexOf('FF') === 2) {
-                            utils.log(`WARNING: FF padding starts after just 1 byte (single character)!`, 'warning');
-                        }
-                        
-                        // Return the raw hex data without conversion
                         resolve(hexData);
                     } else {
                         utils.log(`Read failed: ${response.Status}`, 'error');
@@ -614,10 +492,6 @@ var operations = {
             // Step 4: Add mandatory delay AFTER operation to allow card to stabilize
             utils.log(`Adding post-read stabilization delay (${sectorDelay/2}ms)`, 'debug');
             await utils.sleep(sectorDelay/2);
-            
-            // CRITICAL FIX: Add another authentication reset after the operation
-            utils.log(`Performing authentication reset after allegiance read operation`, 'debug');
-            await resetAuth();
             
             // Step 5: Convert the raw hex to text
             const textData = utils.hexToText(rawHex);
@@ -661,11 +535,7 @@ var operations = {
             // Get sector-specific delay
             const sectorDelay = this.getSectorDelay(absoluteBlock);
             
-            // CRITICAL FIX: Add a complete authentication reset before each operation
-            utils.log(`Performing authentication reset before allegiance write operation`, 'debug');
-            await resetAuth();
-            
-            // Use isolated write approach with authentication reset
+            // Use isolated write approach, same as faction fields
             utils.log(`Using isolated write approach for ${fieldName}`, 'debug');
             
             // Step 1: Convert text data to hex
@@ -705,19 +575,12 @@ var operations = {
             utils.log(`Adding post-write stabilization delay (${sectorDelay}ms)`, 'debug');
             await utils.sleep(sectorDelay);
             
-            // CRITICAL FIX: Add another authentication reset after the operation
-            utils.log(`Performing authentication reset after allegiance write operation`, 'debug');
-            await resetAuth();
-            
-            // Step 7: Verify write with read back (with its own auth cycle)
+            // Step 7: Verify write with read back
             try {
                 utils.log(`Verifying write with read back...`, 'debug');
                 
                 // Wait again before reading to ensure card stability
                 await utils.sleep(sectorDelay / 2);
-                
-                // Reset authentication again before verification read
-                await resetAuth();
                 
                 // Construct a fresh read command with new authentication
                 const readCommand = `LinearRead h ${absoluteBlock} 16 0x60 0`;
@@ -748,9 +611,6 @@ var operations = {
                     utils.log(`  Wrote: ${hexData.toUpperCase()}`, 'warning');
                     utils.log(`  Read: ${readHex.substring(0, hexData.length).toUpperCase()}`, 'warning');
                 }
-                
-                // Reset authentication again after verification read
-                await resetAuth();
             } catch (verifyError) {
                 // Log but don't fail the operation if verification fails
                 utils.log(`Verification read failed: ${verifyError.message}`, 'warning');
@@ -761,20 +621,11 @@ var operations = {
             utils.log(`${fieldName} write error: ${error}`, 'error');
             throw new Error(`Failed to write ${fieldName}: ${error}`);
         }
-    },
-
-    /**
-     * Resets the authentication state of the card reader and card.
-     * This helps isolate operations and prevent data bleeding between blocks.
-     * @returns {Promise<void>}
-     */
-    resetCardSession: async function() {
-        utils.log("Resetting card session for clean authentication state", 'debug');
-        return resetAuth();
     }
 }; // End of operations object definition
 
 // Add these new functions to operations directly with absolute block addressing
+// These functions are for backward compatibility with existing code using absolute block addresses
 
 /**
  * Reads a block using LinearRead method with key index 0 (for registration page).
@@ -853,26 +704,36 @@ operations.writeAbsoluteBlock = async function(blockNumber, data, key) {
 };
 
 /**
- * Gets the appropriate delay time for a given sector
- * @param {number} sector - The sector number
- * @returns {number} - Delay in milliseconds
+ * Gets the appropriate delay for a specific block based on its sector type
+ * @param {number} blockNumber - The absolute block number
+ * @returns {number} The delay in milliseconds
  */
-operations.getSectorDelay = function(sector) {
-    // Use longer delays for more reliable operation
-    // Especially important for faction and allegiance sectors
-    if (sector === 1 || (sector >= 1 && sector <= 15)) {
-        // Faction sectors
-        return 2900;
-    } else if (sector >= 36 && sector <= 38) {
-        // Allegiance sectors
-        return 2900;
-    } else if (sector === 39) {
-        // User data sector
-        return 600;
-    } else {
-        // Default for other sectors
-        return 600;
+operations.getSectorDelay = function(blockNumber) {
+    // Convert block number to sector
+    const addrInfo = utils.calculateMifareAddress(blockNumber);
+    const sector = addrInfo.sector;
+    
+    // Determine sector type
+    let sectorType = 'default';
+    
+    // Sectors 1-15, 17-31 are faction sectors
+    if ((sector >= 1 && sector <= 15) || (sector >= 17 && sector <= 31)) {
+        sectorType = 'faction';
     }
+    // Sectors 36-38 are allegiance sectors
+    else if (sector >= 36 && sector <= 38) {
+        sectorType = 'allegiance';
+    }
+    // Sector 39 is user data
+    else if (sector === 39) {
+        sectorType = 'user';
+    }
+    
+    // Get delay from core configuration or use default
+    const delay = core.SECTOR_DELAYS[sectorType] || core.SECTOR_DELAYS.default;
+    
+    utils.log(`Using ${delay}ms delay for block ${blockNumber} (Sector ${sector}, type: ${sectorType})`, 'debug');
+    return delay;
 };
 
 /**

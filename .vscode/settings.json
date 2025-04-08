@@ -11,5 +11,15 @@
         "markdown",
         "latex",
         "plaintext"
-    ]
+    ],
+    "files.autoSave": "onFocusChange",
+    "cursor.cpp.disabledLanguages": [],
+    "git.alwaysShowStagedChangesResourceGroup": true,
+    "git.alwaysSignOff": false,
+    "git.autoRepositoryDetection": false,
+    "git.branchProtection": [
+        "main"
+    ],
+    "workbench.editor.alwaysShowEditorActions": true,
+    "workbench.list.smoothScrolling": true
 }

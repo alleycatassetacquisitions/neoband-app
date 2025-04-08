@@ -20,10 +20,10 @@ const core = {
     // --- Constants & Configuration ---
     NFC_KEY: "FFFFFFFFFFFF", // Standard key for operations - Ensure this matches the key in map.js if different
     RESERVED_SECTORS: new Set([0, 16, 32, 33, 34, 35]),
-    SECTOR_DELAYS: { // Delays in ms before operations per sector type
-        faction: 50, // Slightly increased from original attempt
-        allegiance: 60, // Slightly increased from original attempt
-        user: 40,
+    SECTOR_DELAYS: {
+        faction: 2900,
+        allegiance: 2900,
+        user: 600,
         default: 50
     },
 

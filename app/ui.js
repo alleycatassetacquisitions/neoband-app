@@ -811,9 +811,15 @@ const ui = {
              for (const [fieldKey, fieldConfig] of Object.entries(factionData.fields)) {
                  const inputId = `faction-${factionKey}-${fieldKey}-input`;
                  try {
-                     // Pass the key from fieldConfig
-                     const hexData = await operations.readBlock(factionSector, fieldConfig.block, fieldConfig.key, `Faction Field ${fieldKey}`);
-                     const textData = utils.hexToText(hexData);
+                     // Use readFactionField which directly returns text (like username)
+                     const textData = await operations.readFactionField(
+                         factionSector, 
+                         fieldConfig.block, 
+                         fieldConfig.key, 
+                         `Faction Field ${fieldKey}`
+                     );
+                     
+                     // Update the UI with the text data
                      ui.updateInputValue(inputId, textData);
                      utils.log(`Read Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
                      if(textData) readCount++;
@@ -872,9 +878,15 @@ const ui = {
                       if(textData.length > 16) {
                           throw new Error(`Data for ${fieldConfig.title} exceeds 16 characters.`);
                       }
-                      const hexData = utils.textToHex(textData); // Encode before writing
                        try {
-                          await operations.writeBlock(factionSector, fieldConfig.block, hexData, fieldConfig.key, `Faction Field ${fieldKey}`);
+                          // Use writeFactionField which works directly with text data like writeUsername
+                          await operations.writeFactionField(
+                              factionSector, 
+                              fieldConfig.block, 
+                              textData, 
+                              fieldConfig.key, 
+                              `Faction Field ${fieldKey}`
+                          );
                           utils.log(`Wrote Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
                            if(textData) writeCount++;
                       } catch (fieldError) {
@@ -954,9 +966,15 @@ const ui = {
              for (const [fieldKey, fieldConfig] of Object.entries(allegianceData.fields)) {
                  const inputId = `allegiance-${allegianceKey}-${fieldKey}-input`;
                  try {
-                     // Pass the key from fieldConfig
-                     const hexData = await operations.readBlock(allegianceSector, fieldConfig.block, fieldConfig.key, `Allegiance Field ${fieldKey}`);
-                     const textData = utils.hexToText(hexData);
+                     // Use readAllegianceField which directly returns text (like username)
+                     const textData = await operations.readAllegianceField(
+                         allegianceSector, 
+                         fieldConfig.block, 
+                         fieldConfig.key, 
+                         `Allegiance Field ${fieldKey}`
+                     );
+                     
+                     // Update the UI with the text data
                      ui.updateInputValue(inputId, textData);
                      utils.log(`Read Allegiance Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
                      if(textData) readCount++;
@@ -1016,9 +1034,15 @@ const ui = {
                        if(textData.length > 16) {
                             throw new Error(`Data for ${fieldConfig.title} exceeds 16 characters.`);
                         }
-                       const hexData = utils.textToHex(textData);
                        try {
-                           await operations.writeBlock(allegianceSector, fieldConfig.block, hexData, fieldConfig.key, `Allegiance Field ${fieldKey}`);
+                           // Use writeAllegianceField which works directly with text data like writeUsername
+                           await operations.writeAllegianceField(
+                               allegianceSector, 
+                               fieldConfig.block, 
+                               textData, 
+                               fieldConfig.key, 
+                               `Allegiance Field ${fieldKey}`
+                           );
                            utils.log(`Wrote Allegiance Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
                             if(textData) writeCount++;
                        } catch (fieldError) {

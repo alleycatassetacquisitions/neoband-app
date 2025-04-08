@@ -171,3 +171,77 @@ These comprehensive updates ensure the allegiance page functionality is fully al
 - This comprehensive update ensures that allegiance field data now persists properly across all operations, with the same reliability as username fields 
 
 ## [Milestone 13] - 2023-04-04
+
+## [Milestone 14] - 2023-04-08
+
+### Fixed
+- Fixed critical issue with faction and allegiance fields being double-encoded during write operations
+- Modified `handleFactionWrite` and `handleAllegianceWrite` functions in ui.js to remove pre-encoding of data
+- Previously, text was being encoded to hex in both the UI code and again in operations.writeFieldWithRetry, causing corruption
+- The fix ensures data is passed as raw text from the UI to operations.writeBlock, letting operations.writeFieldWithRetry handle the encoding once
+- This resolves issues where written data like "hunter" would appear corrupted or missing when read back
+- Data written to faction and allegiance fields now persists correctly with the same reliability as username fields
+
+## [Milestone 15] - 2023-04-09
+
+### Changed
+- Updated sector delay timing in `core.js` to resolve authentication issues during read/write operations:
+  - Increased delay for Sector 1 (Factions) from 50ms to 2900ms
+  - Increased delay for Sectors 36-38 (Allegiances) from 60ms to 2900ms
+  - Increased delay for Sector 39 (User data) from 40ms to 600ms
+- These longer delays ensure proper authentication with the NFC card reader, particularly when accessing multiple blocks within the same sector
+- The longer delays prevent UFR_AUTH_ERROR issues that previously occurred during faction and allegiance operations
+
+### Fixed
+- Resolved authentication failures that occurred when reading faction and allegiance data
+- Fixed issue where successful writes would be followed by failed reads due to insufficient delay between operations
+- Improved reliability of consecutive operations on the same sector
+
+## [Milestone 16] - 2023-04-09
+
+### Fixed
+- Fixed critical issue with double hex-to-text conversion in faction and allegiance read operations
+- Added dedicated `readFactionField` and `readAllegianceField` functions that follow the same pattern as `readUsername`
+- Updated `handleFactionRead` and `handleAllegianceRead` to use these new functions for consistent behavior
+- All field reading now uses the same approach: reading the raw data and performing a single conversion to text
+- This resolves issues where faction fields like "hunter" were incorrectly displayed as empty
+- Fields containing a single character (like "h" from "hunter") now display correctly
+- Standardized the reading approach across all card data (username, factions, and allegiance fields)
+
+## [Milestone 17] - 2023-04-09
+
+### Added
+- Added dedicated `writeFactionField` and `writeAllegianceField` functions that follow the same pattern as `writeUsername`
+- These new functions directly use `writeFieldWithRetry` which properly handles text-to-hex conversion
+
+### Changed
+- Updated `handleFactionWrite` to use `writeFactionField` instead of `writeBlock`
+- Updated `handleAllegianceWrite` to use `writeAllegianceField` instead of `writeBlock`
+- Standardized the writing approach across all card data (username, factions, and allegiance fields)
+
+### Fixed
+- Fixed critical issue where faction fields like "hunter" were only storing the first character "h" during write operations
+- Made faction field writes and reads use the identical approach to username fields, using the same series of function calls and data handling
+- Ensured consistent encoding/decoding behavior for all field types
+- All fields now maintain full text data integrity, resolving the data truncation issues observed in faction fields
+
+## [Milestone 18] - 2023-04-09
+
+### Fixed
+- Resolved critical issue where faction fields were being corrupted during operations within the same sector
+- Implemented isolated authentication for each block read/write operation in faction and allegiance fields
+- Added mandatory delays between operations to ensure card stability and prevent corruption
+- Replaced use of shared functions with direct, isolated commands for each operation
+- Added verification step after writes to confirm data integrity
+- Enhanced logging to show detailed hex analysis during read/write operations
+- Faction data like "hunter" now properly persists across multiple operations
+- Eliminated corruption between different blocks in the same sector
+- Data is now consistently read back exactly as written for all field types (username, faction, allegiance)
+
+### Technical Details
+- Fixed a critical MIFARE card operation issue where authentication sessions weren't properly maintained between blocks
+- Each read/write now performs its own complete authentication cycle
+- Added proper delays before and after operations to ensure card stability
+- Implemented verification reads after writes to confirm data integrity
+- Added detailed hex analysis logging for better debugging
+- Direct card commands now used instead of shared abstractions for better control

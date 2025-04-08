@@ -101,74 +101,142 @@ const utils = {
      * @param {string} hexStr - The hex string (can start with 0x).
      * @returns {string} The decoded text.
      */
-    hexToText: function(hexStr) {
-        // Handle empty input
-        if (!hexStr) return '';
+    hexToText: function(hex) {
+        // Add debugging information at the start
+        utils.log(`Converting hex to text (input): ${hex}`, 'info');
+        
+        if (!hex || typeof hex !== 'string') {
+            utils.log(`Invalid hex input: ${typeof hex} ${hex}`, 'error');
+            return '';
+        }
+        
+        // Sanitize the input: remove '0x' prefix if present
+        if (hex.startsWith('0x') || hex.startsWith('0X')) {
+            hex = hex.slice(2);
+        }
+        
+        // Sanitize the input: ensure even length
+        if (hex.length % 2 !== 0) {
+            utils.log(`WARNING: Odd-length hex string (${hex.length}): ${hex}`, 'warning');
+            hex = '0' + hex;
+        }
+
+        // DEBUG: Log the actual hex bytes being processed
+        utils.log(`Hex bytes breakdown:`, 'debug');
+        let byteLog = '';
+        for (let i = 0; i < hex.length; i += 2) {
+            byteLog += hex.substring(i, i + 2) + ' ';
+            if ((i/2 + 1) % 8 === 0) byteLog += '| ';
+        }
+        utils.log(byteLog, 'debug');
+        
+        // Process the hex string
+        let text = '';
+        let foundFF = false;
+        let textChars = [];
+        
+        try {
+            for (let i = 0; i < hex.length; i += 2) {
+                const hexByte = hex.substring(i, i + 2).toUpperCase();
+                
+                // Track when we see FF bytes to help with debugging
+                if (hexByte === 'FF') {
+                    foundFF = true;
+                    if (textChars.length === 0) {
+                        utils.log('Found FF at start of data', 'debug');
+                    } else if (textChars.length === 1) {
+                        utils.log(`Found FF after single character ${textChars[0]}`, 'debug');
+                    }
+                    continue; // Skip all FF padding bytes
+                }
+                
+                // Skip 00 bytes
+                if (hexByte === '00') {
+                    continue;
+                }
+                
+                // If we've found FF padding but then find a non-FF byte, this is unusual
+                // Report it for debugging purposes
+                if (foundFF && hexByte !== 'FF') {
+                    utils.log(`Warning: Found non-FF byte ${hexByte} after FF padding at position ${i}`, 'warning');
+                }
+                
+                // Convert the current byte to a character and add it to our result
+                const charCode = parseInt(hexByte, 16);
+                if (charCode >= 32 && charCode <= 126) { // printable ASCII
+                    const char = String.fromCharCode(charCode);
+                    textChars.push(char);
+                    text += char;
+                }
+            }
+        } catch (e) {
+            utils.log(`Error in hexToText: ${e.message}`, 'error');
+        }
+        
+        // DEBUG: Log detailed information about what we extracted
+        utils.log(`Characters found in hex: [${textChars.join(', ')}]`, 'debug');
+        if (textChars.length === 1) {
+            utils.log(`WARNING: Only one character (${textChars[0]}) found in hex data!`, 'warning');
+        }
+        utils.log(`Converting hex to text (output): ${text}`, 'info');
+        
+        return text;
+    },
+
+    /**
+     * Pads a hex string to the specified length with FF bytes.
+     * @param {string} hexStr - The hex string to pad.
+     * @param {number} [length=32] - The target length in characters (default: 32 chars = 16 bytes).
+     * @returns {string} The padded hex string.
+     */
+    padHex: function(hexStr, length = 32) {
+        // Validate input
+        if (!hexStr) {
+            utils.log(`Warning: Padding empty hex string with FF`, 'warning');
+            // Return all FF padding if no input
+            return 'F'.repeat(length);
+        }
         
         // Remove 0x prefix if present
         let hex = hexStr.startsWith('0x') || hexStr.startsWith('0X') ? hexStr.slice(2) : hexStr;
         
-        // For debugging purposes, print the full hex string
-        console.debug("Converting hex to text (input):", hex);
-        
-        // Special handling for Neoband's FF-padding convention
-        // First pass: identify the usable data by finding where FF padding starts consistently
-        // Look for the first index where we start seeing only FF bytes to the end
-        let effectiveLength = hex.length;
-        for (let i = 0; i < hex.length; i += 2) {
-            // If we've reached the end of data or have less than 2 chars left, stop
-            if (i + 2 > hex.length) break;
-            
-            const byte = hex.substring(i, i + 2).toUpperCase();
-            
-            // Skip individual FF/00 bytes that might be part of actual data
-            if (byte === 'FF' || byte === '00') continue;
+        // Sanitize to ensure even length
+        if (hex.length % 2 !== 0) {
+            utils.log(`Warning: Odd-length hex string (${hex.length}): ${hex}`, 'warning');
+            hex = hex + '0';  // Append a 0 to make it even
         }
         
-        // Second pass: convert all valid bytes to characters
-        let result = '';
-        for (let i = 0; i < hex.length; i += 2) {
-            if (i + 2 <= hex.length) {
-                const byte = hex.substring(i, i + 2).toUpperCase();
-                
-                // Skip any FF padding or 00 null bytes
-                if (byte !== 'FF' && byte !== '00') {
-                    try {
-                        const charCode = parseInt(byte, 16);
-                        // Only add printable ASCII characters (avoid control characters)
-                        if (charCode >= 32 && charCode <= 126) {
-                            result += String.fromCharCode(charCode);
-                        }
-                    } catch (e) {
-                        console.warn(`Invalid hex byte encountered: ${byte}`);
-                    }
-                }
-            }
+        // Debug the length
+        utils.log(`Padding hex string from ${hex.length} to ${length} characters`, 'debug');
+        utils.log(`Original: ${hex}`, 'debug');
+        
+        // Get the number of bytes in the input
+        const byteCount = hex.length / 2;
+        utils.log(`Original contains ${byteCount} bytes of data`, 'debug');
+        
+        // Calculate padding
+        const paddingNeeded = Math.max(0, length - hex.length);
+        const padding = 'F'.repeat(paddingNeeded);
+        
+        // Log the padding details
+        if (paddingNeeded > 0) {
+            utils.log(`Adding ${paddingNeeded} padding characters (${paddingNeeded/2} bytes)`, 'debug');
+        } else {
+            utils.log(`No padding needed, hex data is already ${hex.length} characters`, 'debug');
         }
         
-        // Log the result for debugging
-        console.debug("Converting hex to text (output):", result);
+        // Pad the hex string on the right with FF
+        const padded = hex + padding;
+        utils.log(`Padded: ${padded}`, 'debug');
         
-        // Return the result, even if it's just a single character
-        return result;
-    },
-
-    /**
-     * Pads a hex string to 16 bytes (32 hex chars) using 'FF' padding.
-     * Truncates if longer than 16 bytes.
-     * @param {string} hexStr - The input hex string.
-     * @returns {string} The padded/truncated hex string.
-     */
-    padHex: function(hexStr) {
-        const targetLength = this.MAX_TEXT_LENGTH * 2; // 32 hex chars
-        let hex = hexStr.startsWith('0x') || hexStr.startsWith('0X') ? hexStr.slice(2) : hexStr;
-        if (hex.length > targetLength) {
-            return hex.substring(0, targetLength);
+        // Check if we need to truncate
+        if (padded.length > length) {
+            const truncated = padded.substring(0, length);
+            utils.log(`Warning: Truncated hex data from ${padded.length} to ${length} characters`, 'warning');
+            return truncated;
         }
-        while (hex.length < targetLength) {
-            hex += 'FF'; // Pad with FF bytes to match original app
-        }
-        return hex;
+        
+        return padded;
     },
 
     /**

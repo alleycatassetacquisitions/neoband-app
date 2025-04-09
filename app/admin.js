@@ -1,5 +1,21 @@
+/**
+ * admin.js
+ * Provides administrator interface and functionality for the Neoband App.
+ * 
+ * This file implements:
+ * - Admin interface initialization and rendering
+ * - Detailed memory map visualization
+ * - Advanced read/write capabilities for memory sectors
+ * - Management tools for factions and allegiances
+ */
+
 // ======================= ADMIN PAGE =======================
 
+/**
+ * Initialize the admin interface when the DOM is fully loaded.
+ * This listener ensures that the admin interface is only built after
+ * the DOM is ready and the required FIELD_MAP has been loaded from map.js.
+ */
 document.addEventListener('DOMContentLoaded', () => {
     // Only initialize admin if FIELD_MAP is available (loaded from map.js)
     if (typeof FIELD_MAP !== 'undefined') {
@@ -14,6 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+/**
+ * Initializes the admin interface by building the UI components.
+ * Creates a dynamic admin interface based on the FIELD_MAP structure,
+ * organizing content by category (factions, allegiances, user data).
+ * 
+ * @returns {void}
+ */
 function initializeAdminInterface() {
     const adminPage = document.getElementById('adminPage');
     if (!adminPage) {
@@ -145,7 +168,7 @@ function initializeAdminInterface() {
         container.appendChild(allegiancesSection);
 
         // Create section for user data (limited view)
-        const userSection = createAdminSection("USER DATA (Sector 39)", FIELD_MAP.user, 'user');
+        const userSection = createAdminSection("USER DATA (Sector 39)", FIELD_MAP.userData, 'user');
         container.appendChild(userSection);
 
         console.log("Admin Interface Initialized Successfully.");
@@ -156,6 +179,15 @@ function initializeAdminInterface() {
     }
 }
 
+/**
+ * Creates an admin section for a specific category (faction, allegiance, user).
+ * Generates a titled section containing a grid of entity buttons.
+ * 
+ * @param {string} sectionTitle - Display title for the section
+ * @param {Object} mapData - The data from FIELD_MAP for this category
+ * @param {string} category - Category identifier ('faction', 'allegiance', or 'user')
+ * @returns {HTMLElement} The constructed section element
+ */
 function createAdminSection(sectionTitle, mapData, category) {
     const section = document.createElement('div');
     section.className = 'admin-section';
@@ -184,31 +216,47 @@ function createAdminSection(sectionTitle, mapData, category) {
     return section;
 }
 
+/**
+ * Creates a button for an entity (faction, allegiance, or user data).
+ * When clicked, displays detailed information about the entity.
+ * 
+ * @param {string} entityKey - Key identifier for the entity (e.g., 'faction1')
+ * @param {Object} entityData - Data structure for this entity from FIELD_MAP
+ * @param {string} category - Category identifier ('faction', 'allegiance', or 'user')
+ * @returns {HTMLButtonElement} The constructed button element
+ */
 function createEntityButton(entityKey, entityData, category) {
     const btn = document.createElement('button');
     btn.className = 'admin-button';
     btn.setAttribute('data-entity-key', entityKey);
     btn.setAttribute('data-category', category);
 
-    // Use the name property if available, otherwise default to entityKey
-    const displayName = entityData.name || entityKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()); // Format camelCase/PascalCase
+    // Handle different data structures for user data vs factions/allegiances
+    let displayName, sectorNumber;
+    if (category === 'user') {
+        displayName = 'User Data';
+        sectorNumber = '39';
+    } else {
+        // For factions and allegiances, use name property if available
+        displayName = entityData.name || entityKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        sectorNumber = entityData.sector;
+    }
 
-    btn.innerHTML = `
-        <div class="sector-header">${displayName}</div>
-        <div class="sector-meta">Sector ${entityData.sector}</div>
-    `;
-
-    btn.addEventListener('click', () => {
-        // Close any existing detail view before opening a new one
-        const existingDetail = document.getElementById('adminDetailView');
-        if (existingDetail) {
-            existingDetail.remove();
-        }
-        // Create and append the new detail view below the button's parent section
-        const detailView = displayEntityDetails(entityKey, entityData, category);
-        btn.closest('.admin-section').appendChild(detailView);
-    });
-
+    // Create button content
+    const header = document.createElement('div');
+    header.className = 'sector-header';
+    header.textContent = displayName;
+    
+    const meta = document.createElement('div');
+    meta.className = 'sector-meta';
+    meta.textContent = `Sector ${sectorNumber}`;
+    
+    btn.appendChild(header);
+    btn.appendChild(meta);
+    
+    // Add click listener
+    btn.addEventListener('click', () => displayEntityDetails(entityKey, entityData, category));
+    
     return btn;
 }
 
@@ -218,24 +266,55 @@ function displayEntityDetails(entityKey, entityData, category) {
     detailView.id = 'adminDetailView'; // ID to easily find and remove later
 
     const displayName = entityData.name || entityKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    
+    // For userData, we need to handle the sector differently
+    const sectorDisplay = category === 'user' ? '39' : entityData.sector;
 
     let fieldsHTML = '';
-    for (const fieldKey in entityData.fields) {
-        const field = entityData.fields[fieldKey];
-        const absoluteBlockId = calculateAbsoluteBlockId(entityData.sector, field.block);
-        const inputId = `admin-input-${entityData.sector}-${field.block}`;
+    
+    // Handle userData differently since it has a different structure
+    if (category === 'user') {
+        // For userData, each property is a field
+        for (const fieldKey in entityData) {
+            const field = entityData[fieldKey];
+            // Skip if not a field object (e.g., might be a function or other property)
+            if (!field || typeof field !== 'object' || !field.block) continue;
+            
+            const absoluteBlockId = calculateAbsoluteBlockId(39, field.block - 240); // Adjust block to be relative to sector 39
+            const relativeBlock = field.block - 240; // Calculate relative block within sector 39
+            const inputId = `admin-input-39-${relativeBlock}`;
 
-        fieldsHTML += `
-        <div class="detail-item">
-            <label for="${inputId}">${field.title}</label>
-            <input type="text" id="${inputId}"
-                   placeholder="${field.placeholder}" value=""
-                   data-sector="${entityData.sector}"
-                   data-block="${field.block}"
-                   data-key="${field.key}" />
-            <div class="field-block-info">Sector ${entityData.sector}, Block ${field.block} (Abs: ${absoluteBlockId})</div>
-        </div>
-        `;
+            fieldsHTML += `
+            <div class="detail-item">
+                <label for="${inputId}">${field.title}</label>
+                <input type="text" id="${inputId}"
+                       placeholder="${field.placeholder}" value=""
+                       data-sector="39"
+                       data-block="${relativeBlock}"
+                       data-key="${field.key}" />
+                <div class="field-block-info">Sector 39, Block ${relativeBlock} (Abs: ${field.block})</div>
+            </div>
+            `;
+        }
+    } else {
+        // For factions and allegiances, use the existing structure
+        for (const fieldKey in entityData.fields) {
+            const field = entityData.fields[fieldKey];
+            const absoluteBlockId = calculateAbsoluteBlockId(entityData.sector, field.block);
+            const inputId = `admin-input-${entityData.sector}-${field.block}`;
+
+            fieldsHTML += `
+            <div class="detail-item">
+                <label for="${inputId}">${field.title}</label>
+                <input type="text" id="${inputId}"
+                       placeholder="${field.placeholder}" value=""
+                       data-sector="${entityData.sector}"
+                       data-block="${field.block}"
+                       data-key="${field.key}" />
+                <div class="field-block-info">Sector ${entityData.sector}, Block ${field.block} (Abs: ${absoluteBlockId})</div>
+            </div>
+            `;
+        }
     }
 
     detailView.innerHTML = `
@@ -282,7 +361,7 @@ async function readAdminData(entityKey, category) {
     try {
         let entityData;
         if (category === 'user') {
-            entityData = FIELD_MAP.user;
+            entityData = FIELD_MAP.userData;
         } else {
             entityData = FIELD_MAP[category][entityKey];
         }
@@ -331,7 +410,7 @@ async function writeAdminData(entityKey, category) {
     try {
         let entityData;
         if (category === 'user') {
-            entityData = FIELD_MAP.user;
+            entityData = FIELD_MAP.userData;
         } else {
             entityData = FIELD_MAP[category][entityKey];
         }
@@ -373,4 +452,4 @@ async function writeAdminData(entityKey, category) {
 // Ensure that `ui.showOperationIndicator`, `ui.hideOperationIndicator`,
 // `ui.showVisualConfirmation`, `utils.log`, `utils.hexToString`,
 // `utils.stringToHex`, `operations.readBlock`, `operations.writeBlock`
-// are all accessible and function as expected. 
+// are all accessible and function as expected.

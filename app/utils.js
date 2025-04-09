@@ -1,16 +1,41 @@
 /**
  * utils.js
- * Utility functions for the Rival App (hex conversion, padding, delays, logging, address calculations).
+ * Utility functions for the Neoband App (hex conversion, padding, delays, logging, address calculations).
+ * 
+ * This file provides essential utility functions including:
+ * - MIFARE address calculations and validation
+ * - Text-to-hex and hex-to-text conversions for NFC data
+ * - Hex padding and formatting utilities
+ * - Logging infrastructure
+ * - Timeout and delay management for NFC operations
  */
 
 const utils = {
+    /**
+     * Constants defining the physical limitations of MIFARE Classic 4K tags.
+     * @constant {number} MAX_BLOCK_ADDRESS - Maximum linear block address in MIFARE Classic 4K (255)
+     * @constant {number} MAX_TEXT_LENGTH - Maximum bytes per block (16 bytes)
+     */
     MAX_BLOCK_ADDRESS: 255, // MIFARE Classic 4K
     MAX_TEXT_LENGTH: 16, // Bytes per block
 
     /**
      * Calculates MIFARE Classic 4K sector/block info from a linear address.
+     * Converts an absolute/linear block address to sector, block-within-sector, and identifies trailer blocks.
+     * 
      * @param {number} logicalAddress - The linear block address (0-255).
-     * @returns {object} { sector: number, blockInSector: number, isTrailerBlock: boolean, absoluteBlock: number }
+     * @returns {object} Address information object with the following properties:
+     *   - sector {number}: The sector number (0-39)
+     *   - blockInSector {number}: The block number within the sector (0-3 or 0-15)
+     *   - isTrailerBlock {boolean}: Whether this is a sector trailer block
+     *   - absoluteBlock {number}: The original logical address (unchanged)
+     * @throws {RangeError} If the provided address is outside valid range
+     * 
+     * Technical Notes:
+     * - MIFARE Classic 4K has 40 sectors total (0-39)
+     * - Sectors 0-31 have 4 blocks each (0-127)
+     * - Sectors 32-39 have 16 blocks each (128-255)
+     * - Sector trailer blocks (block 3 in sectors 0-31, block 15 in sectors 32-39) contain keys and access bits
      */
     calculateMifareAddress: function(logicalAddress) {
         logicalAddress = parseInt(logicalAddress);
@@ -43,9 +68,17 @@ const utils = {
 
     /**
      * Validates if a block address is usable for read/write operations.
+     * Checks whether a block is valid for data storage based on its location and role.
+     * 
      * @param {number} blockAddress - The absolute block address (0-255).
      * @param {boolean} isWriteOperation - True if checking for write permissions (disallows trailer blocks).
      * @returns {boolean} True if the address is valid and usable.
+     * 
+     * Technical Notes:
+     * - Block 0 of Sector 0 (manufacturer block) is never writable and often read-protected
+     * - Reserved sectors (0, 16, 32-35) should be avoided for general data storage
+     * - Sector trailer blocks should not be written to with normal data write operations
+     * - Reading from sector trailers may be allowed depending on access conditions
      */
     isValidDataBlock: function(blockAddress, isWriteOperation = false) {
          try {
@@ -70,10 +103,17 @@ const utils = {
 
     /**
      * Converts a text string to its hexadecimal representation.
-     * Truncates if longer than MAX_TEXT_LENGTH.
-     * Improved to ensure consistent handling of ASCII characters.
+     * Ensures consistent handling of ASCII characters for compatibility with NFC storage.
+     * 
      * @param {string} text - The input text.
      * @returns {string} The hex string (without 0x prefix).
+     * 
+     * Technical Notes:
+     * - Each character is converted to its ASCII value, then to a two-digit hex representation
+     * - Result is a string of hex digits without spaces or 0x prefix
+     * - Text is truncated if longer than MAX_TEXT_LENGTH (16 characters)
+     * - Empty/null input returns an empty string
+     * - Handles basic ASCII characters reliably, extended characters may vary by encoding
      */
     textToHex: function(text) {
         // Handle empty/null/undefined input
@@ -96,79 +136,138 @@ const utils = {
 
     /**
      * Converts a hexadecimal string back to text.
-     * Handles mixed FF/00 padding bytes correctly and preserves all valid characters.
-     * Enhanced for compatibility with the original Neoband App data format.
+     * Handles MIFARE Classic data format with mixed FF/00 padding bytes.
+     * 
      * @param {string} hexStr - The hex string (can start with 0x).
      * @returns {string} The decoded text.
+     * 
+     * Technical Notes:
+     * - Removes 0x prefix if present
+     * - Skips FF bytes (padding) and 00 bytes (null terminators)
+     * - Only converts printable ASCII characters (32-126)
+     * - Logs detailed debugging information about the conversion process
+     * - Handles edge cases like odd-length hex strings and mixed padding
+     * - IMPORTANT: Designed specifically for compatibility with the original Neoband App data format
      */
-    hexToText: function(hexStr) {
-        // Handle empty input
-        if (!hexStr) return '';
+    hexToText: function(hex) {
+        // Add debugging information at the start
+        utils.log(`Converting hex to text (input): ${hex}`, 'info');
         
-        // Remove 0x prefix if present
-        let hex = hexStr.startsWith('0x') || hexStr.startsWith('0X') ? hexStr.slice(2) : hexStr;
-        
-        // For debugging purposes, print the full hex string
-        console.debug("Converting hex to text (input):", hex);
-        
-        // Special handling for Neoband's FF-padding convention
-        // First pass: identify the usable data by finding where FF padding starts consistently
-        // Look for the first index where we start seeing only FF bytes to the end
-        let effectiveLength = hex.length;
-        for (let i = 0; i < hex.length; i += 2) {
-            // If we've reached the end of data or have less than 2 chars left, stop
-            if (i + 2 > hex.length) break;
-            
-            const byte = hex.substring(i, i + 2).toUpperCase();
-            
-            // Skip individual FF/00 bytes that might be part of actual data
-            if (byte === 'FF' || byte === '00') continue;
+        if (!hex || typeof hex !== 'string') {
+            utils.log(`Invalid hex input: ${typeof hex} ${hex}`, 'error');
+            return '';
         }
         
-        // Second pass: convert all valid bytes to characters
-        let result = '';
+        // Sanitize the input: remove '0x' prefix if present
+        if (hex.startsWith('0x') || hex.startsWith('0X')) {
+            hex = hex.slice(2);
+        }
+        
+        // Sanitize the input: ensure even length
+        if (hex.length % 2 !== 0) {
+            utils.log(`WARNING: Odd-length hex string (${hex.length}): ${hex}`, 'warning');
+            hex = '0' + hex;
+        }
+
+        // DEBUG: Log the actual hex bytes being processed
+        utils.log(`Hex bytes breakdown:`, 'debug');
+        let byteLog = '';
         for (let i = 0; i < hex.length; i += 2) {
-            if (i + 2 <= hex.length) {
-                const byte = hex.substring(i, i + 2).toUpperCase();
+            byteLog += hex.substring(i, i + 2) + ' ';
+            if ((i/2 + 1) % 8 === 0) byteLog += '| ';
+        }
+        utils.log(byteLog, 'debug');
+        
+        // Process the hex string
+        let text = '';
+        let foundFF = false;
+        let textChars = [];
+        
+        try {
+            for (let i = 0; i < hex.length; i += 2) {
+                const hexByte = hex.substring(i, i + 2).toUpperCase();
                 
-                // Skip any FF padding or 00 null bytes
-                if (byte !== 'FF' && byte !== '00') {
-                    try {
-                        const charCode = parseInt(byte, 16);
-                        // Only add printable ASCII characters (avoid control characters)
-                        if (charCode >= 32 && charCode <= 126) {
-                            result += String.fromCharCode(charCode);
-                        }
-                    } catch (e) {
-                        console.warn(`Invalid hex byte encountered: ${byte}`);
+                // Track when we see FF bytes to help with debugging
+                if (hexByte === 'FF') {
+                    foundFF = true;
+                    if (textChars.length === 0) {
+                        utils.log('Found FF at start of data', 'debug');
+                    } else if (textChars.length === 1) {
+                        utils.log(`Found FF after single character ${textChars[0]}`, 'debug');
                     }
+                    continue; // Skip all FF padding bytes
+                }
+                
+                // Skip 00 bytes
+                if (hexByte === '00') {
+                    continue;
+                }
+                
+                // If we've found FF padding but then find a non-FF byte, this is unusual
+                // Report it for debugging purposes
+                if (foundFF && hexByte !== 'FF') {
+                    utils.log(`Warning: Found non-FF byte ${hexByte} after FF padding at position ${i}`, 'warning');
+                }
+                
+                // Convert the current byte to a character and add it to our result
+                const charCode = parseInt(hexByte, 16);
+                if (charCode >= 32 && charCode <= 126) { // printable ASCII
+                    const char = String.fromCharCode(charCode);
+                    textChars.push(char);
+                    text += char;
                 }
             }
+        } catch (e) {
+            utils.log(`Error in hexToText: ${e.message}`, 'error');
         }
         
-        // Log the result for debugging
-        console.debug("Converting hex to text (output):", result);
+        // DEBUG: Log detailed information about what we extracted
+        utils.log(`Characters found in hex: [${textChars.join(', ')}]`, 'debug');
+        if (textChars.length === 1) {
+            utils.log(`WARNING: Only one character (${textChars[0]}) found in hex data!`, 'warning');
+        }
+        utils.log(`Converting hex to text (output): ${text}`, 'info');
         
-        // Return the result, even if it's just a single character
-        return result;
+        return text;
     },
 
     /**
-     * Pads a hex string to 16 bytes (32 hex chars) using 'FF' padding.
-     * Truncates if longer than 16 bytes.
-     * @param {string} hexStr - The input hex string.
-     * @returns {string} The padded/truncated hex string.
+     * Pads a hex string to the specified length with FF bytes.
+     * Used to ensure block data has the correct length for MIFARE Classic blocks.
+     * 
+     * @param {string} hexStr - The hex string to pad.
+     * @param {number} [length=32] - The target length in characters (default: 32 chars = 16 bytes).
+     * @returns {string} The padded hex string.
+     * 
+     * Technical Notes:
+     * - Default padding is with FF bytes, which is standard for MIFARE Classic
+     * - If input is empty/null, returns all FF padding
+     * - Length parameter should be even (multiple of 2) since each byte is 2 hex chars
+     * - Default length of 32 characters represents 16 bytes (full MIFARE block)
      */
-    padHex: function(hexStr) {
-        const targetLength = this.MAX_TEXT_LENGTH * 2; // 32 hex chars
-        let hex = hexStr.startsWith('0x') || hexStr.startsWith('0X') ? hexStr.slice(2) : hexStr;
-        if (hex.length > targetLength) {
-            return hex.substring(0, targetLength);
+    padHex: function(hexStr, length = 32) {
+        // Validate input
+        if (!hexStr) {
+            utils.log(`Warning: Padding empty hex string with FF`, 'warning');
+            // Return all FF padding if no input
+            return 'F'.repeat(length);
         }
-        while (hex.length < targetLength) {
-            hex += 'FF'; // Pad with FF bytes to match original app
+        
+        // Remove 0x prefix if present
+        if (hexStr.startsWith('0x') || hexStr.startsWith('0X')) {
+            hexStr = hexStr.slice(2);
         }
-        return hex;
+        
+        // Ensure proper length
+        if (hexStr.length > length) {
+            utils.log(`Warning: Hex string (${hexStr.length} chars) exceeds target length (${length})`, 'warning');
+            // Truncate if too long
+            return hexStr.substring(0, length);
+        }
+        
+        // Pad with FF to target length
+        const paddedHex = hexStr + 'F'.repeat(length - hexStr.length);
+        return paddedHex;
     },
 
     /**

@@ -39,6 +39,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added logging in `operations.js` to show raw `ufResponse()` output and the exact command string before sending via `ufRequest()`.
 - Refactored `ui.js` `handleRegScan` to only perform tag detection (`scanTag`) and not automatically trigger `handleRegRead`.
 - Refactored `ui.js` `handleRegRead` to be triggered only by the read button and explicitly read only defined user fields (Username, Allegiance, Status) using `operations.readBlock` with correct block addresses and keys from `FIELD_MAP`, removing the incorrect attempt to read Block 0.
+- Increased delay times for allegiance (4000ms) and user (1200ms) operations to fix authentication errors
+- Improved retry mechanism for NFC operations with allegiance sectors by adding progressive backoff
+- Added extra initial delay for allegiance sectors which are more prone to errors
+- Fixed handling of write operations to ensure consistent delays and error management
+- Fixed critical issue with username reading functionality by correcting the readFieldWithRetryRaw function to use LinearRead command instead of incorrectly using LinearWrite command format
 
 ### Removed
 - Removed redundant `MEMORY_MAP` definition from `core.js`.
@@ -171,3 +176,104 @@ These comprehensive updates ensure the allegiance page functionality is fully al
 - This comprehensive update ensures that allegiance field data now persists properly across all operations, with the same reliability as username fields 
 
 ## [Milestone 13] - 2023-04-04
+
+## [Milestone 14] - 2023-04-08
+
+### Fixed
+- Fixed critical issue with faction and allegiance fields being double-encoded during write operations
+- Modified `handleFactionWrite` and `handleAllegianceWrite` functions in ui.js to remove pre-encoding of data
+- Previously, text was being encoded to hex in both the UI code and again in operations.writeFieldWithRetry, causing corruption
+- The fix ensures data is passed as raw text from the UI to operations.writeBlock, letting operations.writeFieldWithRetry handle the encoding once
+- This resolves issues where written data like "hunter" would appear corrupted or missing when read back
+- Data written to faction and allegiance fields now persists correctly with the same reliability as username fields
+
+## [Milestone 15] - 2023-04-09
+
+### Changed
+- Updated sector delay timing in `core.js` to resolve authentication issues during read/write operations:
+  - Increased delay for Sector 1 (Factions) from 50ms to 2900ms
+  - Increased delay for Sectors 36-38 (Allegiances) from 60ms to 2900ms
+  - Increased delay for Sector 39 (User data) from 40ms to 600ms
+- These longer delays ensure proper authentication with the NFC card reader, particularly when accessing multiple blocks within the same sector
+- The longer delays prevent UFR_AUTH_ERROR issues that previously occurred during faction and allegiance operations
+
+### Fixed
+- Resolved authentication failures that occurred when reading faction and allegiance data
+- Fixed issue where successful writes would be followed by failed reads due to insufficient delay between operations
+- Improved reliability of consecutive operations on the same sector
+
+## [Milestone 16] - 2023-04-09
+
+### Fixed
+- Fixed critical issue with double hex-to-text conversion in faction and allegiance read operations
+- Added dedicated `readFactionField` and `readAllegianceField` functions that follow the same pattern as `readUsername`
+- Updated `handleFactionRead` and `handleAllegianceRead` to use these new functions for consistent behavior
+- All field reading now uses the same approach: reading the raw data and performing a single conversion to text
+- This resolves issues where faction fields like "hunter" were incorrectly displayed as empty
+- Fields containing a single character (like "h" from "hunter") now display correctly
+- Standardized the reading approach across all card data (username, factions, and allegiance fields)
+
+## [Milestone 17] - 2023-04-09
+
+### Added
+- Added dedicated `writeFactionField` and `writeAllegianceField` functions that follow the same pattern as `writeUsername`
+- These new functions directly use `writeFieldWithRetry` which properly handles text-to-hex conversion
+
+### Changed
+- Updated `handleFactionWrite` to use `writeFactionField` instead of `writeBlock`
+- Updated `handleAllegianceWrite` to use `writeAllegianceField` instead of `writeBlock`
+- Standardized the writing approach across all card data (username, factions, and allegiance fields)
+
+### Fixed
+- Fixed critical issue where faction fields like "hunter" were only storing the first character "h" during write operations
+- Made faction field writes and reads use the identical approach to username fields, using the same series of function calls and data handling
+- Ensured consistent encoding/decoding behavior for all field types
+- All fields now maintain full text data integrity, resolving the data truncation issues observed in faction fields
+
+## [Milestone 18] - 2023-04-09
+
+### Fixed
+- Resolved critical issue where faction fields were being corrupted during operations within the same sector
+- Implemented isolated authentication for each block read/write operation in faction and allegiance fields
+- Added mandatory delays between operations to ensure card stability and prevent corruption
+- Replaced use of shared functions with direct, isolated commands for each operation
+- Added verification step after writes to confirm data integrity
+- Enhanced logging to show detailed hex analysis during read/write operations
+- Faction data like "hunter" now properly persists across multiple operations
+- Eliminated corruption between different blocks in the same sector
+- Data is now consistently read back exactly as written for all field types (username, faction, allegiance)
+
+### Technical Details
+- Fixed a critical MIFARE card operation issue where authentication sessions weren't properly maintained between blocks
+- Each read/write now performs its own complete authentication cycle
+- Added proper delays before and after operations to ensure card stability
+- Implemented verification reads after writes to confirm data integrity
+- Added detailed hex analysis logging for better debugging
+- Direct card commands now used instead of shared abstractions for better control
+
+## [Milestone 17] - 2023-04-10
+
+### Added
+- Added comprehensive technical documentation to all application files:
+  - Enhanced `core.js` with detailed comments explaining state management, initialization, and core application logic
+  - Updated `operations.js` with extensive NFC technical documentation including memory addressing, authentication, and data handling
+  - Added detailed comments to `utils.js` explaining MIFARE Classic 4K memory structure, hex conversion, and data padding
+  - Improved `ui.js` documentation with clear explanations of UI initialization, rendering, and event handling
+  - Enhanced `map.js` with comprehensive memory map documentation including sector allocation and field definitions
+  - Added detailed technical documentation to `admin.js` explaining admin interface functionality
+- Added JSDoc-style parameter and return type documentation to all major functions
+- Added technical notes sections explaining MIFARE Classic 4K memory structure and constraints
+- Included detailed authentication key documentation and sector addressing explanations
+- Added explanations of error handling and recovery strategies
+
+## [Milestone 18] - 2023-04-10
+
+### Added
+- Enhanced the index.html file with comprehensive documentation:
+  - Added detailed application overview explaining purpose and key features
+  - Documented the critical script loading order requirements for D-Logic compatibility
+  - Added section-by-section documentation explaining each page's purpose and functionality
+  - Clarified the "app/" prefix requirement and file location constraints
+  - Added detailed comments for UI elements explaining their roles and interactions
+  - Improved comments on dynamic content generation
+  - Added technical notes about uFR browser extension integration

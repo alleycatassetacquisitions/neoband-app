@@ -1,6 +1,13 @@
 /**
  * ui.js
- * Handles UI updates, DOM manipulation, and event listeners for the Rival App.
+ * Handles UI updates, DOM manipulation, and event listeners for the Neoband App.
+ * 
+ * This file provides the user interface management including:
+ * - Page navigation and display
+ * - Event handling for user interactions
+ * - NFC tag operation interface
+ * - Dynamic UI updates based on application state
+ * - Visual feedback for operations
  */
 
 const ui = {
@@ -8,6 +15,14 @@ const ui = {
     /**
      * Initializes the UI elements and sets up event listeners.
      * Called once when the DOM is ready (from core.js).
+     * 
+     * This function:
+     * 1. Sets up navigation handlers between pages
+     * 2. Attaches event listeners to all interactive elements
+     * 3. Populates dynamic dropdowns with faction and allegiance data
+     * 4. Ensures the initial UI state matches the application state
+     * 
+     * @returns {void}
      */
     init: function() {
         utils.log("UI Initializing...", 'info');
@@ -39,8 +54,8 @@ const ui = {
         // Log Toggle Button Listener
         document.getElementById('log-toggle')?.addEventListener('click', this.toggleLogDisplay);
 
-         // Visual Confirmation Button Listener
-         document.getElementById('confirmButton')?.addEventListener('click', this.hideVisualConfirmation);
+        // Visual Confirmation Button Listener
+        document.getElementById('confirmButton')?.addEventListener('click', this.hideVisualConfirmation);
 
 
         // Populate dynamic dropdowns
@@ -56,6 +71,17 @@ const ui = {
 
     /**
      * Updates the entire UI based on the current application state (core.currentState).
+     * This is the central function for synchronizing the UI with application state.
+     * 
+     * The render function:
+     * 1. Updates all UI elements to reflect current state
+     * 2. Handles visibility and enabled/disabled states of buttons
+     * 3. Updates status displays and form fields
+     * 4. Ensures consistent display across all pages
+     * 
+     * Called after state changes that require UI updates.
+     * 
+     * @returns {void}
      */
     render: function() {
         utils.log("UI Rendering...", 'debug');
@@ -99,10 +125,10 @@ const ui = {
         ui.setButtonDisabled('faction-write-btn', isOpRunning);
 
         // Allegiance buttons
-         const isAllegianceSelected = !!state.selectedAllegiance;
-         ui.setButtonDisabled('allegiance-scan-btn', isOpRunning);
-         ui.setButtonDisabled('allegiance-read-btn', isOpRunning);
-         ui.setButtonDisabled('allegiance-write-btn', isOpRunning);
+        const isAllegianceSelected = !!state.selectedAllegiance;
+        ui.setButtonDisabled('allegiance-scan-btn', isOpRunning);
+        ui.setButtonDisabled('allegiance-read-btn', isOpRunning);
+        ui.setButtonDisabled('allegiance-write-btn', isOpRunning);
 
         // --- Update active page ---
         this.showPage(state.activePage);
@@ -111,7 +137,17 @@ const ui = {
 
     /**
      * Shows the specified page and hides others. Updates nav highlighting.
+     * This function handles all page navigation within the application.
+     * 
+     * The function:
+     * 1. Updates the core state with the new active page
+     * 2. Hides all pages in the DOM
+     * 3. Shows only the target page
+     * 4. Updates navigation menu highlighting
+     * 5. Handles error cases with a fallback to default page
+     * 
      * @param {string} pageId - The ID of the page to display.
+     * @returns {void}
      */
     showPage: function(pageId) {
         utils.log(`Navigating to page: ${pageId}`, 'debug');
@@ -127,23 +163,26 @@ const ui = {
             console.error(`Page with ID ${pageId} not found!`);
             // Show default page as fallback
             document.getElementById('registrationPage')?.classList.add('active');
-             core.updateState({ activePage: 'registrationPage' }, false);
+            core.updateState({ activePage: 'registrationPage' }, false);
         }
 
-         // Update navigation menu highlighting
-         document.querySelectorAll('.nav-menu a').forEach(link => link.classList.remove('active-nav'));
-         const activeNavLink = document.getElementById(`nav-${pageId.replace('Page', '')}`);
-         if (activeNavLink) {
-             activeNavLink.classList.add('active-nav');
-         }
+        // Update navigation menu highlighting
+        document.querySelectorAll('.nav-menu a').forEach(link => link.classList.remove('active-nav'));
+        const activeNavLink = document.getElementById(`nav-${pageId.replace('Page', '')}`);
+        if (activeNavLink) {
+            activeNavLink.classList.add('active-nav');
+        }
     },
 
     // --- UI Element Updaters ---
 
     /**
      * Safely updates the value of an input element.
+     * Checks for the element's existence before attempting to set its value.
+     * 
      * @param {string} elementId - The ID of the input element.
      * @param {string} value - The value to set.
+     * @returns {void}
      */
     updateInputValue: function(elementId, value) {
         const element = document.getElementById(elementId);
@@ -156,8 +195,17 @@ const ui = {
 
     /**
      * Safely updates the value of a select element.
+     * Finds the matching option by value or text content and selects it.
+     * 
      * @param {string} selectId - The ID of the select element.
      * @param {string} value - The value to select.
+     * @returns {void}
+     * 
+     * Technical Notes:
+     * - First attempts to match by option value
+     * - If no match by value, tries to match by option text content
+     * - If still no match, logs a debug message
+     * - Handles edge cases like null/undefined values gracefully
      */
     updateSelectValue: function(selectId, value) {
         const select = document.getElementById(selectId);
@@ -195,15 +243,25 @@ const ui = {
 
     /**
      * Sets the disabled state of a button.
+     * Used to enable/disable buttons based on application state.
+     * 
      * @param {string} buttonId - The ID of the button element.
      * @param {boolean} isDisabled - True to disable, false to enable.
+     * @returns {void}
      */
     setButtonDisabled: function(buttonId, isDisabled) {
         const button = document.getElementById(buttonId);
         if (button) {
             button.disabled = isDisabled;
+            // Also update visual disabled state with a class
+            if (isDisabled) {
+                button.classList.add('disabled');
+            } else {
+                button.classList.remove('disabled');
+            }
         } else {
-             // utils.log(`Button with ID ${buttonId} not found for disabling.`, 'warning');
+            // Commented out to reduce noise in logs, as this is normal during initialization
+            // utils.log(`Button with ID ${buttonId} not found for disable state update.`, 'warning');
         }
     },
 
@@ -811,12 +869,23 @@ const ui = {
              for (const [fieldKey, fieldConfig] of Object.entries(factionData.fields)) {
                  const inputId = `faction-${factionKey}-${fieldKey}-input`;
                  try {
-                     // Pass the key from fieldConfig
-                     const hexData = await operations.readBlock(factionSector, fieldConfig.block, fieldConfig.key, `Faction Field ${fieldKey}`);
-                     const textData = utils.hexToText(hexData);
-                     ui.updateInputValue(inputId, textData);
-                     utils.log(`Read Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
-                     if(textData) readCount++;
+                     // Explicitly read only the single block for this field
+                     let blockText = await operations.readFactionField(
+                         factionSector,
+                         fieldConfig.block,
+                         fieldConfig.key,
+                         `Faction Field ${fieldKey}`
+                     );
+ 
+                     // Permanently trim padding and residual characters
+                     blockText = blockText.trim();
+ 
+                     // Update only this input with this block's decoded data
+                     ui.updateInputValue(inputId, blockText);
+ 
+                     utils.log(`Read Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${blockText}"`, 'info');
+ 
+                     if (blockText) readCount++;
                  } catch (fieldError) {
                      utils.log(`Failed to read Faction Field ${fieldKey} (Block ${fieldConfig.block}): ${fieldError.message}`, 'error');
                      ui.updateInputValue(inputId, ''); // Clear field on error
@@ -867,14 +936,24 @@ const ui = {
                  const inputId = `faction-${factionKey}-${fieldKey}-input`;
                  const inputElement = document.getElementById(inputId);
                   if (inputElement) {
-                      const textData = inputElement.value;
+                      let textData = inputElement.value;
+
+                      // Enforce dedicated data for Block 4 (Hunter/Bounty)
+                      // Enforce strict isolation: write ONLY this input's data to its dedicated block
+
                       // Validate length (optional, but good practice)
                       if(textData.length > 16) {
                           throw new Error(`Data for ${fieldConfig.title} exceeds 16 characters.`);
                       }
-                      const hexData = utils.textToHex(textData); // Encode before writing
                        try {
-                          await operations.writeBlock(factionSector, fieldConfig.block, hexData, fieldConfig.key, `Faction Field ${fieldKey}`);
+                          // Use writeFactionField which works directly with text data like writeUsername
+                          await operations.writeFactionField(
+                              factionSector, 
+                              fieldConfig.block, 
+                              textData, 
+                              fieldConfig.key, 
+                              `Faction Field ${fieldKey}`
+                          );
                           utils.log(`Wrote Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
                            if(textData) writeCount++;
                       } catch (fieldError) {
@@ -954,9 +1033,15 @@ const ui = {
              for (const [fieldKey, fieldConfig] of Object.entries(allegianceData.fields)) {
                  const inputId = `allegiance-${allegianceKey}-${fieldKey}-input`;
                  try {
-                     // Pass the key from fieldConfig
-                     const hexData = await operations.readBlock(allegianceSector, fieldConfig.block, fieldConfig.key, `Allegiance Field ${fieldKey}`);
-                     const textData = utils.hexToText(hexData);
+                     // Use readAllegianceField which directly returns text (like username)
+                     const textData = await operations.readAllegianceField(
+                         allegianceSector, 
+                         fieldConfig.block, 
+                         fieldConfig.key, 
+                         `Allegiance Field ${fieldKey}`
+                     );
+                     
+                     // Update the UI with the text data
                      ui.updateInputValue(inputId, textData);
                      utils.log(`Read Allegiance Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
                      if(textData) readCount++;
@@ -1016,9 +1101,15 @@ const ui = {
                        if(textData.length > 16) {
                             throw new Error(`Data for ${fieldConfig.title} exceeds 16 characters.`);
                         }
-                       const hexData = utils.textToHex(textData);
                        try {
-                           await operations.writeBlock(allegianceSector, fieldConfig.block, hexData, fieldConfig.key, `Allegiance Field ${fieldKey}`);
+                           // Use writeAllegianceField which works directly with text data like writeUsername
+                           await operations.writeAllegianceField(
+                               allegianceSector, 
+                               fieldConfig.block, 
+                               textData, 
+                               fieldConfig.key, 
+                               `Allegiance Field ${fieldKey}`
+                           );
                            utils.log(`Wrote Allegiance Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
                             if(textData) writeCount++;
                        } catch (fieldError) {

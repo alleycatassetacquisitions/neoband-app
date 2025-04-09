@@ -2,3 +2,5 @@
 # Ignore all files in cursor rules but keep the directory
 .cursor/rules/*
 *.code-workspace
+*.mdc
+*.vscode/

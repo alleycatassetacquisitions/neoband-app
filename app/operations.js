@@ -1,9 +1,25 @@
 /**
  * operations.js
  * Handles NFC communication logic (read/write operations) using the uFR API.
+ * 
+ * This file provides MIFARE Classic 4K tag operations including:
+ * - Tag scanning and detection
+ * - Block reading with authentication
+ * - Block writing with authentication
+ * - User data and faction/allegiance field operations
+ * - Helper functions for reliable NFC operations
  */
 
 const operations = {
+    /**
+     * Authentication mode constants for MIFARE Classic cards.
+     * These values are passed to the uFR API to indicate which authentication method to use.
+     * - AUTH_MODE_A (0x60): Uses Key A for authentication (standard approach)
+     * - AUTH_MODE_B (0x61): Uses Key B for authentication (offers more security options)
+     * 
+     * The authentication mode determines which key (A or B) from the sector trailer is used
+     * for authenticating access to a specific sector in the MIFARE Classic card.
+     */
     AUTH_MODE_A: ' 0x60', // MIFARE_AUTHENT1A
     AUTH_MODE_B: ' 0x61', // MIFARE_AUTHENT1B
     // DEFAULT_KEY_INDEX: 0, // No longer needed as we use _PK
@@ -12,7 +28,17 @@ const operations = {
 
     /**
      * Scans for a tag and updates the core application state.
-     * @returns {Promise<Object>} Resolves with the scanned tag info or rejects on error.
+     * Uses the uFR API's GetCardIdEx command to detect an NFC tag in the reader's field.
+     * When a tag is detected, it updates the application state and attempts to read username data.
+     * 
+     * @returns {Promise<Object>} Resolves with the scanned tag info (primarily UID) or rejects on error.
+     * 
+     * @throws {Error} If tag scanning fails or no tag is detected
+     * 
+     * Technical Notes:
+     * - GetCardIdEx returns extended tag information including UID, SAK, and ATQA values
+     * - For MIFARE Classic tags, only the UID is currently used in the application
+     * - After successful scan, triggers an attempt to read the username (handled by UI module)
      */
     scanTag: async function() {
         utils.log("Scanning for tag...", 'info');
@@ -63,13 +89,22 @@ const operations = {
 
     /**
      * Reads a single block from the MIFARE Classic card.
-     * Now always uses absolute addressing with LinearRead for consistent behavior.
+     * Uses linear/absolute addressing to access any block on the MIFARE Classic 4K card.
+     * Handles authentication and data retrieval in one operation.
+     * 
      * @param {number} sector - The sector number (0-39).
-     * @param {number} block - The block number within the sector (0-3 or 0-15).
+     * @param {number} block - The block number within the sector (0-3 for sectors 0-31, 0-15 for sectors 32-39).
      * @param {string} key - The 12-character hex key string (e.g., "FFFFFFFFFFFF").
      * @param {string} operationDesc - A description of the operation being performed (for logging).
      * @returns {Promise<string>} Resolves with the raw hex data string (without '0x').
      * @throws {Error} - If read operation fails.
+     * 
+     * Technical Notes:
+     * - MIFARE Classic 4K has 40 sectors: sectors 0-31 have 4 blocks each, sectors 32-39 have 16 blocks each
+     * - Block 3 in sectors 0-31 and block 15 in sectors 32-39 are sector trailers containing keys and access conditions
+     * - Linear/absolute addressing maps: block = (sector * 4) + block for sectors 0-31
+     *                                    block = 128 + ((sector - 32) * 16) + block for sectors 32-39
+     * - Each block contains 16 bytes of data
      */
     readBlock: async function(sector, block, key, operationDesc = 'Block') {
         utils.log(`Executing read command for ${operationDesc} (Sector ${sector}, Block ${block}) with key ${key ? '[REDACTED]' : 'NONE'}...`, 'debug');
@@ -95,16 +130,24 @@ const operations = {
 
     /**
      * Writes a 16-byte data block to the specified sector and block.
-     * Now always uses absolute addressing with LinearWrite for consistent behavior.
+     * Uses linear/absolute addressing to access any data block on the MIFARE Classic 4K card.
+     * Handles authentication, data formatting, and writing in one operation.
      *
-     * @param {number} sector - The target sector number.
-     * @param {number} block - The target block number within the sector.
+     * @param {number} sector - The target sector number (0-39).
+     * @param {number} block - The target block number within the sector (0-3 for sectors 0-31, 0-15 for sectors 32-39).
      * @param {string} data - The 16-byte data to write (as a UTF-8 string or hex).
      * @param {string} key - The 12-character hex key string (e.g., "FFFFFFFFFFFF").
      * @param {string} fieldDescription - A description of the field being written (for logging).
      * @param {number} [retryCount=2] - Maximum number of retries on failure.
      * @returns {Promise<boolean>} - True if write was successful.
      * @throws {Error} - If write operation fails.
+     * 
+     * Technical Notes:
+     * - Data will be converted to hex and padded to 16 bytes (FF padding)
+     * - Sector trailers (block 3 of each sector in sectors 0-31, block 15 in sectors 32-39) should NOT be written 
+     *   with this method as they require special formatting for keys and access conditions
+     * - The method uses the LinearWrite command which requires absolute block addressing
+     * - IMPORTANT: Never write to block 0 of sector 0 (manufacturer data)
      */
     writeBlock: async function(sector, block, data, key, fieldDescription, retryCount = 2) {
         // Check if FIELD_MAP is defined
@@ -140,8 +183,16 @@ const operations = {
 
     /**
      * Reads the username from its designated block (240).
-     * Implementation matches the original Neoband App exactly.
+     * Block 240 is a standardized location for storing the user's name in this application.
+     * 
      * @returns {Promise<string|null>} Username text or null if read fails.
+     * @throws {Error} If the read operation fails after retry attempts
+     * 
+     * Technical Notes:
+     * - Block 240 is located in Sector 60, Block 0 (large sector region)
+     * - The username is stored as plain ASCII text
+     * - Maximum username length is 16 characters (16 bytes per block)
+     * - The method trims whitespace from the result for consistent display
      */
     readUsername: async function() {
         try {
@@ -161,10 +212,17 @@ const operations = {
 
     /**
      * Writes the username to its designated block (240).
-     * Implementation matches the original Neoband App exactly.
+     * Ensures the username fits within the 16-byte block size constraint.
+     * 
      * @param {string} username - The username to write (up to 16 characters).
      * @returns {Promise<void>} Resolves when write is complete.
-     * @throws {Error} If write fails.
+     * @throws {Error} If write fails after retry attempts.
+     * 
+     * Technical Notes:
+     * - If username exceeds 16 characters, it will be truncated
+     * - Block 240 is in Sector 60, Block 0
+     * - Data is automatically padded with FF bytes by the writeFieldWithRetry method
+     * - Username is stored as plain ASCII text for compatibility
      */
     writeUsername: async function(username) {
         if (username.length > 16) {
@@ -185,12 +243,19 @@ const operations = {
 
     /**
      * Reads a faction field from the specified sector and block.
-     * Implementation follows the same pattern as readUsername for consistency.
+     * Used to retrieve faction-specific data from a tag.
+     * 
      * @param {number} sector - The faction sector number
      * @param {number} block - The block number within the sector
      * @param {string} key - The key to use for authentication
      * @param {string} fieldName - Name of the field for logging
      * @returns {Promise<string>} The text data from the field
+     * 
+     * Technical Notes:
+     * - Faction data is stored in blocks 0-2 of sectors 1-30 (avoiding sector trailers)
+     * - Each faction uses a complete sector for its data
+     * - This function converts the raw hex data to text for display
+     * - The function follows the same pattern as readUsername for consistency
      */
     readFactionField: async function(sector, block, key, fieldName = 'Faction Field') {
         try {
@@ -778,24 +843,28 @@ operations.readFieldWithRetryRaw = async function(address, retryCount = 3) {
     let attempts = 0;
     const maxAttempts = retryCount + 1; // Initial attempt + retries
     
-    // Add an initial delay before first attempt (like the original app)
-    await utils.sleep(sectorDelay);
+    // Add an initial delay before first attempt and extra delay for allegiance sectors
+    const initialDelay = addrInfo.sector >= 36 && addrInfo.sector <= 38 ? sectorDelay * 1.5 : sectorDelay;
+    utils.log(`Using ${initialDelay}ms delay for read operation from block ${blockNumber}`, 'debug');
+    await utils.sleep(initialDelay);
     
     while (attempts < maxAttempts) {
         try {
-            // Progressive backoff for retries
+            // Build the command with proper authentication parameters
+            const readCommand = `LinearRead h ${address} 16${auth_mode} ${key_index}`;
+            utils.log(`Command to be executed: ${readCommand}`, 'debug');
+            
             if (attempts > 0) {
-                const backoffMultiplier = addrInfo.sector === 36 ? 2.0 : 1.5;
+                // Progressive backoff for retries
+                const backoffMultiplier = addrInfo.sector >= 36 && addrInfo.sector <= 38 ? 2.5 : 1.5;
                 const backoffDelay = Math.min(sectorDelay * backoffMultiplier, 5000);
                 utils.log(`Retry attempt ${attempts}/${retryCount} after ${backoffDelay}ms delay...`, 'info');
                 await utils.sleep(backoffDelay);
             }
             
-            // Build command exactly as in the original app
-            const command = `LinearRead h ${address} 16${auth_mode} ${key_index}`;
-            
+            // Perform the read operation with the proper command
             const rawHex = await new Promise((resolve, reject) => {
-                ufRequest(command, function() {
+                ufRequest(readCommand, function() {
                     const response = ufResponse();
                     
                     // DEBUGGING: Log the full response
@@ -1007,29 +1076,32 @@ operations.writeFieldWithRetry = async function(address, text, retryCount = 3) {
         utils.log(`Padding added ${hexData.length - originalHexData.length} bytes`, 'debug');
     }
     
-    // DEBUGGING: Check the command format
-    const command = `LinearWrite 0x${hexData} ${address} 16${auth_mode} ${key_index}`;
-    utils.log(`Command to be executed: ${command}`, 'debug');
-    
     let attempts = 0;
     const maxAttempts = retryCount + 1; // Initial attempt + retries
     
-    // Add an initial delay before first attempt (like the original app)
-    await utils.sleep(sectorDelay);
+    // Add an initial delay before first attempt and extra delay for allegiance sectors
+    const initialDelay = addrInfo.sector >= 36 && addrInfo.sector <= 38 ? sectorDelay * 1.5 : sectorDelay;
+    
+    utils.log(`Using ${initialDelay}ms delay for write operation to block ${blockNumber}`, 'debug');
+    await utils.sleep(initialDelay);
     
     while (attempts < maxAttempts) {
         try {
-            // Progressive backoff for retries
+            // Build the command with proper authentication parameters
+            const writeCommand = `LinearWrite 0x${hexData} ${address} 16${auth_mode} ${key_index}`;
+            utils.log(`Command to be executed: ${writeCommand}`, 'debug');
+            
             if (attempts > 0) {
-                const backoffMultiplier = addrInfo.sector === 36 ? 2.0 : 1.5;
+                // Progressive backoff for retries
+                const backoffMultiplier = addrInfo.sector >= 36 && addrInfo.sector <= 38 ? 2.5 : 1.5;
                 const backoffDelay = Math.min(sectorDelay * backoffMultiplier, 5000);
                 utils.log(`Retry attempt ${attempts}/${retryCount} after ${backoffDelay}ms delay...`, 'info');
                 await utils.sleep(backoffDelay);
             }
             
-            // Execute command and check response
-            const result = await new Promise((resolve, reject) => {
-                ufRequest(command, function() {
+            // Perform the write operation with the proper command
+            await new Promise((resolve, reject) => {
+                ufRequest(writeCommand, function() {
                     const response = ufResponse();
                     
                     // DEBUGGING: Log the full response

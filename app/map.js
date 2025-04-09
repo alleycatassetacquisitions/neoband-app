@@ -1,14 +1,49 @@
-/*
-  map.js - Fully Hard-Coded Memory Map for the Neoband App
-  This file defines:
-  - 30 Factions (Sector 1 to 30): Each with 3 fields.
-  - 3 Allegiances (Sector 36 to 38): Each with 15 fields.
-  - User registration mapping (Sector 39): Only the username field.
-  Each field contains: title, placeholder, block number (relative to sector start), and the NFC key.
-*/
+/**
+ * map.js - Memory Map Definition for the Neoband App
+ * 
+ * This file defines the complete MIFARE Classic 4K memory layout used by the Neoband App.
+ * It specifies the exact sectors, blocks, and fields for all data storage in the application.
+ * 
+ * Memory Layout Overview:
+ * - 30 Factions (Sectors 1-30): Each with 3 fields stored in blocks 0-2 within its sector
+ * - 3 Allegiances (Sectors 36-38): Each with 15 fields (spread across multiple blocks)
+ * - User registration data (Sector 39): Contains username and other user-specific fields
+ * 
+ * Technical Notes:
+ * - All operations use the standard key "FFFFFFFFFFFF" for authentication
+ * - Sector trailers (block 3 in each sector, or block 15 in large sectors) are not used for data
+ * - Sector 0 (manufacturer data), Sector 16 (MAD), and Sectors 32-35 are reserved
+ * - Each field specifies its sector, block, key, and metadata for UI display
+ * 
+ * This memory map ensures consistent data storage across the application and
+ * allows the app to locate and manage specific fields on the MIFARE Classic 4K tag.
+ */
 
+/**
+ * Common NFC authentication key used for all fields.
+ * This is the factory default key (FF FF FF FF FF FF) for MIFARE Classic.
+ * @constant {string}
+ */
 const NFC_KEY = "FFFFFFFFFFFF"; // Common NFC key used for all fields
 
+/**
+ * Complete field map defining all data storage locations on the MIFARE Classic 4K tag.
+ * This object acts as a comprehensive schema for the entire tag's memory usage.
+ * Each entry specifies a category of data with its location and attributes.
+ * 
+ * Structure:
+ * - factions: 30 faction objects, each with 3 fields
+ * - allegiances: 3 allegiance objects, each with 15 fields
+ * - userData: Fields for user registration data (username, etc.)
+ * 
+ * Each field contains:
+ * - title: Human-readable field name displayed in the UI
+ * - placeholder: Text shown when field is empty
+ * - block: Relative block number within its sector
+ * - key: Authentication key for reading/writing this field
+ * 
+ * @type {Object}
+ */
 const FIELD_MAP = {
   factions: {
     faction1: {

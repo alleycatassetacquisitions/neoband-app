@@ -1,30 +1,70 @@
 <!DOCTYPE html>
-<html ufr lang="en"><!-- This attribute might be important for the uFR browser extension -->
+<!--
+  Neoband App - MIFARE Classic 4K NFC Tag Management Interface
+  
+  This application provides a browser-based interface for interacting with MIFARE Classic 4K
+  NFC tags using the uFR Zero Online Lite ISO 14443 A/B Network NFC RFID Reader/Writer.
+  
+  Key features:
+  - User registration and data management
+  - Faction data read/write capabilities
+  - Allegiance data read/write capabilities
+  - Administrator interface for advanced memory control
+  - Comprehensive logging system
+  
+  This application works offline and requires the D-Logic uFR browser extension to communicate
+  with the physical NFC reader hardware.
+-->
+<html ufr lang="en"><!-- The 'ufr' attribute enables integration with the uFR browser extension -->
     <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
    
-
-    <!-- Stylesheet -->
+    <!-- 
+      External stylesheets 
+      Note: Despite the "app/" prefix, all files must actually be in the root directory.
+      The "app/" prefix is required by the D-Logic uFR browser extension.
+    -->
     <link rel="stylesheet" type="text/css" href="app/style.css">
 
-    <!-- IMPORTANT: Scripts must be referenced with "app/" prefix for uFR Zero device -->
-    <!-- Correct Load order: map -> utils -> ui -> core -> operations -> admin -->
-    <script src="app/map.js"></script>        <!-- Load map FIRST -->
-    <script src="app/utils.js"></script>
-    <script src="app/ui.js"></script>
-    <script src="app/core.js"></script>
-    <script src="app/operations.js"></script>
-    <script src="app/admin.js"></script>
+    <!-- 
+      Script loading order is critical for proper functionality
+      IMPORTANT: All scripts must be referenced with "app/" prefix for uFR Zero device compatibility
+      despite actually being located in the root directory (not in an app/ folder).
+      This is a requirement of the D-Logic app shell.
+      
+      Load sequence:
+      1. map.js - Defines the MIFARE memory map structure (FIELD_MAP)
+      2. utils.js - Utility functions for hex conversion, logging, etc.
+      3. ui.js - UI manipulation and event handling
+      4. core.js - Application state management and initialization
+      5. operations.js - NFC communication and card operations
+      6. admin.js - Administrative interface functionality
+    -->
+    <script src="app/map.js"></script>        <!-- Load map.js FIRST to make FIELD_MAP available to other modules -->
+    <script src="app/utils.js"></script>      <!-- Utility functions used by all other modules -->
+    <script src="app/ui.js"></script>         <!-- UI components and event handlers -->
+    <script src="app/core.js"></script>       <!-- Core application logic and state management -->
+    <script src="app/operations.js"></script> <!-- NFC read/write operations -->
+    <script src="app/admin.js"></script>      <!-- Administrative functionality -->
 
-
-    <!-- Removed inline <style> block -->
-    <title>Neoband App- NeoBand Interface</title> <!-- for the reader the title needs be under the script references-->
+    <!-- 
+      Title positioning is important - must be placed after script tags for the D-Logic reader
+      to properly recognize the application configuration.
+    -->
+    <title>Neoband App- NeoBand Interface</title>
 
 </head>
 
 <body>
-
+    <!--
+      Application Header and Navigation
+      The navigation menu provides access to the four main sections of the application:
+      - Registration: User data management
+      - Factions: Faction-specific data
+      - Allegiances: Allegiance-specific data
+      - Admin: Advanced memory map control
+    -->
     <header>
         <h1>Neoband App</h1>
         <nav class="nav-menu">
@@ -32,13 +72,20 @@
                 <li><a href="#" id="nav-reg" class="active-nav">Registration</a></li>
                 <li><a href="#" id="nav-faction">Factions</a></li>
                 <li><a href="#" id="nav-allegiance">Allegiances</a></li>
-                <li><a href="#" id="nav-admin">Admin</a></li> <!-- Added Admin link -->
+                <li><a href="#" id="nav-admin">Admin</a></li>
             </ul>
         </nav>
     </header>
 
     <main>
-        <!-- ======================= REGISTRATION PAGE ======================= -->
+        <!-- 
+          Registration Page
+          This section handles user registration and basic tag operations:
+          - Reading username and allegiance data
+          - Writing new username and allegiance
+          - Resetting tag data
+          - Displaying current tag information
+        -->
         <div id="registrationPage" class="page active">
             <h2>Neoband Registration</h2>
 
@@ -51,7 +98,7 @@
                 <label for="reg-allegiance-select">Assign Allegiance:</label>
                 <select id="reg-allegiance-select" class="input">
                     <option value="">-- Select Allegiance --</option>
-                    <!-- Options populated by ui.js -->
+                    <!-- Options dynamically populated by ui.js from FIELD_MAP -->
                 </select>
             </div>
 
@@ -82,7 +129,14 @@
             </div>
         </div>
 
-        <!-- ======================= FACTION PAGE ======================= -->
+        <!-- 
+          Faction Page
+          This section manages faction-specific data:
+          - Selection of different factions (from sectors 1-30)
+          - Reading faction-specific data fields
+          - Writing faction data to the tag
+          - Each faction has multiple data fields (stored in blocks 0-2 of its sector)
+        -->
         <div id="factionPage" class="page">
             <h2>Faction Data Management</h2>
 
@@ -95,7 +149,7 @@
                 <label for="faction-select">Select Faction:</label>
                 <select id="faction-select" class="input">
                     <option value="">-- Select Faction --</option>
-                    <!-- Options populated by ui.js -->
+                    <!-- Options dynamically populated by ui.js from FIELD_MAP.factions -->
                 </select>
             </div>
 
@@ -103,7 +157,7 @@
             <div id="faction-details" class="details-section">
                  <h3 id="faction-name-display">Faction Fields</h3>
                  <div id="faction-fields-container" class="fields-grid">
-                     <!-- Faction-specific fields will be generated here by ui.js -->
+                     <!-- Faction-specific fields are dynamically generated here by ui.js -->
                  </div>
              </div>
 
@@ -114,7 +168,14 @@
             </div>
         </div>
 
-        <!-- ======================= ALLEGIANCES PAGE ======================= -->
+        <!-- 
+          Allegiances Page
+          This section manages allegiance-specific data:
+          - Selection of different allegiances (from sectors 36-38)
+          - Reading allegiance data fields
+          - Writing allegiance data to the tag
+          - Each allegiance has 15 data fields (stored in blocks 0-14 of its sector)
+        -->
         <div id="allegiancesPage" class="page">
             <h2>Allegiance Data Management</h2>
 
@@ -127,7 +188,7 @@
                 <label for="allegiance-select">Select Allegiance:</label>
                 <select id="allegiance-select" class="input">
                     <option value="">-- Select Allegiance --</option>
-                    <!-- Options populated by ui.js -->
+                    <!-- Options dynamically populated by ui.js from FIELD_MAP.allegiances -->
                 </select>
             </div>
 
@@ -135,7 +196,7 @@
              <div id="allegiance-details" class="details-section">
                  <h3 id="allegiance-name-display">Allegiance Fields</h3>
                  <div id="allegiance-fields-container" class="fields-grid">
-                     <!-- Allegiance-specific fields (15) will be generated here by ui.js -->
+                     <!-- Allegiance-specific fields are dynamically generated here by ui.js -->
                  </div>
              </div>
 
@@ -146,26 +207,45 @@
             </div>
         </div>
 
-        <!-- ======================= ADMIN PAGE ======================= -->
+        <!-- 
+          Admin Page
+          This section provides advanced control over the entire MIFARE Classic 4K memory map:
+          - Management interface for all factions and allegiances
+          - Direct access to specific sectors and blocks
+          - Advanced read/write capabilities
+          - Detailed memory address information
+          The admin interface is dynamically generated by admin.js
+        -->
         <div id="adminPage" class="page">
             <h2>Admin Data Control</h2>
             <p>Full Faction/Allegiance memory map control.</p>
             <div id="adminContainer">
-                <!-- Admin interface will be generated here by admin.js -->
+                <!-- Admin interface is dynamically generated here by admin.js -->
             </div>
         </div>
 
     </main>
 
-    <!-- ======================= SHARED UI ELEMENTS ======================= -->
+    <!-- 
+      Shared UI Elements
+      These elements are used across all pages for consistent user interaction
+    -->
 
-    <!-- Operation Indicator -->
+    <!-- 
+      Operation Indicator
+      Displays a loading spinner during NFC operations to indicate activity
+      and prevent multiple operations from being initiated simultaneously
+    -->
     <div id="operationIndicator">
         <div id="operationMessage">Processing...</div>
         <div class="spinner"></div>
     </div>
 
-    <!-- Visual Confirmation Modal -->
+    <!-- 
+      Visual Confirmation Modal
+      Provides feedback after operations complete
+      Shows success/error status and a message describing the result
+    -->
     <div id="visualConfirmation">
         <div id="confirmIcon">✓</div>
         <div id="confirmTitle">Success</div>
@@ -173,21 +253,25 @@
         <button id="confirmButton" class="btn">OK</button>
     </div>
 
-    <!-- Log Display Area -->
+    <!-- 
+      Log Display Area
+      Shows detailed operation logs for debugging and tracking NFC operations
+      Can be toggled visible/hidden with the button
+    -->
     <div id="logContainer">
         <div id="logHeader">
             <span>OPERATION LOG</span>
             <button id="log-toggle" aria-label="Toggle Log Display Visibility" title="Toggle Log Display Visibility">Hide</button>
         </div>
          <div id="logDisplay">
-             <!-- Log messages will appear here -->
+             <!-- Log messages are dynamically appended here by utils.log() -->
          </div>
      </div>
 
-    <!-- Ensure Core logic runs after the DOM is fully parsed -->
-    <!-- <script>
-        // Moved initialization to core.js using DOMContentLoaded
-        // document.addEventListener('DOMContentLoaded', core.init);
-    </script> -->
+    <!-- 
+      Application Initialization
+      Initialization logic is handled in core.js through a DOMContentLoaded event listener
+      This ensures all DOM elements are available before the application initializes
+    -->
 
  </body></html>

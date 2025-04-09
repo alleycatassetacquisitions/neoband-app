@@ -39,6 +39,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added logging in `operations.js` to show raw `ufResponse()` output and the exact command string before sending via `ufRequest()`.
 - Refactored `ui.js` `handleRegScan` to only perform tag detection (`scanTag`) and not automatically trigger `handleRegRead`.
 - Refactored `ui.js` `handleRegRead` to be triggered only by the read button and explicitly read only defined user fields (Username, Allegiance, Status) using `operations.readBlock` with correct block addresses and keys from `FIELD_MAP`, removing the incorrect attempt to read Block 0.
+- Increased delay times for allegiance (4000ms) and user (1200ms) operations to fix authentication errors
+- Improved retry mechanism for NFC operations with allegiance sectors by adding progressive backoff
+- Added extra initial delay for allegiance sectors which are more prone to errors
+- Fixed handling of write operations to ensure consistent delays and error management
+- Fixed critical issue with username reading functionality by correcting the readFieldWithRetryRaw function to use LinearRead command instead of incorrectly using LinearWrite command format
 
 ### Removed
 - Removed redundant `MEMORY_MAP` definition from `core.js`.
@@ -245,3 +250,30 @@ These comprehensive updates ensure the allegiance page functionality is fully al
 - Implemented verification reads after writes to confirm data integrity
 - Added detailed hex analysis logging for better debugging
 - Direct card commands now used instead of shared abstractions for better control
+
+## [Milestone 17] - 2023-04-10
+
+### Added
+- Added comprehensive technical documentation to all application files:
+  - Enhanced `core.js` with detailed comments explaining state management, initialization, and core application logic
+  - Updated `operations.js` with extensive NFC technical documentation including memory addressing, authentication, and data handling
+  - Added detailed comments to `utils.js` explaining MIFARE Classic 4K memory structure, hex conversion, and data padding
+  - Improved `ui.js` documentation with clear explanations of UI initialization, rendering, and event handling
+  - Enhanced `map.js` with comprehensive memory map documentation including sector allocation and field definitions
+  - Added detailed technical documentation to `admin.js` explaining admin interface functionality
+- Added JSDoc-style parameter and return type documentation to all major functions
+- Added technical notes sections explaining MIFARE Classic 4K memory structure and constraints
+- Included detailed authentication key documentation and sector addressing explanations
+- Added explanations of error handling and recovery strategies
+
+## [Milestone 18] - 2023-04-10
+
+### Added
+- Enhanced the index.html file with comprehensive documentation:
+  - Added detailed application overview explaining purpose and key features
+  - Documented the critical script loading order requirements for D-Logic compatibility
+  - Added section-by-section documentation explaining each page's purpose and functionality
+  - Clarified the "app/" prefix requirement and file location constraints
+  - Added detailed comments for UI elements explaining their roles and interactions
+  - Improved comments on dynamic content generation
+  - Added technical notes about uFR browser extension integration

@@ -277,3 +277,33 @@ These comprehensive updates ensure the allegiance page functionality is fully al
   - Added detailed comments for UI elements explaining their roles and interactions
   - Improved comments on dynamic content generation
   - Added technical notes about uFR browser extension integration
+
+## [Version 3.0.2] - 2023-06-22
+
+### Fixed
+- Critical bug fix: Fixed issue where username was being written to block 21 (Sector 5, Block 1) instead of block 240 (Sector 39, Block 0)
+- Added hardcore validation and safeguards in writeFieldWithRetry and writeUsername functions to prevent incorrect block usage
+- Added emergency detection and correction if the app tries to write to block 21 when it should be writing to block 240
+- Improved address validation to ensure correct sector/block calculation and consistent handling of numerical vs string addresses
+
+### Enhanced
+- Added post-write verification for username writes to confirm data is correctly stored
+- Added comprehensive debugging logs to trace the exact path of block addresses through the system
+- Enhanced the getSectorDelay function with special handling for username block
+- Added reference logging to show mapping between block 21 and 240 for better debugging
+
+## [Version 3.0.1] - 2023-06-21
+
+### Fixed
+- Critical bug fix: Added proper validation for block addresses to ensure username is written to the correct sector (39) and block (0) instead of incorrectly targeting sector 5
+- Implemented `reverseLinearToSectorBlock` function in `utils.js` that correctly maps linear block addresses to sector/block coordinates
+- Added `validateSectorBlockMapping` function to detect inconsistencies between block numbering systems
+- Updated UI to show the correct sector and block information during username read/write operations
+- Enhanced block validation in `readFieldWithRetryRaw` and `writeFieldWithRetry` functions
+- Fixed technical documentation to correctly state that block 240 is in Sector 39, Block 0 (not Sector 60)
+
+### Enhanced
+- Improved error handling with additional validation checks for critical block operations
+- Added detailed logging for block validation failures to help diagnose issues
+- Updated UI messages to include both linear block numbers and sector/block coordinates for clarity
+- Added `detectBlockMappingIssues` utility function to help identify and correct block addressing issues when migrating data between different addressing schemes

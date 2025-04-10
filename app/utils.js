@@ -67,6 +67,78 @@ const utils = {
     },
 
     /**
+     * Converts a linear block number to sector and block coordinates within that sector.
+     * This is the reverse operation of the linear block calculation.
+     * 
+     * @param {number} linearBlock - The linear block address (0-255)
+     * @returns {Object} An object with sector and block properties
+     * @throws {RangeError} If the linear block number is invalid
+     */
+    reverseLinearToSectorBlock: function(linearBlock) {
+        // Ensure we have a valid number
+        linearBlock = parseInt(linearBlock);
+        if (isNaN(linearBlock) || linearBlock < 0 || linearBlock > this.MAX_BLOCK_ADDRESS) {
+            throw new RangeError('Invalid linear block address: ' + linearBlock);
+        }
+        
+        let sector, block;
+        
+        // Check if block is in the small sectors (0-31) or large sectors (32-39)
+        if (linearBlock < 128) {
+            // Small sectors: 4 blocks each
+            sector = Math.floor(linearBlock / 4);
+            block = linearBlock % 4;
+        } else {
+            // Large sectors: 16 blocks each
+            const largeBlockOffset = linearBlock - 128;
+            sector = 32 + Math.floor(largeBlockOffset / 16);
+            block = largeBlockOffset % 16;
+        }
+        
+        return { sector, block };
+    },
+    
+    /**
+     * Validate if a sector/block combination maps to the expected linear block address.
+     * This function helps catch inconsistencies between sector/block addressing and linear addressing.
+     * 
+     * @param {number} sector - The sector number (0-39)
+     * @param {number} block - The block number within the sector
+     * @param {number} expectedLinearBlock - The expected linear block address
+     * @returns {boolean} True if the sector/block correctly maps to the expected linear address
+     */
+    validateSectorBlockMapping: function(sector, block, expectedLinearBlock) {
+        try {
+            // Calculate what the linear block should be
+            let calculatedLinearBlock;
+            
+            // Validate sector and block ranges
+            if (sector < 0 || sector > 39) {
+                return false;
+            }
+            
+            if (sector < 32) {
+                // Small sectors: blocks 0-3 only
+                if (block < 0 || block > 3) {
+                    return false;
+                }
+                calculatedLinearBlock = (sector * 4) + block;
+            } else {
+                // Large sectors: blocks 0-15 only
+                if (block < 0 || block > 15) {
+                    return false;
+                }
+                calculatedLinearBlock = 128 + ((sector - 32) * 16) + block;
+            }
+            
+            // Check if calculated linear block matches the expected one
+            return calculatedLinearBlock === parseInt(expectedLinearBlock);
+        } catch (e) {
+            return false; // Any error means validation failed
+        }
+    },
+
+    /**
      * Validates if a block address is usable for read/write operations.
      * Checks whether a block is valid for data storage based on its location and role.
      * 
@@ -356,5 +428,64 @@ const utils = {
             this.logElement.innerHTML = '';
             this.log("Log cleared.", 'info');
         }
+    },
+
+    /**
+     * Identifies inconsistencies between block address systems and provides corrected mappings.
+     * This utility function is used to help migrate data between different block addressing schemes
+     * and to detect potential issues with block addressing.
+     * 
+     * @param {Object} blockMap - Map of block addresses to check { "linearBlock": expectedSector, ... }
+     * @returns {Object} Report of inconsistencies with corrected mappings
+     */
+    detectBlockMappingIssues: function(blockMap) {
+        const report = {
+            validMappings: [],
+            invalidMappings: [],
+            correctedMappings: []
+        };
+        
+        for (const [linearBlock, expectedSector] of Object.entries(blockMap)) {
+            try {
+                const blockNum = parseInt(linearBlock);
+                const calculatedInfo = this.reverseLinearToSectorBlock(blockNum);
+                
+                if (calculatedInfo.sector === parseInt(expectedSector)) {
+                    report.validMappings.push({
+                        linearBlock: blockNum,
+                        sector: calculatedInfo.sector,
+                        block: calculatedInfo.block,
+                        status: 'valid'
+                    });
+                } else {
+                    report.invalidMappings.push({
+                        linearBlock: blockNum,
+                        expectedSector: parseInt(expectedSector),
+                        actualSector: calculatedInfo.sector,
+                        actualBlock: calculatedInfo.block,
+                        status: 'invalid'
+                    });
+                    
+                    // Calculate the correct linear block for the expected sector and same block
+                    let correctedLinearBlock;
+                    if (parseInt(expectedSector) < 32) {
+                        correctedLinearBlock = (parseInt(expectedSector) * 4) + calculatedInfo.block;
+                    } else {
+                        correctedLinearBlock = 128 + ((parseInt(expectedSector) - 32) * 16) + calculatedInfo.block;
+                    }
+                    
+                    report.correctedMappings.push({
+                        originalLinearBlock: blockNum,
+                        correctedLinearBlock: correctedLinearBlock,
+                        sector: parseInt(expectedSector),
+                        block: calculatedInfo.block
+                    });
+                }
+            } catch (error) {
+                this.log(`Error checking block mapping for ${linearBlock}: ${error.message}`, 'error');
+            }
+        }
+        
+        return report;
     }
 }; 

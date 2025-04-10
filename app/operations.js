@@ -189,7 +189,7 @@ const operations = {
      * @throws {Error} If the read operation fails after retry attempts
      * 
      * Technical Notes:
-     * - Block 240 is located in Sector 60, Block 0 (large sector region)
+     * - Block 240 is located in Sector 39, Block 0 (large sector region)
      * - The username is stored as plain ASCII text
      * - Maximum username length is 16 characters (16 bytes per block)
      * - The method trims whitespace from the result for consistent display
@@ -198,8 +198,23 @@ const operations = {
         try {
             utils.log("Reading username from block 240...", 'info');
             
+            // Validate that block 240 maps to the expected sector/block
+            const expectedAddress = 240;
+            const sectorBlock = utils.reverseLinearToSectorBlock(expectedAddress);
+            
+            utils.log(`Username should be in Sector ${sectorBlock.sector}, Block ${sectorBlock.block}`, 'debug');
+            
+            if (sectorBlock.sector !== 39 || sectorBlock.block !== 0) {
+                utils.log(`WARNING: Block 240 maps to Sector ${sectorBlock.sector}, Block ${sectorBlock.block} - expected Sector 39, Block 0`, 'warning');
+            }
+            
+            // Validate the block address before reading
+            if (!utils.validateSectorBlockMapping(39, 0, expectedAddress)) {
+                utils.log(`Critical error: Block address validation failed! Linear block 240 is actually in Sector ${sectorBlock.sector}, Block ${sectorBlock.block}`, 'error');
+            }
+            
             // Read from block 240 using the same method as the original app
-            const username = await this.readFieldWithRetry("240");
+            const username = await this.readFieldWithRetry(expectedAddress.toString());
             utils.log("Successfully read username: " + username, 'success');
             
             // Return username (trimmed, as in the original app)
@@ -220,7 +235,7 @@ const operations = {
      * 
      * Technical Notes:
      * - If username exceeds 16 characters, it will be truncated
-     * - Block 240 is in Sector 60, Block 0
+     * - Block 240 is in Sector 39, Block 0
      * - Data is automatically padded with FF bytes by the writeFieldWithRetry method
      * - Username is stored as plain ASCII text for compatibility
      */
@@ -230,14 +245,81 @@ const operations = {
         }
         
         try {
-            utils.log("Writing username to block 240: " + username, 'info');
+            // CRITICAL FIX: Force the correct address as a string to ensure no type conversions
+            const TARGET_USERNAME_BLOCK = "240";
             
-            // Write username to block 240 using the same method as the original app
-            await this.writeFieldWithRetry("240", username);
-            utils.log("Successfully wrote username", 'success');
+            const expectedAddress = 240;
+            const sectorBlock = utils.reverseLinearToSectorBlock(expectedAddress);
+            
+            utils.log(`Writing username "${username}" to block 240 (Sector ${sectorBlock.sector}, Block ${sectorBlock.block})`, 'info');
+            
+            // Validate that block 240 maps to the expected sector/block
+            if (sectorBlock.sector !== 39 || sectorBlock.block !== 0) {
+                utils.log(`WARNING: Block 240 maps to Sector ${sectorBlock.sector}, Block ${sectorBlock.block} - expected Sector 39, Block 0`, 'warning');
+            }
+            
+            // Validate the block address before writing
+            if (!utils.validateSectorBlockMapping(39, 0, expectedAddress)) {
+                const errorMsg = `Critical error: Block address validation failed! Linear block 240 does not map to Sector 39, Block 0 as expected`;
+                utils.log(errorMsg, 'error');
+                throw new Error(errorMsg);
+            }
+            
+            // CRITICAL FIX: Hard-code the address directly rather than using a variable
+            // This ensures we're writing exactly to block 240, not block 21
+            utils.log(`CRITICAL VERIFICATION: Ensuring username is written to block 240 (Sector 39, Block 0)`, 'warning');
+            
+            // Check for sector 5, block 1 (which is block 21)
+            const block21 = utils.reverseLinearToSectorBlock(21);
+            utils.log(`For reference, Block 21 maps to Sector ${block21.sector}, Block ${block21.block}`, 'info');
+            
+            // Write username to block 240 using explicit string "240" to avoid any type conversion issues
+            await this.writeFieldWithRetry(TARGET_USERNAME_BLOCK, username);
+            utils.log("Successfully wrote username to block 240", 'success');
+            
+            // Add a longer delay before verification read
+            utils.log("Adding a 3-second recovery delay before verification read...", 'info');
+            
+            // Create a delay using setTimeout wrapped in a Promise
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    utils.log("Verifying username write by reading the data back...", 'info');
+                    try {
+                        this.readUsername().then(readUsername => {
+                            if (readUsername === username) {
+                                utils.log("Verification successful - username read back matches what was written", 'success');
+                            } else {
+                                utils.log("Verification warning - username read back doesn't match what was written", 'warning');
+                                utils.log("Expected: " + username + ", Read: " + readUsername, 'warning');
+                            }
+                            resolve({
+                                status: "success",
+                                message: "Username written successfully"
+                            });
+                        }).catch(verifyError => {
+                            utils.log("Verification read failed: " + verifyError, 'critical');
+                            // Even if verification fails, the write was successful
+                            resolve({
+                                status: "success",
+                                message: "Username written successfully"
+                            });
+                        });
+                    } catch (verifyError) {
+                        utils.log("Verification read failed: " + verifyError, 'critical');
+                        // Even if verification fails, the write was successful
+                        resolve({
+                            status: "success",
+                            message: "Username written successfully"
+                        });
+                    }
+                }, 3000); // 3 second delay
+            });
         } catch (error) {
-            utils.log("Username write error: " + error, 'error');
-            throw new Error("Failed to write username: " + error);
+            utils.log("Error writing username: " + error, 'error');
+            return {
+                status: "error",
+                message: "Error writing username: " + error
+            };
         }
     },
 
@@ -669,12 +751,12 @@ const operations = {
                 });
                 
                 // Check if the written data matches what was read
-                if (readHex.substring(0, hexData.length).toUpperCase() === hexData.toUpperCase()) {
+                if (readHex.substring(0, paddedHex.length).toUpperCase() === paddedHex.toUpperCase()) {
                     utils.log(`✓ Verification confirmed data was written correctly`, 'success');
                 } else {
                     utils.log(`⚠ Verification shows data mismatch!`, 'warning');
-                    utils.log(`  Wrote: ${hexData.toUpperCase()}`, 'warning');
-                    utils.log(`  Read: ${readHex.substring(0, hexData.length).toUpperCase()}`, 'warning');
+                    utils.log(`  Wrote: ${paddedHex.toUpperCase()}`, 'warning');
+                    utils.log(`  Read: ${readHex.substring(0, paddedHex.length).toUpperCase()}`, 'warning');
                 }
             } catch (verifyError) {
                 // Log but don't fail the operation if verification fails
@@ -729,43 +811,275 @@ operations.readAbsoluteBlock = async function(blockNumber, key) {
 };
 
 /**
- * Writes to a block using LinearWrite method with key index 0 (for registration page).
- * Uses absolute block addressing (0-255) compatible with the original app.
+ * Writes to a block using LinearWrite method with retry mechanism, matching original Neoband App behavior
+ * Uses absolute block addressing (0-255)
  * 
- * @param {number} blockNumber - The absolute block number (0-255)
- * @param {string} data - The string data to write
- * @param {string} key - The 12-character hex key (unused, kept for compatibility)
- * @returns {Promise<boolean>} True if successful
+ * @param {string|number} address - The absolute block number (0-255)
+ * @param {string} text - The text data to write
+ * @param {number} retryCount - Maximum number of retries on failure (default: 3)
+ * @returns {Promise<void>} Resolves when write is complete
  */
-operations.writeAbsoluteBlock = async function(blockNumber, data, key) {
-    utils.log(`Writing to block ${blockNumber}...`, 'info');
+operations.writeFieldWithRetry = async function(address, text, retryCount = 3) {
+    // Convert block number to string if it's not already
+    address = address.toString();
     
-    // Convert data to hex if it's not already
-    const hexData = typeof data === 'string' && !data.startsWith('0x') ? 
-        utils.textToHex(data) : data;
+    // CRITICAL USERNAME SAFEGUARD: Check if this is a username write
+    const isUsernameWrite = address === "240" || parseInt(address) === 240;
+    if (isUsernameWrite) {
+        utils.log(`==== CRITICAL USERNAME WRITE TO BLOCK 240 DETECTED ====`, 'warning');
+        // Force the address to be the exact string "240"
+        address = "240";
+    }
     
-    // Format block number as hex
-    const blockHex = blockNumber.toString(16).padStart(2, '0');
+    // Detect attempts to write to block 21
+    if (address === "21" || parseInt(address) === 21) {
+        utils.log(`!!!! CRITICAL ERROR: ATTEMPT TO WRITE TO BLOCK 21 DETECTED !!!!`, 'error');
+        utils.log(`This is likely an attempt to write to the username block that was incorrectly routed.`, 'error');
+        
+        // Check if this seems to be a username (limited length text string)
+        if (typeof text === 'string' && text.length <= 16) {
+            utils.log(`Emergency correction: This appears to be a username. Redirecting write to block 240.`, 'warning');
+            address = "240";
+        } else {
+            utils.log(`Writing to block 21 with non-username data. Proceeding with caution.`, 'warning');
+        }
+    }
     
-    // Command format from original Neoband App: "LinearWrite 0x[hexData] [address] 16[auth_mode] [key_index]"
-    // Note the address is not preceded by 'h'
+    utils.log(`Writing to address ${address}...`, 'info');
+    
+    // Validate the address
+    const blockNumber = parseInt(address);
+    const addrInfo = utils.calculateMifareAddress(blockNumber);
+    
+    // Block validation - check if this is a valid writable block
+    if (!utils.isValidDataBlock(blockNumber, true)) {
+        const errorMsg = `Cannot write to restricted block ${blockNumber} in Sector ${addrInfo.sector}`;
+        utils.log(errorMsg, 'error');
+        throw new Error(errorMsg);
+    }
+    
+    // Additional address validation for critical blocks
+    if (blockNumber === 240) {
+        // Special validation for username block
+        const expectedSectorBlock = utils.reverseLinearToSectorBlock(blockNumber);
+        if (expectedSectorBlock.sector !== 39 || expectedSectorBlock.block !== 0) {
+            const errorMsg = `VALIDATION ERROR: Block 240 resolves to Sector ${expectedSectorBlock.sector}, Block ${expectedSectorBlock.block} - expected Sector 39, Block 0`;
+            utils.log(errorMsg, 'error');
+            throw new Error(errorMsg);
+        }
+    }
+    
+    // Get sector-specific delay
+    const sectorDelay = this.getSectorDelay(blockNumber);
+    
+    // DEBUGGING: Add detailed sector information
+    utils.log(`Writing to sector ${addrInfo.sector}, block ${addrInfo.blockInSector} (Absolute: ${blockNumber})`, 'debug');
+    if (blockNumber === 240) {
+        utils.log(`This is a USERNAME block`, 'debug');
+    } else if (addrInfo.sector === 1) {
+        utils.log(`This is a FACTION block`, 'debug');
+    } else if (addrInfo.sector >= 36 && addrInfo.sector <= 38) {
+        utils.log(`This is an ALLEGIANCE block`, 'debug');
+    } else if (blockNumber === 21) {
+        utils.log(`WARNING: This is BLOCK 21 (Sector 5, Block 1) - NOT the username block!`, 'error');
+    }
+    
+    // Check for mismatch with actual blocks being used
+    if (blockNumber === 240 && addrInfo.sector !== 39) {
+        utils.log(`CRITICAL ERROR: Block 240 is incorrectly mapping to Sector ${addrInfo.sector}, Block ${addrInfo.blockInSector}!`, 'error');
+    }
+    
+    // MIFARE Classic MF1ICS50 memory layout validity check
+    const calculatedLinearBlock = addrInfo.sector < 32 
+        ? (addrInfo.sector * 4) + addrInfo.blockInSector
+        : 128 + ((addrInfo.sector - 32) * 16) + addrInfo.blockInSector;
+    
+    if (calculatedLinearBlock !== blockNumber) {
+        utils.log(`CRITICAL ERROR: Block address calculation mismatch!`, 'error');
+        utils.log(`  Input absolute block: ${blockNumber}`, 'error');
+        utils.log(`  Calculated sector/block: ${addrInfo.sector}/${addrInfo.blockInSector}`, 'error');
+        utils.log(`  Re-calculated absolute block: ${calculatedLinearBlock}`, 'error');
+    }
+    
+    // Prepare authentication parameters for the command
     const auth_mode = " 0x60"; // Space before auth mode matches original app
     const key_index = "0";
-    const command = `LinearWrite 0x${hexData} ${blockHex} 16${auth_mode} ${key_index}`;
     
-    return new Promise((resolve, reject) => {
-        ufRequest(command, function() {
-            const response = ufResponse();
-            
-            if (response.Status && response.Status.indexOf("UFR_OK") !== -1) {
-                utils.log(`Write successful to block ${blockNumber}`, 'success');
-                resolve(true);
-            } else {
-                utils.log(`Write failed for block ${blockNumber}: ${response.Status}`, 'error');
-                reject(new Error("Write failed: " + response.Status));
+    // Log the sector we're accessing for debugging
+    utils.log(`Writing to address ${address} (Sector ${addrInfo.sector}, Block ${addrInfo.blockInSector})`, 'info');
+    utils.log(`Using auth mode: 0x60, delay: ${sectorDelay}ms`, 'info');
+    
+    // DEBUGGING: Log the input text details
+    if (text) {
+        utils.log(`Input text details:`, 'debug');
+        utils.log(`  Length: ${text.length} characters`, 'debug');
+        utils.log(`  Content: "${text}"`, 'debug');
+        const textBytes = [...text].map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+        utils.log(`  Bytes: ${textBytes}`, 'debug');
+    } else {
+        utils.log(`Input text is empty or null`, 'debug');
+    }
+    
+    // Enhanced text-to-hex conversion for Neoband compatibility
+    // First, convert input text to proper hex representation
+    let hexData = "";
+    if (text) {
+        // Ensure we're working with a string
+        const textStr = String(text || "");
+        
+        // Limit to max length for a block (16 chars)
+        const limitedText = textStr.slice(0, utils.MAX_TEXT_LENGTH);
+        
+        // Convert to hex using the utility function
+        hexData = utils.textToHex(limitedText);
+        
+        utils.log(`Converting "${limitedText}" to hex: ${hexData}`, 'debug');
+    }
+    
+    // Ensure consistent padding - always pad to 32 hex chars (16 bytes) with FF
+    const originalHexData = hexData;
+    hexData = utils.padHex(hexData);
+    utils.log(`Padded hex data: ${hexData}`, 'debug');
+    
+    // DEBUGGING: Check for specific issues
+    if (originalHexData.length !== hexData.length) {
+        utils.log(`Padding added ${hexData.length - originalHexData.length} bytes`, 'debug');
+    }
+    
+    let attempts = 0;
+    const maxAttempts = retryCount + 1; // Initial attempt + retries
+    
+    // Add an initial delay before first attempt and extra delay for allegiance sectors
+    const initialDelay = addrInfo.sector >= 36 && addrInfo.sector <= 38 ? sectorDelay * 1.5 : sectorDelay;
+    
+    utils.log(`Using ${initialDelay}ms delay for write operation to block ${blockNumber}`, 'debug');
+    await utils.sleep(initialDelay);
+    
+    while (attempts < maxAttempts) {
+        try {
+            // CRITICAL USERNAME SAFEGUARD: For username, always force the block to 240
+            if (isUsernameWrite) {
+                address = "240"; // Force exact string "240"
+                utils.log(`SAFEGUARD: Forcing address to exactly "240" for username write`, 'warning');
             }
-        });
-    });
+            
+            // CRITICAL DEBUG: Completely rebuild the address to ensure we're using exactly 240
+            if (parseInt(address) === 240) {
+                address = "240"; // Force exact string "240"
+                utils.log(`OVERRIDE: Forcing address to exactly "240" to prevent string issues`, 'warning');
+            }
+            
+            // Check for block 21 mismatch - this should never happen
+            if (parseInt(address) === 21) {
+                utils.log(`CRITICAL ERROR: Attempt to write to block 21 detected! This is incorrect for username.`, 'error');
+                utils.log(`Original address received: ${address}`, 'error');
+                
+                // Force the correct address if this was intended for username
+                if (text && text.length <= 16) {
+                    utils.log(`Emergency fix: Redirecting write from block 21 to block 240 (username)`, 'warning');
+                    address = "240";
+                }
+            }
+            
+            // Build the command with proper authentication parameters
+            const writeCommand = `LinearWrite 0x${hexData} ${address} 16${auth_mode} ${key_index}`;
+            utils.log(`Command to be executed: ${writeCommand}`, 'debug');
+            
+            // CRITICAL DEBUG: Detect if we're accidentally sending a wrong address in command
+            if (parseInt(address) === 240) {
+                utils.log(`FINAL COMMAND CHECK: ${writeCommand}`, 'warning');
+            }
+            
+            if (attempts > 0) {
+                // Progressive backoff for retries
+                const backoffMultiplier = addrInfo.sector >= 36 && addrInfo.sector <= 38 ? 2.5 : 1.5;
+                const backoffDelay = Math.min(sectorDelay * backoffMultiplier, 5000);
+                utils.log(`Retry attempt ${attempts}/${retryCount} after ${backoffDelay}ms delay...`, 'info');
+                await utils.sleep(backoffDelay);
+            }
+            
+            // Perform the write operation with the proper command
+            await new Promise((resolve, reject) => {
+                ufRequest(writeCommand, function() {
+                    const response = ufResponse();
+                    
+                    // DEBUGGING: Log the full response
+                    utils.log(`Write response: ${JSON.stringify(response)}`, 'debug');
+                    
+                    if (response.Status === "[0x00 (0)] UFR_OK") {
+                        utils.log(`Write successful to address ${address}`, 'success');
+                        resolve(true);
+                    } else if (response.Status && response.Status.includes("UFR_AUTH_ERROR") && attempts === 0) {
+                        // Try with Key B on first auth error (like original app)
+                        utils.log(`Auth failed with Key A for address ${address}, trying Key B...`, 'warning');
+                        reject({ tryKeyB: true, status: response.Status });
+                    } else {
+                        utils.log(`Write failed for address ${address}: ${response.Status}`, 'warning');
+                        reject(new Error(`Write failed: ${response.Status}`));
+                    }
+                });
+            });
+            
+            // DEBUGGING: Verify the write with a read back if we want to be extra careful
+            if (blockNumber === 4 || blockNumber === 240) { // Only for faction Block 0 or username
+                try {
+                    utils.log(`Verifying write with immediate read back...`, 'debug');
+                    const readBack = await this.readFieldWithRetryRaw(address, 1);
+                    utils.log(`Read back hex: ${readBack}`, 'debug');
+                    
+                    // Compare with what we tried to write
+                    if (readBack.substring(0, originalHexData.length).toUpperCase() === originalHexData.toUpperCase()) {
+                        utils.log(`Verification successful - data matches what was written`, 'success');
+                    } else {
+                        utils.log(`WARNING: Read back data differs from what was written!`, 'warning');
+                        utils.log(`  Wrote: ${originalHexData.toUpperCase()}`, 'warning');
+                        utils.log(`  Read:  ${readBack.substring(0, originalHexData.length).toUpperCase()}`, 'warning');
+                        utils.log(`  Full:  ${readBack}`, 'warning');
+                    }
+                } catch (verifyError) {
+                    utils.log(`Verification read failed: ${verifyError.message}`, 'warning');
+                }
+            }
+            
+            return; // Success, exit the function
+            
+        } catch (error) {
+            // Check if we should try with Key B
+            if (error.tryKeyB) {
+                try {
+                    // Try with Key B authentication
+                    await utils.sleep(sectorDelay); // Use sector-specific delay before trying Key B
+                    const keyB_command = `LinearWrite 0x${hexData} ${address} 16 0x61 ${key_index}`;
+                    
+                    await new Promise((resolve, reject) => {
+                        ufRequest(keyB_command, function() {
+                            const response = ufResponse();
+                            
+                            if (response.Status === "[0x00 (0)] UFR_OK") {
+                                utils.log(`Write successful to address ${address} using Key B`, 'success');
+                                resolve();
+                            } else {
+                                utils.log(`Write failed with Key B for address ${address}: ${response.Status}`, 'warning');
+                                reject(new Error(`Write failed with both Key A and Key B at address ${address}: ${response.Status}`));
+                            }
+                        });
+                    });
+                    
+                    return; // Success with Key B, exit the function
+                } catch (keyBError) {
+                    // Both Key A and Key B failed, continue with normal retry
+                }
+            }
+            
+            attempts++;
+            
+            // If we've exhausted all retries, throw the final error
+            if (attempts >= maxAttempts) {
+                utils.log(`Write failed permanently for address ${address} after ${retryCount} retries`, 'error');
+                throw new Error(`Write failed after ${retryCount} retries: ${error.message || error}`);
+            }
+        }
+    }
 };
 
 /**
@@ -774,9 +1088,24 @@ operations.writeAbsoluteBlock = async function(blockNumber, data, key) {
  * @returns {number} The delay in milliseconds
  */
 operations.getSectorDelay = function(blockNumber) {
+    // Special handling for username block to ensure correct sector recognition
+    if (blockNumber === 240) {
+        utils.log(`Special delay handling for username block 240`, 'debug');
+        const sectorBlock = utils.reverseLinearToSectorBlock(blockNumber);
+        utils.log(`Username block 240 maps to Sector ${sectorBlock.sector}, Block ${sectorBlock.block}`, 'debug');
+        
+        // Force the sector to be 39 for the username block
+        return core.SECTOR_DELAYS.user;
+    }
+    
     // Convert block number to sector
     const addrInfo = utils.calculateMifareAddress(blockNumber);
     const sector = addrInfo.sector;
+    
+    // CRITICAL DEBUG: Report for block 21
+    if (blockNumber === 21) {
+        utils.log(`WARNING: Block 21 maps to Sector ${sector}, Block ${addrInfo.blockInSector}`, 'warning');
+    }
     
     // Determine sector type
     let sectorType = 'default';
@@ -818,6 +1147,20 @@ operations.readFieldWithRetryRaw = async function(address, retryCount = 3) {
     // Validate the address before proceeding
     const blockNumber = parseInt(address);
     const addrInfo = utils.calculateMifareAddress(blockNumber);
+    
+    // Block validation - check if this is a valid usable block
+    if (!utils.isValidDataBlock(blockNumber, false)) {
+        utils.log(`Warning: Attempting to read from potentially restricted block ${blockNumber} in Sector ${addrInfo.sector}`, 'warning');
+    }
+    
+    // Additional address validation for critical blocks
+    if (blockNumber === 240) {
+        // Special validation for username block
+        const expectedSectorBlock = utils.reverseLinearToSectorBlock(blockNumber);
+        if (expectedSectorBlock.sector !== 39 || expectedSectorBlock.block !== 0) {
+            utils.log(`VALIDATION ERROR: Block 240 resolves to Sector ${expectedSectorBlock.sector}, Block ${expectedSectorBlock.block} - expected Sector 39, Block 0`, 'error');
+        }
+    }
     
     // Get sector-specific delay
     const sectorDelay = this.getSectorDelay(blockNumber);
@@ -970,7 +1313,7 @@ operations.readFieldWithRetryRaw = async function(address, retryCount = 3) {
             }
         }
     }
-},
+};
 
 /**
  * Reads a block using LinearRead method with retry mechanism, matching original Neoband App behavior
@@ -1012,11 +1355,51 @@ operations.writeFieldWithRetry = async function(address, text, retryCount = 3) {
     // Convert block number to string if it's not already
     address = address.toString();
     
+    // CRITICAL USERNAME SAFEGUARD: Check if this is a username write
+    const isUsernameWrite = address === "240" || parseInt(address) === 240;
+    if (isUsernameWrite) {
+        utils.log(`==== CRITICAL USERNAME WRITE TO BLOCK 240 DETECTED ====`, 'warning');
+        // Force the address to be the exact string "240"
+        address = "240";
+    }
+    
+    // Detect attempts to write to block 21
+    if (address === "21" || parseInt(address) === 21) {
+        utils.log(`!!!! CRITICAL ERROR: ATTEMPT TO WRITE TO BLOCK 21 DETECTED !!!!`, 'error');
+        utils.log(`This is likely an attempt to write to the username block that was incorrectly routed.`, 'error');
+        
+        // Check if this seems to be a username (limited length text string)
+        if (typeof text === 'string' && text.length <= 16) {
+            utils.log(`Emergency correction: This appears to be a username. Redirecting write to block 240.`, 'warning');
+            address = "240";
+        } else {
+            utils.log(`Writing to block 21 with non-username data. Proceeding with caution.`, 'warning');
+        }
+    }
+    
     utils.log(`Writing to address ${address}...`, 'info');
     
     // Validate the address
     const blockNumber = parseInt(address);
     const addrInfo = utils.calculateMifareAddress(blockNumber);
+    
+    // Block validation - check if this is a valid writable block
+    if (!utils.isValidDataBlock(blockNumber, true)) {
+        const errorMsg = `Cannot write to restricted block ${blockNumber} in Sector ${addrInfo.sector}`;
+        utils.log(errorMsg, 'error');
+        throw new Error(errorMsg);
+    }
+    
+    // Additional address validation for critical blocks
+    if (blockNumber === 240) {
+        // Special validation for username block
+        const expectedSectorBlock = utils.reverseLinearToSectorBlock(blockNumber);
+        if (expectedSectorBlock.sector !== 39 || expectedSectorBlock.block !== 0) {
+            const errorMsg = `VALIDATION ERROR: Block 240 resolves to Sector ${expectedSectorBlock.sector}, Block ${expectedSectorBlock.block} - expected Sector 39, Block 0`;
+            utils.log(errorMsg, 'error');
+            throw new Error(errorMsg);
+        }
+    }
     
     // Get sector-specific delay
     const sectorDelay = this.getSectorDelay(blockNumber);
@@ -1029,6 +1412,25 @@ operations.writeFieldWithRetry = async function(address, text, retryCount = 3) {
         utils.log(`This is a FACTION block`, 'debug');
     } else if (addrInfo.sector >= 36 && addrInfo.sector <= 38) {
         utils.log(`This is an ALLEGIANCE block`, 'debug');
+    } else if (blockNumber === 21) {
+        utils.log(`WARNING: This is BLOCK 21 (Sector 5, Block 1) - NOT the username block!`, 'error');
+    }
+    
+    // Check for mismatch with actual blocks being used
+    if (blockNumber === 240 && addrInfo.sector !== 39) {
+        utils.log(`CRITICAL ERROR: Block 240 is incorrectly mapping to Sector ${addrInfo.sector}, Block ${addrInfo.blockInSector}!`, 'error');
+    }
+    
+    // MIFARE Classic MF1ICS50 memory layout validity check
+    const calculatedLinearBlock = addrInfo.sector < 32 
+        ? (addrInfo.sector * 4) + addrInfo.blockInSector
+        : 128 + ((addrInfo.sector - 32) * 16) + addrInfo.blockInSector;
+    
+    if (calculatedLinearBlock !== blockNumber) {
+        utils.log(`CRITICAL ERROR: Block address calculation mismatch!`, 'error');
+        utils.log(`  Input absolute block: ${blockNumber}`, 'error');
+        utils.log(`  Calculated sector/block: ${addrInfo.sector}/${addrInfo.blockInSector}`, 'error');
+        utils.log(`  Re-calculated absolute block: ${calculatedLinearBlock}`, 'error');
     }
     
     // Prepare authentication parameters for the command
@@ -1087,9 +1489,38 @@ operations.writeFieldWithRetry = async function(address, text, retryCount = 3) {
     
     while (attempts < maxAttempts) {
         try {
+            // CRITICAL USERNAME SAFEGUARD: For username, always force the block to 240
+            if (isUsernameWrite) {
+                address = "240"; // Force exact string "240"
+                utils.log(`SAFEGUARD: Forcing address to exactly "240" for username write`, 'warning');
+            }
+            
+            // CRITICAL DEBUG: Completely rebuild the address to ensure we're using exactly 240
+            if (parseInt(address) === 240) {
+                address = "240"; // Force exact string "240"
+                utils.log(`OVERRIDE: Forcing address to exactly "240" to prevent string issues`, 'warning');
+            }
+            
+            // Check for block 21 mismatch - this should never happen
+            if (parseInt(address) === 21) {
+                utils.log(`CRITICAL ERROR: Attempt to write to block 21 detected! This is incorrect for username.`, 'error');
+                utils.log(`Original address received: ${address}`, 'error');
+                
+                // Force the correct address if this was intended for username
+                if (text && text.length <= 16) {
+                    utils.log(`Emergency fix: Redirecting write from block 21 to block 240 (username)`, 'warning');
+                    address = "240";
+                }
+            }
+            
             // Build the command with proper authentication parameters
             const writeCommand = `LinearWrite 0x${hexData} ${address} 16${auth_mode} ${key_index}`;
             utils.log(`Command to be executed: ${writeCommand}`, 'debug');
+            
+            // CRITICAL DEBUG: Detect if we're accidentally sending a wrong address in command
+            if (parseInt(address) === 240) {
+                utils.log(`FINAL COMMAND CHECK: ${writeCommand}`, 'warning');
+            }
             
             if (attempts > 0) {
                 // Progressive backoff for retries

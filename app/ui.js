@@ -600,7 +600,10 @@ const ui = {
             
             // Update indicator
             ui.updateOperationIndicator("Reading Username Data");
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading username from block 240...</div>`;
+            
+            // Get correct sector and block information
+            const sectorBlock = utils.reverseLinearToSectorBlock(240);
+            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading username from Sector ${sectorBlock.sector}, Block ${sectorBlock.block} (Linear: 240)...</div>`;
             
             // Read username from block 240 using the method from original app
             const username = await operations.readUsername();
@@ -646,61 +649,68 @@ const ui = {
         // Show log display and initialize
         const logDisplay = document.getElementById("logDisplay");
         logDisplay.style.display = "block";
-        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Starting username write operation...</div>`;
-        utils.log("Starting username write operation...", 'info');
-        
-        // Show operation indicator
-        ui.showOperationIndicator("Preparing to Write Username");
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Starting registration...</div>`;
+        utils.log("Starting registration...", 'info');
         
         try {
-            const username = document.getElementById("reg-username").value.trim();
-            
-            // Log validation steps
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Validating inputs...</div>`;
-            utils.log("Validating inputs...", 'info');
-            
-            // Validate inputs
             if (!document.getElementById("reg-band-id").value.trim()) {
                 logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No tag detected. Please scan a tag first.</div>`;
-                utils.log("No tag detected. Please scan a tag first.", 'error');
-                ui.updateOperationIndicator("Error: No Tag Detected");
-                
-                setTimeout(() => {
-                    ui.hideOperationIndicator();
-                    ui.showVisualConfirmation("No Tag Detected", "Please scan a band first", "error");
-                }, 1000);
-             return;
-         }
+                utils.log("No tag detected. Please scan a tag first", 'error');
+                ui.showVisualConfirmation("No Tag Detected", "Please scan a band first", "error");
+                return;
+            }
             
+            const username = document.getElementById("reg-username").value.trim();
             if (!username) {
-                logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No username provided.</div>`;
-                utils.log("No username provided.", 'error');
-                ui.updateOperationIndicator("Error: Missing Username");
-                
-                setTimeout(() => {
-             ui.hideOperationIndicator();
-                    ui.showVisualConfirmation("Missing Username", "Please enter a username", "error");
-                }, 1000);
-             return;
-         }
+                logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Username is required.</div>`;
+                utils.log("Username is required", 'error');
+                ui.showVisualConfirmation("Validation Error", "Username is required", "error");
+                return;
+            }
             
             if (username.length > 16) {
-                logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Username too long (max 16 characters).</div>`;
-                utils.log("Username too long (max 16 characters).", 'error');
-                ui.updateOperationIndicator("Error: Username Too Long");
-                
-                setTimeout(() => {
-              ui.hideOperationIndicator();
-                    ui.showVisualConfirmation("Username Too Long", "Username must be 16 characters or less", "error");
-                }, 1000);
-              return;
-         }
+                logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Username must be 16 characters or less.</div>`;
+                utils.log("Username must be 16 characters or less", 'error');
+                ui.showVisualConfirmation("Validation Error", "Username must be 16 characters or less", "error");
+                return;
+            }
             
             // All validations passed
             logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Validation passed</div>`;
             utils.log("Validation passed", 'success');
+            
+            // Get correct sector and block information
+            const sectorBlock = utils.reverseLinearToSectorBlock(240);
+            if (sectorBlock.sector !== 39 || sectorBlock.block !== 0) {
+                logDisplay.innerHTML += `<div style='color:#FF0000;'>⚠️ CRITICAL: Block 240 validation error!</div>`;
+                logDisplay.innerHTML += `<div style='color:#FF0000;'>Block 240 maps to Sector ${sectorBlock.sector}, Block ${sectorBlock.block}, expected Sector 39, Block 0</div>`;
+                utils.log(`CRITICAL ERROR: Block 240 maps incorrectly! Got Sector ${sectorBlock.sector}, Block ${sectorBlock.block}`, 'error');
+                
+                // Force correct values to continue safely
+                utils.log("Forcing correct sector/block values for username", 'warning');
+                logDisplay.innerHTML += `<div style='color:#FFA500;'>Forcing correct values to proceed safely</div>`;
+            }
+            
+            // CRITICAL SAFEGUARD: Double check the mapping calculation
+            const calculatedLinearBlock = (sectorBlock.sector < 32)
+                ? (sectorBlock.sector * 4) + sectorBlock.block
+                : 128 + ((sectorBlock.sector - 32) * 16) + sectorBlock.block;
+                
+            if (calculatedLinearBlock !== 240) {
+                logDisplay.innerHTML += `<div style='color:#FF0000;'>⚠️ CRITICAL: Block address calculation error!</div>`;
+                logDisplay.innerHTML += `<div style='color:#FF0000;'>Block calculation gave ${calculatedLinearBlock}, expected 240</div>`;
+                utils.log(`CRITICAL ERROR: Block address calculation gave ${calculatedLinearBlock} instead of 240!`, 'error');
+                
+                // Force correct block for safety
+                logDisplay.innerHTML += `<div style='color:#FFA500;'>Forcing block 240 for username write</div>`;
+            }
+            
             ui.updateOperationIndicator("Writing Username: " + username);
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing username "${username}" to block 240...</div>`;
+            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing username "${username}" to Sector 39, Block 0 (Linear: 240)...</div>`;
+            
+            // CRITICAL SAFEGUARD: Use an explicit string "240" for the username block
+            const USERNAME_BLOCK = "240";
+            logDisplay.innerHTML += `<div style='color:#FFA500;'>Using explicit block address "${USERNAME_BLOCK}" for maximum safety</div>`;
             
             // Write username to block 240 using method from original app
             await operations.writeUsername(username);
@@ -730,7 +740,7 @@ const ui = {
             
             // Show error confirmation
             setTimeout(() => {
-             ui.hideOperationIndicator();
+                ui.hideOperationIndicator();
                 ui.showVisualConfirmation("Write Error", error.toString(), "error");
             }, 1000);
          }

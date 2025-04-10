@@ -601,11 +601,10 @@ const ui = {
             // Update indicator
             ui.updateOperationIndicator("Reading Username Data");
             
-            // Get correct sector and block information
-            const sectorBlock = utils.reverseLinearToSectorBlock(240);
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading username from Sector ${sectorBlock.sector}, Block ${sectorBlock.block} (Linear: 240)...</div>`;
+            // Get correct sector and block information for username
+            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Reading username from Sector 39, Block 0...</div>`;
             
-            // Read username from block 240 using the method from original app
+            // Read username from sector 39, block 0 using method from original app
             const username = await operations.readUsername();
             
             // Update UI
@@ -679,40 +678,10 @@ const ui = {
             logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Validation passed</div>`;
             utils.log("Validation passed", 'success');
             
-            // Get correct sector and block information
-            const sectorBlock = utils.reverseLinearToSectorBlock(240);
-            if (sectorBlock.sector !== 39 || sectorBlock.block !== 0) {
-                logDisplay.innerHTML += `<div style='color:#FF0000;'>⚠️ CRITICAL: Block 240 validation error!</div>`;
-                logDisplay.innerHTML += `<div style='color:#FF0000;'>Block 240 maps to Sector ${sectorBlock.sector}, Block ${sectorBlock.block}, expected Sector 39, Block 0</div>`;
-                utils.log(`CRITICAL ERROR: Block 240 maps incorrectly! Got Sector ${sectorBlock.sector}, Block ${sectorBlock.block}`, 'error');
-                
-                // Force correct values to continue safely
-                utils.log("Forcing correct sector/block values for username", 'warning');
-                logDisplay.innerHTML += `<div style='color:#FFA500;'>Forcing correct values to proceed safely</div>`;
-            }
-            
-            // CRITICAL SAFEGUARD: Double check the mapping calculation
-            const calculatedLinearBlock = (sectorBlock.sector < 32)
-                ? (sectorBlock.sector * 4) + sectorBlock.block
-                : 128 + ((sectorBlock.sector - 32) * 16) + sectorBlock.block;
-                
-            if (calculatedLinearBlock !== 240) {
-                logDisplay.innerHTML += `<div style='color:#FF0000;'>⚠️ CRITICAL: Block address calculation error!</div>`;
-                logDisplay.innerHTML += `<div style='color:#FF0000;'>Block calculation gave ${calculatedLinearBlock}, expected 240</div>`;
-                utils.log(`CRITICAL ERROR: Block address calculation gave ${calculatedLinearBlock} instead of 240!`, 'error');
-                
-                // Force correct block for safety
-                logDisplay.innerHTML += `<div style='color:#FFA500;'>Forcing block 240 for username write</div>`;
-            }
-            
             ui.updateOperationIndicator("Writing Username: " + username);
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing username "${username}" to Sector 39, Block 0 (Linear: 240)...</div>`;
+            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing username "${username}" to Sector 39, Block 0...</div>`;
             
-            // CRITICAL SAFEGUARD: Use an explicit string "240" for the username block
-            const USERNAME_BLOCK = "240";
-            logDisplay.innerHTML += `<div style='color:#FFA500;'>Using explicit block address "${USERNAME_BLOCK}" for maximum safety</div>`;
-            
-            // Write username to block 240 using method from original app
+            // Write username using method from operations
             await operations.writeUsername(username);
             
             // Update core state and UI
@@ -777,17 +746,15 @@ const ui = {
             logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Beginning factory reset...</div>`;
             utils.log("Beginning factory reset...", 'info');
 
-            // Clear all user data blocks using writeFieldWithRetry for better reliability
-              const userFields = FIELD_MAP.user.fields;
-
+            // Clear all user data blocks
             logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing username block...</div>`;
-            await operations.writeFieldWithRetry("240", ""); // Username block
+            await operations.writeBlock(39, 0, "", NFC_KEY, 'Username Clear'); // Sector 39, Block 0 (Username)
             
             logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing status block...</div>`;
-            await operations.writeFieldWithRetry(userFields.status.block.toString(), ""); // Status block
+            await operations.writeBlock(39, 2, "", NFC_KEY, 'Status Clear'); // Sector 39, Block 2 (Status)
             
             logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing allegiance block...</div>`;
-            await operations.writeFieldWithRetry(userFields.allegiance.block.toString(), ""); // Allegiance block
+            await operations.writeBlock(39, 3, "", NFC_KEY, 'Allegiance Clear'); // Sector 39, Block 3 (Allegiance)
 
             // Update UI
             ui.updateInputValue('reg-status', "Unregistered");
@@ -1143,13 +1110,13 @@ const ui = {
         // Use the logDisplay like the original app
         const logDisplay = document.getElementById("logDisplay");
         logDisplay.style.display = "block";
-        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Auto-reading username from block 240...</div>`;
+        logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Auto-reading username from Sector 39, Block 0...</div>`;
         
         try {
-            // Read username from block 240 - using the same method as original app
+            // Read username using operations.readUsername
             const username = await operations.readUsername();
             
-            // Update all username fields if username is found - matching original app behavior
+            // Update all username fields if username is found
             if (username && username.trim() !== "") {
                 // Update all username fields
                 ui.updateInputValue('reg-username', username);
@@ -1170,6 +1137,10 @@ const ui = {
                 // Show success confirmation
                 ui.showVisualConfirmation("Username Found", `Username: ${username}`, "success");
             } else {
+                // Clear username fields since no username was found
+                ui.updateInputValue('reg-username', "");
+                ui.updateInputValue('reg-current-username', "");
+                
                 // Keep the UID in the username fields with a note - matching original app
                 const unregisteredText = `${uid} (Unregistered)`;
                 ui.updateInputValue('faction-current-username', unregisteredText);
@@ -1186,6 +1157,10 @@ const ui = {
                 ui.showVisualConfirmation("No Username", "This tag is not registered yet", "warning");
             }
         } catch (error) {
+            // Clear username fields on error
+            ui.updateInputValue('reg-username', "");
+            ui.updateInputValue('reg-current-username', "");
+            
             // Update with error message - matching original app
             const errorText = `${uid} (Error reading)`;
             ui.updateInputValue('faction-current-username', errorText);

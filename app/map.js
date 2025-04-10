@@ -387,59 +387,141 @@ const FIELD_MAP = {
     sector: 39,
     fields: {
       // Use absolute Block IDs from CSV
-      username:   { title: "Username",              placeholder: "Enter Username",             block: 240, key: NFC_KEY },
+      username:   { title: "Username",              placeholder: "Enter Username",             block: 0, key: NFC_KEY },
       // Add other user fields used in handleRegWrite / handleRegRead
-      status:     { title: "Band Status",           placeholder: "N/A",                      block: 242, key: NFC_KEY }, // Placeholder N/A as it's usually read-only display or set internally
-      allegiance: { title: "Affiliated Allegiance", placeholder: "No Affiliated Allegiance", block: 243, key: NFC_KEY }
+      status:     { title: "Band Status",           placeholder: "N/A",                      block: 2, key: NFC_KEY }, // Placeholder N/A as it's usually read-only display or set internally
+      allegiance: { title: "Affiliated Allegiance", placeholder: "No Affiliated Allegiance", block: 3, key: NFC_KEY }
       // Add other user fields from CSV if needed later (244-254)
     }
   }
 };
 
-// Validate mapping: Ensure every field has a valid sector, block, key, and placeholder
+/**
+ * Validates the FIELD_MAP structure to ensure consistency and proper field mappings.
+ * This function checks that:
+ * 1. User data is in Sector 39
+ * 2. Faction data is in Sectors 1-15
+ * 3. Allegiance data is in Sectors 36-38
+ * 4. All required fields are present with valid types
+ */
 function validateFieldMap() {
-  for (const category in FIELD_MAP) {
-    const catData = FIELD_MAP[category];
-    if (category === 'user') { // User category structure is different
-      if (typeof catData.sector !== 'number') {
-          console.warn(`Misaligned mapping: ${category} missing valid sector.`);
-      }
-      for (const field in catData.fields) {
-        const mapping = catData.fields[field];
-        if (typeof mapping.block !== 'number') {
-          console.warn(`Misaligned mapping: ${category} -> ${field} missing valid block.`);
-        }
-        if (!mapping.key) {
-          console.warn(`Missing key for mapping: ${category} -> ${field}`);
-        }
-        if (!mapping.placeholder) {
-          console.warn(`Missing placeholder for mapping: ${category} -> ${field}`);
-        }
-      }
-    } else { // Factions and Allegiances
-      for (const name in catData) {
-        const entity = catData[name];
-        if (typeof entity.sector !== 'number') {
-          console.warn(`Misaligned mapping: ${category} -> ${name} missing valid sector.`);
-        }
-        if (!entity.name) {
-            console.warn(`Missing name for mapping: ${category} -> ${name}`);
-        }
-        for (const field in entity.fields) {
-          const mapping = entity.fields[field];
-          if (typeof mapping.block !== 'number') {
-            console.warn(`Misaligned mapping: ${category} -> ${name} -> ${field} missing valid block.`);
-          }
-          if (!mapping.key) {
-            console.warn(`Missing key for mapping: ${category} -> ${name} -> ${field}`);
-          }
-          if (!mapping.placeholder) {
-            console.warn(`Missing placeholder for mapping: ${category} -> ${name} -> ${field}`);
-          }
-        }
-      }
-    }
+  // Validate user section
+  if (!FIELD_MAP.user || typeof FIELD_MAP.user !== 'object') {
+    console.error("CRITICAL: FIELD_MAP.user is missing or invalid");
+    return;
   }
+  
+  // Validate user sector assignment
+  if (FIELD_MAP.user.sector !== 39) {
+    console.error(`CRITICAL: User sector should be 39, found ${FIELD_MAP.user.sector}`);
+    // Auto-correct to prevent errors
+    FIELD_MAP.user.sector = 39;
+  }
+  
+  // Validate user fields
+  if (!FIELD_MAP.user.fields || !FIELD_MAP.user.fields.username) {
+    console.error("CRITICAL: Username field configuration is missing");
+    return;
+  }
+  
+  // Validate username is in block 0
+  if (FIELD_MAP.user.fields.username.block !== 0) {
+    console.error(`CRITICAL: Username block should be 0, found ${FIELD_MAP.user.fields.username.block}`);
+    // Auto-correct
+    FIELD_MAP.user.fields.username.block = 0;
+  }
+  
+  // Validate factions
+  if (!FIELD_MAP.factions || typeof FIELD_MAP.factions !== 'object') {
+    console.error("CRITICAL: FIELD_MAP.factions is missing or invalid");
+    return;
+  }
+  
+  // Check each faction for proper sector assignment (should be 1-15)
+  Object.entries(FIELD_MAP.factions).forEach(([key, faction]) => {
+    if (typeof faction !== 'object') {
+      console.warn(`Faction ${key} is not a valid object`);
+      return;
+    }
+    
+    if (typeof faction.sector !== 'number') {
+      console.warn(`Faction ${key} has invalid sector type: ${typeof faction.sector}`);
+      return;
+    }
+    
+    // Validate faction sector range
+    if (faction.sector < 1 || faction.sector > 31 || faction.sector === 16) {
+      console.error(`CRITICAL: Faction ${key} sector should be between 1-15 or 17-31, found ${faction.sector}`);
+    }
+    
+    // Check faction fields
+    if (!faction.fields || typeof faction.fields !== 'object') {
+      console.warn(`Faction ${key} has missing or invalid fields`);
+      return;
+    }
+    
+    // Check each field has required properties
+    Object.entries(faction.fields).forEach(([fieldKey, field]) => {
+      if (!field.title || typeof field.title !== 'string') {
+        console.warn(`Faction ${key}, field ${fieldKey} is missing title`);
+      }
+      
+      if (typeof field.block !== 'number') {
+        console.warn(`Faction ${key}, field ${fieldKey} has invalid block number type`);
+      }
+      
+      if (!field.key || typeof field.key !== 'string') {
+        console.warn(`Faction ${key}, field ${fieldKey} is missing key`);
+      }
+    });
+  });
+  
+  // Validate allegiances
+  if (!FIELD_MAP.allegiances || typeof FIELD_MAP.allegiances !== 'object') {
+    console.error("CRITICAL: FIELD_MAP.allegiances is missing or invalid");
+    return;
+  }
+  
+  // Check each allegiance for proper sector assignment (should be 36-38)
+  Object.entries(FIELD_MAP.allegiances).forEach(([key, allegiance]) => {
+    if (typeof allegiance !== 'object') {
+      console.warn(`Allegiance ${key} is not a valid object`);
+      return;
+    }
+    
+    if (typeof allegiance.sector !== 'number') {
+      console.warn(`Allegiance ${key} has invalid sector type: ${typeof allegiance.sector}`);
+      return;
+    }
+    
+    // Validate allegiance sector range
+    if (allegiance.sector < 36 || allegiance.sector > 38) {
+      console.error(`CRITICAL: Allegiance ${key} sector should be between 36-38, found ${allegiance.sector}`);
+    }
+    
+    // Check allegiance fields
+    if (!allegiance.fields || typeof allegiance.fields !== 'object') {
+      console.warn(`Allegiance ${key} has missing or invalid fields`);
+      return;
+    }
+    
+    // Check each field has required properties
+    Object.entries(allegiance.fields).forEach(([fieldKey, field]) => {
+      if (!field.title || typeof field.title !== 'string') {
+        console.warn(`Allegiance ${key}, field ${fieldKey} is missing title`);
+      }
+      
+      if (typeof field.block !== 'number') {
+        console.warn(`Allegiance ${key}, field ${fieldKey} has invalid block number type`);
+      }
+      
+      if (!field.key || typeof field.key !== 'string') {
+        console.warn(`Allegiance ${key}, field ${fieldKey} is missing key`);
+      }
+    });
+  });
+  
+  console.info("Field map validation complete");
 }
 validateFieldMap();
 

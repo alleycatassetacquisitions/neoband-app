@@ -280,8 +280,8 @@ function displayEntityDetails(entityKey, entityData, category) {
             // Skip if not a field object (e.g., might be a function or other property)
             if (!field || typeof field !== 'object' || !field.block) continue;
             
-            const absoluteBlockId = calculateAbsoluteBlockId(39, field.block - 240); // Adjust block to be relative to sector 39
-            const relativeBlock = field.block - 240; // Calculate relative block within sector 39
+            const absoluteBlockId = calculateAbsoluteBlockId(39, field.block - 0); // Adjust block to be relative to sector 39
+            const relativeBlock = field.block - 0; // Calculate relative block within sector 39
             const inputId = `admin-input-39-${relativeBlock}`;
 
             fieldsHTML += `

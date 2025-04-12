@@ -41,17 +41,20 @@
       5. operations.js - NFC communication and card operations
       6. admin.js - Administrative interface functionality
     -->
+    <script src="app/neoband-sdk.js"></script>
     <script src="app/map.js"></script>        <!-- Load map.js FIRST to make FIELD_MAP available to other modules -->
     <script src="app/utils.js"></script>      <!-- Utility functions used by all other modules -->
-    <script src="app/ui.js"></script>         <!-- UI components and event handlers -->
-    <script src="app/core.js"></script>       <!-- Core application logic and state management -->
     <script src="app/operations.js"></script> <!-- NFC read/write operations -->
+    <script src="app/core.js"></script>       <!-- Core application logic and state management -->
+    <script src="app/ui.js"></script>         <!-- UI components and event handlers -->
     <script src="app/admin.js"></script>      <!-- Administrative functionality -->
 
     <!-- 
       Title positioning is important - must be placed after script tags for the D-Logic reader
       to properly recognize the application configuration.
     -->
+<!-- IMPORTANT: Place the D-Logic SDK JavaScript file as 'app/ufr.js' and uncomment the line below -->
+
     <title>Neoband App- NeoBand Interface</title>
 
 </head>

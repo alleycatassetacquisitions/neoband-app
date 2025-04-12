@@ -1,15 +1,48 @@
 /**
- * utils.js
- * Utility functions for the Neoband App (hex conversion, padding, delays, logging, address calculations).
+ * @file utils.js
+ * @description Utility Functions and Data Conversion
  * 
- * This file provides essential utility functions including:
- * - MIFARE address calculations and validation
- * - Text-to-hex and hex-to-text conversions for NFC data
- * - Hex padding and formatting utilities
- * - Logging infrastructure
- * - Timeout and delay management for NFC operations
+ * This module provides utility functions for:
+ * 1. Data conversion between text and hex formats
+ * 2. Logging and debugging
+ * 3. Memory address calculations
+ * 4. Error handling and validation
+ * 
+ * Data Conversion:
+ * - Text to Hex: Converts text data to MIFARE-compatible hex format
+ * - Hex to Text: Converts hex data back to readable text
+ * - Padding: Handles FF padding for MIFARE blocks
+ * 
+ * Memory Addressing:
+ * 1. Linear to Sector/Block:
+ *    - Converts absolute block numbers to sector/block pairs
+ *    - Handles different sector sizes (4 vs 16 blocks)
+ *    - Validates address bounds
+ * 
+ * 2. Sector/Block to Linear:
+ *    - Converts sector/block pairs to absolute block numbers
+ *    - Accounts for sector trailer blocks
+ *    - Validates input ranges
+ * 
+ * Logging System:
+ * - Debug: Detailed operation information
+ * - Info: Normal operation events
+ * - Warning: Non-critical issues
+ * - Error: Critical problems
+ * 
+ * Validation Functions:
+ * - Input validation for all operations
+ * - Address range checking
+ * - Data format verification
+ * 
+ * @version 3.0.3
+ * @lastUpdated 2025-04-11
  */
 
+/**
+ * Utility functions module
+ * @namespace
+ */
 const utils = {
     /**
      * Constants defining the physical limitations of MIFARE Classic 4K tags.
@@ -160,6 +193,13 @@ const utils = {
                  return false;
              }
               // Reserved sectors - never usable
+              // Guard against undefined 'core' or 'core.RESERVED_SECTORS'
+              if (typeof core === 'undefined' || !core.RESERVED_SECTORS) {
+                  utils.log("ERROR: 'core' or 'core.RESERVED_SECTORS' is undefined in utils.isValidDataBlock(). Assuming reserved sector.", 'error');
+                  return false; // Fail safe: treat as reserved/invalid
+              }
+              // Original logic preserved for reference:
+              // if (core.RESERVED_SECTORS.has(addrInfo.sector)) { return false; }
               if (core.RESERVED_SECTORS.has(addrInfo.sector)) {
                   return false;
               }
@@ -359,9 +399,13 @@ const utils = {
      * Initializes the logger by getting the log display element.
      */
     initLogger: function() {
-        this.logElement = document.getElementById('logDisplay');
-        if (!this.logElement) {
-            console.error("Log display element (#logDisplay) not found!");
+        try {
+            this.logElement = document.getElementById('logDisplay');
+            if (!this.logElement) {
+                console.error("Log display element (#logDisplay) not found!");
+            }
+        } catch (e) {
+            console.error("Error initializing logger:", e);
         }
     },
 
@@ -410,13 +454,17 @@ const utils = {
         }
 
         if (levelNum <= this.logLevelThreshold && this.logElement) {
-            const logEntry = document.createElement('div');
-            logEntry.style.color = color;
-             const timestamp = new Date().toLocaleTimeString();
-             logEntry.textContent = `[${timestamp}] [${prefix}] ${message}`;
-             this.logElement.appendChild(logEntry);
-             // Auto-scroll to the bottom
-             this.logElement.scrollTop = this.logElement.scrollHeight;
+            try {
+                const logEntry = document.createElement('div');
+                logEntry.style.color = color;
+                const timestamp = new Date().toLocaleTimeString();
+                logEntry.textContent = `[${timestamp}] [${prefix}] ${message}`;
+                this.logElement.appendChild(logEntry);
+                // Auto-scroll to the bottom
+                this.logElement.scrollTop = this.logElement.scrollHeight;
+            } catch (e) {
+                console.error("Error updating log display:", e);
+            }
         }
     },
 
@@ -487,5 +535,53 @@ const utils = {
         }
         
         return report;
+    },
+/**
+ * Converts a 12-character hex key string (e.g., "FFFFFFFFFFFF") to a 6-byte Uint8Array.
+ * @param {string} hexStr - 12-character hex string representing the key.
+ * @returns {Uint8Array} 6-byte key array.
+ */
+hexKeyToBytes: function(hexStr) {
+    const result = new Uint8Array(6);
+    for(let i = 0; i < 6; i++){
+        const byteStr = hexStr.substr(i*2,2);
+        const byteVal = parseInt(byteStr, 16);
+        if (isNaN(byteVal)) {
+            utils.log(`Invalid hex byte '${byteStr}' in hexKeyToBytes() at position ${i}`, 'warning');
+            result[i] = 0; // Default to 0 on invalid byte
+        } else {
+            result[i] = byteVal;
+        }
     }
+    return result;
+},
+
+/**
+ * Converts a hex string (any length) to a Uint8Array.
+ * @param {string} hexStr - Hex string.
+ * @returns {Uint8Array} Byte array.
+ */
+hexToBytes: function(hexStr){
+    const result = [];
+    for(let i=0; i<hexStr.length; i+=2){
+        const byteStr = hexStr.substr(i,2);
+        const byteVal = parseInt(byteStr, 16);
+        if (isNaN(byteVal)) {
+            utils.log(`Invalid hex byte '${byteStr}' in hexToBytes() at position ${i}`, 'warning');
+            result.push(0); // Default to 0 on invalid byte
+        } else {
+            result.push(byteVal);
+        }
+    }
+    return new Uint8Array(result);
+},
+
+/**
+ * Converts a byte array (Uint8Array) to a hex string (uppercase).
+ * @param {Uint8Array} byteArray - Byte array.
+ * @returns {string} Hex string.
+ */
+bytesToHex: function(byteArray){
+    return Array.from(byteArray).map(b => ('0'+b.toString(16)).slice(-2)).join('').toUpperCase();
+},
 }; 

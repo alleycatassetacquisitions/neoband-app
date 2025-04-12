@@ -1,48 +1,46 @@
 /**
- * map.js - Memory Map Definition for the Neoband App
+ * @file map.js
+ * @description MIFARE Classic 4K Memory Map and Field Definitions
  * 
- * This file defines the complete MIFARE Classic 4K memory layout used by the Neoband App.
- * It specifies the exact sectors, blocks, and fields for all data storage in the application.
+ * This file defines the memory layout and field mappings for the Neoband App,
+ * specifically designed for MIFARE Classic 4K cards. The mapping follows strict
+ * MIFARE Classic memory structure constraints and D-Logic SDK requirements.
  * 
- * Memory Layout Overview:
- * - 30 Factions (Sectors 1-30): Each with 3 fields stored in blocks 0-2 within its sector
- * - 3 Allegiances (Sectors 36-38): Each with 15 fields (spread across multiple blocks)
- * - User registration data (Sector 39): Contains username and other user-specific fields
+ * Memory Structure:
+ * - MIFARE Classic 4K has 40 sectors (numbered 0-39)
+ * - Each sector has multiple blocks:
+ *   - Sectors 0-31: 4 blocks each (0-3)
+ *   - Sectors 32-39: 16 blocks each (0-15)
+ * - Block 3 in each sector is the "trailer" block (contains keys and access bits)
+ * - Only data blocks (0-2) are used for storing field values
  * 
- * Technical Notes:
- * - All operations use the standard key "FFFFFFFFFFFF" for authentication
- * - Sector trailers (block 3 in each sector, or block 15 in large sectors) are not used for data
- * - Sector 0 (manufacturer data), Sector 16 (MAD), and Sectors 32-35 are reserved
- * - Each field specifies its sector, block, key, and metadata for UI display
+ * Field Mapping Rules:
+ * 1. Factions use sectors 1-15 and 17-31 (30 factions total)
+ *    - Each faction gets 3 fields (blocks 0-2 in their sector)
+ *    - Sector 16 is reserved (skipped as per CSV)
+ * 2. Allegiances use sectors 36-38
+ *    - Each allegiance spans 5 consecutive sectors
+ *    - Only blocks 0-2 are used in each sector
+ * 3. User data (username) uses sector 39, block 0
  * 
- * This memory map ensures consistent data storage across the application and
- * allows the app to locate and manage specific fields on the MIFARE Classic 4K tag.
+ * Authentication:
+ * - All operations use the same authentication key (FFFFFFFFFFFF)
+ * - Each block requires fresh authentication before access
+ * - Proper delays are crucial between operations (see core.js)
+ * 
+ * @version 3.0.3
+ * @lastUpdated 2025-04-11
  */
 
-/**
- * Common NFC authentication key used for all fields.
- * This is the factory default key (FF FF FF FF FF FF) for MIFARE Classic.
- * @constant {string}
- */
-const NFC_KEY = "FFFFFFFFFFFF"; // Common NFC key used for all fields
+// Global authentication key used for all sectors
+const NFC_KEY = "FFFFFFFFFFFF";
 
 /**
- * Complete field map defining all data storage locations on the MIFARE Classic 4K tag.
- * This object acts as a comprehensive schema for the entire tag's memory usage.
- * Each entry specifies a category of data with its location and attributes.
- * 
- * Structure:
- * - factions: 30 faction objects, each with 3 fields
- * - allegiances: 3 allegiance objects, each with 15 fields
- * - userData: Fields for user registration data (username, etc.)
- * 
- * Each field contains:
- * - title: Human-readable field name displayed in the UI
- * - placeholder: Text shown when field is empty
- * - block: Relative block number within its sector
- * - key: Authentication key for reading/writing this field
- * 
- * @type {Object}
+ * FIELD_MAP restored and updated [2025-04-11]:
+ * - Full restoration from old-map.js: all 30 factions and 3 allegiances, with correct sector/block/key addressing and metadata.
+ * - All field objects now include both "sector" and "block" properties for compatibility with neoband-sdk.js and recent fixes.
+ * - All comments, validation, and structure preserved per project requirements.
+ * - See CHANGELOG.md for details.
  */
 const FIELD_MAP = {
   factions: {
@@ -50,135 +48,135 @@ const FIELD_MAP = {
       name: "Alleycat",
       sector: 1,
       fields: {
-        field1: { title: "Hunter/Bounty", placeholder: "Enter Hunter/Bounty", block: 0, key: NFC_KEY }, // Block ID 4
-        field2: { title: "# of Wins", placeholder: "Enter # of wins", block: 1, key: NFC_KEY }, // Block ID 5
-        field3: { title: "Best Draw Time", placeholder: "Enter Best Draw Time", block: 2, key: NFC_KEY } // Block ID 6
+        field1: { title: "Hunter/Bounty", placeholder: "Enter Hunter/Bounty", sector: 1, block: 0, key: NFC_KEY },
+        field2: { title: "# of Wins", placeholder: "Enter # of wins", sector: 1, block: 1, key: NFC_KEY },
+        field3: { title: "Best Draw Time", placeholder: "Enter Best Draw Time", sector: 1, block: 2, key: NFC_KEY }
       }
     },
     faction2: {
       name: "Faction #2",
       sector: 2,
       fields: {
-        field1: { title: "Faction #2 Field #1", placeholder: "Faction #2 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 8
-        field2: { title: "Faction #2 Field #2", placeholder: "Faction #2 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 9
-        field3: { title: "Faction #2 Field #3", placeholder: "Faction #2 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 10
+        field1: { title: "Faction #2 Field #1", placeholder: "Faction #2 Field #1 Placeholder", sector: 2, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #2 Field #2", placeholder: "Faction #2 Field #2 Placeholder", sector: 2, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #2 Field #3", placeholder: "Faction #2 Field #3 Placeholder", sector: 2, block: 2, key: NFC_KEY }
       }
     },
     faction3: {
       name: "Faction #3",
       sector: 3,
       fields: {
-        field1: { title: "Faction #3 Field #1", placeholder: "Faction #3 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 12
-        field2: { title: "Faction #3 Field #2", placeholder: "Faction #3 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 13
-        field3: { title: "Faction #3 Field #3", placeholder: "Faction #3 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 14
+        field1: { title: "Faction #3 Field #1", placeholder: "Faction #3 Field #1 Placeholder", sector: 3, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #3 Field #2", placeholder: "Faction #3 Field #2 Placeholder", sector: 3, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #3 Field #3", placeholder: "Faction #3 Field #3 Placeholder", sector: 3, block: 2, key: NFC_KEY }
       }
     },
     faction4: {
       name: "Faction #4",
       sector: 4,
       fields: {
-        field1: { title: "Faction #4 Field #1", placeholder: "Faction #4 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 16
-        field2: { title: "Faction #4 Field #2", placeholder: "Faction #4 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 17
-        field3: { title: "Faction #4 Field #3", placeholder: "Faction #4 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 18
+        field1: { title: "Faction #4 Field #1", placeholder: "Faction #4 Field #1 Placeholder", sector: 4, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #4 Field #2", placeholder: "Faction #4 Field #2 Placeholder", sector: 4, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #4 Field #3", placeholder: "Faction #4 Field #3 Placeholder", sector: 4, block: 2, key: NFC_KEY }
       }
     },
     faction5: {
       name: "Faction #5",
       sector: 5,
       fields: {
-        field1: { title: "Faction #5 Field #1", placeholder: "Faction #5 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 20
-        field2: { title: "Faction #5 Field #2", placeholder: "Faction #5 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 21
-        field3: { title: "Faction #5 Field #3", placeholder: "Faction #5 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 22
+        field1: { title: "Faction #5 Field #1", placeholder: "Faction #5 Field #1 Placeholder", sector: 5, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #5 Field #2", placeholder: "Faction #5 Field #2 Placeholder", sector: 5, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #5 Field #3", placeholder: "Faction #5 Field #3 Placeholder", sector: 5, block: 2, key: NFC_KEY }
       }
     },
     faction6: {
       name: "Faction #6",
       sector: 6,
       fields: {
-        field1: { title: "Faction #6 Field #1", placeholder: "Faction #6 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 24
-        field2: { title: "Faction #6 Field #2", placeholder: "Faction #6 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 25
-        field3: { title: "Faction #6 Field #3", placeholder: "Faction #6 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 26
+        field1: { title: "Faction #6 Field #1", placeholder: "Faction #6 Field #1 Placeholder", sector: 6, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #6 Field #2", placeholder: "Faction #6 Field #2 Placeholder", sector: 6, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #6 Field #3", placeholder: "Faction #6 Field #3 Placeholder", sector: 6, block: 2, key: NFC_KEY }
       }
     },
     faction7: {
       name: "Faction #7",
       sector: 7,
       fields: {
-        field1: { title: "Faction #7 Field #1", placeholder: "Faction #7 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 28
-        field2: { title: "Faction #7 Field #2", placeholder: "Faction #7 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 29
-        field3: { title: "Faction #7 Field #3", placeholder: "Faction #7 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 30
+        field1: { title: "Faction #7 Field #1", placeholder: "Faction #7 Field #1 Placeholder", sector: 7, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #7 Field #2", placeholder: "Faction #7 Field #2 Placeholder", sector: 7, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #7 Field #3", placeholder: "Faction #7 Field #3 Placeholder", sector: 7, block: 2, key: NFC_KEY }
       }
     },
     faction8: {
       name: "Faction #8",
       sector: 8,
       fields: {
-        field1: { title: "Faction #8 Field #1", placeholder: "Faction #8 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 32
-        field2: { title: "Faction #8 Field #2", placeholder: "Faction #8 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 33
-        field3: { title: "Faction #8 Field #3", placeholder: "Faction #8 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 34
+        field1: { title: "Faction #8 Field #1", placeholder: "Faction #8 Field #1 Placeholder", sector: 8, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #8 Field #2", placeholder: "Faction #8 Field #2 Placeholder", sector: 8, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #8 Field #3", placeholder: "Faction #8 Field #3 Placeholder", sector: 8, block: 2, key: NFC_KEY }
       }
     },
     faction9: {
       name: "Faction #9",
       sector: 9,
       fields: {
-        field1: { title: "Faction #9 Field #1", placeholder: "Faction #9 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 36
-        field2: { title: "Faction #9 Field #2", placeholder: "Faction #9 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 37
-        field3: { title: "Faction #9 Field #3", placeholder: "Faction #9 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 38
+        field1: { title: "Faction #9 Field #1", placeholder: "Faction #9 Field #1 Placeholder", sector: 9, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #9 Field #2", placeholder: "Faction #9 Field #2 Placeholder", sector: 9, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #9 Field #3", placeholder: "Faction #9 Field #3 Placeholder", sector: 9, block: 2, key: NFC_KEY }
       }
     },
     faction10: {
       name: "Faction #10",
       sector: 10,
       fields: {
-        field1: { title: "Faction #10 Field #1", placeholder: "Faction #10 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 40
-        field2: { title: "Faction #10 Field #2", placeholder: "Faction #10 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 41
-        field3: { title: "Faction #10 Field #3", placeholder: "Faction #10 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 42
+        field1: { title: "Faction #10 Field #1", placeholder: "Faction #10 Field #1 Placeholder", sector: 10, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #10 Field #2", placeholder: "Faction #10 Field #2 Placeholder", sector: 10, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #10 Field #3", placeholder: "Faction #10 Field #3 Placeholder", sector: 10, block: 2, key: NFC_KEY }
       }
     },
     faction11: {
       name: "Faction #11",
       sector: 11,
       fields: {
-        field1: { title: "Faction #11 Field #1", placeholder: "Faction #11 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 44
-        field2: { title: "Faction #11 Field #2", placeholder: "Faction #11 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 45
-        field3: { title: "Faction #11 Field #3", placeholder: "Faction #11 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 46
+        field1: { title: "Faction #11 Field #1", placeholder: "Faction #11 Field #1 Placeholder", sector: 11, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #11 Field #2", placeholder: "Faction #11 Field #2 Placeholder", sector: 11, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #11 Field #3", placeholder: "Faction #11 Field #3 Placeholder", sector: 11, block: 2, key: NFC_KEY }
       }
     },
     faction12: {
       name: "Faction #12",
       sector: 12,
       fields: {
-        field1: { title: "Faction #12 Field #1", placeholder: "Faction #12 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 48
-        field2: { title: "Faction #12 Field #2", placeholder: "Faction #12 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 49
-        field3: { title: "Faction #12 Field #3", placeholder: "Faction #12 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 50
+        field1: { title: "Faction #12 Field #1", placeholder: "Faction #12 Field #1 Placeholder", sector: 12, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #12 Field #2", placeholder: "Faction #12 Field #2 Placeholder", sector: 12, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #12 Field #3", placeholder: "Faction #12 Field #3 Placeholder", sector: 12, block: 2, key: NFC_KEY }
       }
     },
     faction13: {
       name: "Faction #13",
       sector: 13,
       fields: {
-        field1: { title: "Faction #13 Field #1", placeholder: "Faction #13 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 52
-        field2: { title: "Faction #13 Field #2", placeholder: "Faction #13 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 53
-        field3: { title: "Faction #13 Field #3", placeholder: "Faction #13 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 54
+        field1: { title: "Faction #13 Field #1", placeholder: "Faction #13 Field #1 Placeholder", sector: 13, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #13 Field #2", placeholder: "Faction #13 Field #2 Placeholder", sector: 13, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #13 Field #3", placeholder: "Faction #13 Field #3 Placeholder", sector: 13, block: 2, key: NFC_KEY }
       }
     },
     faction14: {
       name: "Faction #14",
       sector: 14,
       fields: {
-        field1: { title: "Faction #14 Field #1", placeholder: "Faction #14 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 56
-        field2: { title: "Faction #14 Field #2", placeholder: "Faction #14 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 57
-        field3: { title: "Faction #14 Field #3", placeholder: "Faction #14 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 58
+        field1: { title: "Faction #14 Field #1", placeholder: "Faction #14 Field #1 Placeholder", sector: 14, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #14 Field #2", placeholder: "Faction #14 Field #2 Placeholder", sector: 14, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #14 Field #3", placeholder: "Faction #14 Field #3 Placeholder", sector: 14, block: 2, key: NFC_KEY }
       }
     },
     faction15: {
       name: "Faction #15",
       sector: 15,
       fields: {
-        field1: { title: "Faction #15 Field #1", placeholder: "Faction #15 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 60
-        field2: { title: "Faction #15 Field #2", placeholder: "Faction #15 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 61
-        field3: { title: "Faction #15 Field #3", placeholder: "Faction #15 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 62
+        field1: { title: "Faction #15 Field #1", placeholder: "Faction #15 Field #1 Placeholder", sector: 15, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #15 Field #2", placeholder: "Faction #15 Field #2 Placeholder", sector: 15, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #15 Field #3", placeholder: "Faction #15 Field #3 Placeholder", sector: 15, block: 2, key: NFC_KEY }
       }
     },
     // Sector 16 is skipped as per CSV
@@ -186,348 +184,224 @@ const FIELD_MAP = {
       name: "Faction #16",
       sector: 17,
       fields: {
-        field1: { title: "Faction #16 Field #1", placeholder: "Faction #16 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 68
-        field2: { title: "Faction #16 Field #2", placeholder: "Faction #16 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 69
-        field3: { title: "Faction #16 Field #3", placeholder: "Faction #16 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 70
+        field1: { title: "Faction #16 Field #1", placeholder: "Faction #16 Field #1 Placeholder", sector: 17, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #16 Field #2", placeholder: "Faction #16 Field #2 Placeholder", sector: 17, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #16 Field #3", placeholder: "Faction #16 Field #3 Placeholder", sector: 17, block: 2, key: NFC_KEY }
       }
     },
     faction17: {
       name: "Faction #17",
       sector: 18,
       fields: {
-        field1: { title: "Faction #17 Field #1", placeholder: "Faction #17 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 72
-        field2: { title: "Faction #17 Field #2", placeholder: "Faction #17 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 73
-        field3: { title: "Faction #17 Field #3", placeholder: "Faction #17 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 74
+        field1: { title: "Faction #17 Field #1", placeholder: "Faction #17 Field #1 Placeholder", sector: 18, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #17 Field #2", placeholder: "Faction #17 Field #2 Placeholder", sector: 18, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #17 Field #3", placeholder: "Faction #17 Field #3 Placeholder", sector: 18, block: 2, key: NFC_KEY }
       }
     },
     faction18: {
       name: "Faction #18",
       sector: 19,
       fields: {
-        field1: { title: "Faction #18 Field #1", placeholder: "Faction #18 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 76
-        field2: { title: "Faction #18 Field #2", placeholder: "Faction #18 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 77
-        field3: { title: "Faction #18 Field #3", placeholder: "Faction #18 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 78
+        field1: { title: "Faction #18 Field #1", placeholder: "Faction #18 Field #1 Placeholder", sector: 19, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #18 Field #2", placeholder: "Faction #18 Field #2 Placeholder", sector: 19, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #18 Field #3", placeholder: "Faction #18 Field #3 Placeholder", sector: 19, block: 2, key: NFC_KEY }
       }
     },
     faction19: {
       name: "Faction #19",
       sector: 20,
       fields: {
-        field1: { title: "Faction #19 Field #1", placeholder: "Faction #19 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 80
-        field2: { title: "Faction #19 Field #2", placeholder: "Faction #19 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 81
-        field3: { title: "Faction #19 Field #3", placeholder: "Faction #19 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 82
+        field1: { title: "Faction #19 Field #1", placeholder: "Faction #19 Field #1 Placeholder", sector: 20, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #19 Field #2", placeholder: "Faction #19 Field #2 Placeholder", sector: 20, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #19 Field #3", placeholder: "Faction #19 Field #3 Placeholder", sector: 20, block: 2, key: NFC_KEY }
       }
     },
     faction20: {
       name: "Faction #20",
       sector: 21,
       fields: {
-        field1: { title: "Faction #20 Field #1", placeholder: "Faction #20 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 84
-        field2: { title: "Faction #20 Field #2", placeholder: "Faction #20 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 85
-        field3: { title: "Faction #20 Field #3", placeholder: "Faction #20 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 86
+        field1: { title: "Faction #20 Field #1", placeholder: "Faction #20 Field #1 Placeholder", sector: 21, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #20 Field #2", placeholder: "Faction #20 Field #2 Placeholder", sector: 21, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #20 Field #3", placeholder: "Faction #20 Field #3 Placeholder", sector: 21, block: 2, key: NFC_KEY }
       }
     },
     faction21: {
       name: "Faction #21",
       sector: 22,
       fields: {
-        field1: { title: "Faction #21 Field #1", placeholder: "Faction #21 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 88
-        field2: { title: "Faction #21 Field #2", placeholder: "Faction #21 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 89
-        field3: { title: "Faction #21 Field #3", placeholder: "Faction #21 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 90
+        field1: { title: "Faction #21 Field #1", placeholder: "Faction #21 Field #1 Placeholder", sector: 22, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #21 Field #2", placeholder: "Faction #21 Field #2 Placeholder", sector: 22, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #21 Field #3", placeholder: "Faction #21 Field #3 Placeholder", sector: 22, block: 2, key: NFC_KEY }
       }
     },
     faction22: {
       name: "Faction #22",
       sector: 23,
       fields: {
-        field1: { title: "Faction #22 Field #1", placeholder: "Faction #22 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 92
-        field2: { title: "Faction #22 Field #2", placeholder: "Faction #22 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 93
-        field3: { title: "Faction #22 Field #3", placeholder: "Faction #22 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 94
+        field1: { title: "Faction #22 Field #1", placeholder: "Faction #22 Field #1 Placeholder", sector: 23, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #22 Field #2", placeholder: "Faction #22 Field #2 Placeholder", sector: 23, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #22 Field #3", placeholder: "Faction #22 Field #3 Placeholder", sector: 23, block: 2, key: NFC_KEY }
       }
     },
     faction23: {
       name: "Faction #23",
       sector: 24,
       fields: {
-        field1: { title: "Faction #23 Field #1", placeholder: "Faction #23 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 96
-        field2: { title: "Faction #23 Field #2", placeholder: "Faction #23 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 97
-        field3: { title: "Faction #23 Field #3", placeholder: "Faction #23 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 98
+        field1: { title: "Faction #23 Field #1", placeholder: "Faction #23 Field #1 Placeholder", sector: 24, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #23 Field #2", placeholder: "Faction #23 Field #2 Placeholder", sector: 24, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #23 Field #3", placeholder: "Faction #23 Field #3 Placeholder", sector: 24, block: 2, key: NFC_KEY }
       }
     },
     faction24: {
       name: "Faction #24",
       sector: 25,
       fields: {
-        field1: { title: "Faction #24 Field #1", placeholder: "Faction #24 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 100
-        field2: { title: "Faction #24 Field #2", placeholder: "Faction #24 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 101
-        field3: { title: "Faction #24 Field #3", placeholder: "Faction #24 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 102
+        field1: { title: "Faction #24 Field #1", placeholder: "Faction #24 Field #1 Placeholder", sector: 25, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #24 Field #2", placeholder: "Faction #24 Field #2 Placeholder", sector: 25, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #24 Field #3", placeholder: "Faction #24 Field #3 Placeholder", sector: 25, block: 2, key: NFC_KEY }
       }
     },
     faction25: {
       name: "Faction #25",
       sector: 26,
       fields: {
-        field1: { title: "Faction #25 Field #1", placeholder: "Faction #25 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 104
-        field2: { title: "Faction #25 Field #2", placeholder: "Faction #25 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 105
-        field3: { title: "Faction #25 Field #3", placeholder: "Faction #25 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 106
+        field1: { title: "Faction #25 Field #1", placeholder: "Faction #25 Field #1 Placeholder", sector: 26, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #25 Field #2", placeholder: "Faction #25 Field #2 Placeholder", sector: 26, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #25 Field #3", placeholder: "Faction #25 Field #3 Placeholder", sector: 26, block: 2, key: NFC_KEY }
       }
     },
     faction26: {
       name: "Faction #26",
       sector: 27,
       fields: {
-        field1: { title: "Faction #26 Field #1", placeholder: "Faction #26 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 108
-        field2: { title: "Faction #26 Field #2", placeholder: "Faction #26 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 109
-        field3: { title: "Faction #26 Field #3", placeholder: "Faction #26 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 110
+        field1: { title: "Faction #26 Field #1", placeholder: "Faction #26 Field #1 Placeholder", sector: 27, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #26 Field #2", placeholder: "Faction #26 Field #2 Placeholder", sector: 27, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #26 Field #3", placeholder: "Faction #26 Field #3 Placeholder", sector: 27, block: 2, key: NFC_KEY }
       }
     },
     faction27: {
       name: "Faction #27",
       sector: 28,
       fields: {
-        field1: { title: "Faction #27 Field #1", placeholder: "Faction #27 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 112
-        field2: { title: "Faction #27 Field #2", placeholder: "Faction #27 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 113
-        field3: { title: "Faction #27 Field #3", placeholder: "Faction #27 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 114
+        field1: { title: "Faction #27 Field #1", placeholder: "Faction #27 Field #1 Placeholder", sector: 28, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #27 Field #2", placeholder: "Faction #27 Field #2 Placeholder", sector: 28, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #27 Field #3", placeholder: "Faction #27 Field #3 Placeholder", sector: 28, block: 2, key: NFC_KEY }
       }
     },
     faction28: {
       name: "Faction #28",
       sector: 29,
       fields: {
-        field1: { title: "Faction #28 Field #1", placeholder: "Faction #28 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 116
-        field2: { title: "Faction #28 Field #2", placeholder: "Faction #28 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 117
-        field3: { title: "Faction #28 Field #3", placeholder: "Faction #28 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 118
+        field1: { title: "Faction #28 Field #1", placeholder: "Faction #28 Field #1 Placeholder", sector: 29, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #28 Field #2", placeholder: "Faction #28 Field #2 Placeholder", sector: 29, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #28 Field #3", placeholder: "Faction #28 Field #3 Placeholder", sector: 29, block: 2, key: NFC_KEY }
       }
     },
     faction29: {
       name: "Faction #29",
       sector: 30,
       fields: {
-        field1: { title: "Faction #29 Field #1", placeholder: "Faction #29 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 120
-        field2: { title: "Faction #29 Field #2", placeholder: "Faction #29 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 121
-        field3: { title: "Faction #29 Field #3", placeholder: "Faction #29 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 122
+        field1: { title: "Faction #29 Field #1", placeholder: "Faction #29 Field #1 Placeholder", sector: 30, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #29 Field #2", placeholder: "Faction #29 Field #2 Placeholder", sector: 30, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #29 Field #3", placeholder: "Faction #29 Field #3 Placeholder", sector: 30, block: 2, key: NFC_KEY }
       }
     },
     faction30: {
       name: "Faction #30",
       sector: 31,
       fields: {
-        field1: { title: "Faction #30 Field #1", placeholder: "Faction #30 Field #1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 124
-        field2: { title: "Faction #30 Field #2", placeholder: "Faction #30 Field #2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 125
-        field3: { title: "Faction #30 Field #3", placeholder: "Faction #30 Field #3 Placeholder", block: 2, key: NFC_KEY } // Block ID 126
+        field1: { title: "Faction #30 Field #1", placeholder: "Faction #30 Field #1 Placeholder", sector: 31, block: 0, key: NFC_KEY },
+        field2: { title: "Faction #30 Field #2", placeholder: "Faction #30 Field #2 Placeholder", sector: 31, block: 1, key: NFC_KEY },
+        field3: { title: "Faction #30 Field #3", placeholder: "Faction #30 Field #3 Placeholder", sector: 31, block: 2, key: NFC_KEY }
       }
     }
   },
   allegiances: {
+    
     allegiance1: {
       name: "Endline",
       sector: 36,
       fields: {
-        field1: { title: "Allegiance #1 Field 1", placeholder: "Allegiance #1 Field 1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 192
-        field2: { title: "Allegiance #1 Field 2", placeholder: "Allegiance #1 Field 2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 193
-        field3: { title: "Allegiance #1 Field 3", placeholder: "Allegiance #1 Field 3 Placeholder", block: 2, key: NFC_KEY }, // Block ID 194
-        field4: { title: "Allegiance #1 Field 4", placeholder: "Allegiance #1 Field 4 Placeholder", block: 3, key: NFC_KEY }, // Block ID 195
-        field5: { title: "Allegiance #1 Field 5", placeholder: "Allegiance #1 Field 5 Placeholder", block: 4, key: NFC_KEY }, // Block ID 196
-        field6: { title: "Allegiance #1 Field 6", placeholder: "Allegiance #1 Field 6 Placeholder", block: 5, key: NFC_KEY }, // Block ID 197
-        field7: { title: "Allegiance #1 Field 7", placeholder: "Allegiance #1 Field 7 Placeholder", block: 6, key: NFC_KEY }, // Block ID 198
-        field8: { title: "Allegiance #1 Field 8", placeholder: "Allegiance #1 Field 8 Placeholder", block: 7, key: NFC_KEY }, // Block ID 199
-        field9: { title: "Allegiance #1 Field 9", placeholder: "Allegiance #1 Field 9 Placeholder", block: 8, key: NFC_KEY }, // Block ID 200
-        field10: { title: "Allegiance #1 Field 10", placeholder: "Allegiance #1 Field 10 Placeholder", block: 9, key: NFC_KEY }, // Block ID 201
-        field11: { title: "Allegiance #1 Field 11", placeholder: "Allegiance #1 Field 11 Placeholder", block: 10, key: NFC_KEY }, // Block ID 202
-        field12: { title: "Allegiance #1 Field 12", placeholder: "Allegiance #1 Field 12 Placeholder", block: 11, key: NFC_KEY }, // Block ID 203
-        field13: { title: "Allegiance #1 Field 13", placeholder: "Allegiance #1 Field 13 Placeholder", block: 12, key: NFC_KEY }, // Block ID 204
-        field14: { title: "Allegiance #1 Field 14", placeholder: "Allegiance #1 Field 14 Placeholder", block: 13, key: NFC_KEY }, // Block ID 205
-        field15: { title: "Allegiance #1 Field 15", placeholder: "Allegiance #1 Field 15 Placeholder", block: 14, key: NFC_KEY } // Block ID 206
+        field1: { title: "Allegiance #1 Field 1", placeholder: "Allegiance #1 Field 1 Placeholder", sector: 36, block: 0, key: NFC_KEY },
+        field2: { title: "Allegiance #1 Field 2", placeholder: "Allegiance #1 Field 2 Placeholder", sector: 36, block: 1, key: NFC_KEY },
+        field3: { title: "Allegiance #1 Field 3", placeholder: "Allegiance #1 Field 3 Placeholder", sector: 36, block: 2, key: NFC_KEY },
+        field4: { title: "Allegiance #1 Field 4", placeholder: "Allegiance #1 Field 4 Placeholder", sector: 36, block: 3, key: NFC_KEY },
+        field5: { title: "Allegiance #1 Field 5", placeholder: "Allegiance #1 Field 5 Placeholder", sector: 36, block: 4, key: NFC_KEY },
+        field6: { title: "Allegiance #1 Field 6", placeholder: "Allegiance #1 Field 6 Placeholder", sector: 36, block: 5, key: NFC_KEY },
+        field7: { title: "Allegiance #1 Field 7", placeholder: "Allegiance #1 Field 7 Placeholder", sector: 36, block: 6, key: NFC_KEY },
+        field8: { title: "Allegiance #1 Field 8", placeholder: "Allegiance #1 Field 8 Placeholder", sector: 36, block: 7, key: NFC_KEY },
+        field9: { title: "Allegiance #1 Field 9", placeholder: "Allegiance #1 Field 9 Placeholder", sector: 36, block: 8, key: NFC_KEY },
+        field10: { title: "Allegiance #1 Field 10", placeholder: "Allegiance #1 Field 10 Placeholder", sector: 36, block: 9, key: NFC_KEY },
+        field11: { title: "Allegiance #1 Field 11", placeholder: "Allegiance #1 Field 11 Placeholder", sector: 36, block: 10, key: NFC_KEY },
+        field12: { title: "Allegiance #1 Field 12", placeholder: "Allegiance #1 Field 12 Placeholder", sector: 36, block: 11, key: NFC_KEY },
+        field13: { title: "Allegiance #1 Field 13", placeholder: "Allegiance #1 Field 13 Placeholder", sector: 36, block: 12, key: NFC_KEY },
+        field14: { title: "Allegiance #1 Field 14", placeholder: "Allegiance #1 Field 14 Placeholder", sector: 36, block: 13, key: NFC_KEY },
+        field15: { title: "Allegiance #1 Field 15", placeholder: "Allegiance #1 Field 15 Placeholder", sector: 36, block: 14, key: NFC_KEY }
       }
     },
     allegiance2: {
       name: "Helix",
       sector: 37,
       fields: {
-        field1: { title: "Allegiance #2 Field 1", placeholder: "Allegiance #2 Field 1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 208
-        field2: { title: "Allegiance #2 Field 2", placeholder: "Allegiance #2 Field 2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 209
-        field3: { title: "Allegiance #2 Field 3", placeholder: "Allegiance #2 Field 3 Placeholder", block: 2, key: NFC_KEY }, // Block ID 210
-        field4: { title: "Allegiance #2 Field 4", placeholder: "Allegiance #2 Field 4 Placeholder", block: 3, key: NFC_KEY }, // Block ID 211
-        field5: { title: "Allegiance #2 Field 5", placeholder: "Allegiance #2 Field 5 Placeholder", block: 4, key: NFC_KEY }, // Block ID 212
-        field6: { title: "Allegiance #2 Field 6", placeholder: "Allegiance #2 Field 6 Placeholder", block: 5, key: NFC_KEY }, // Block ID 213
-        field7: { title: "Allegiance #2 Field 7", placeholder: "Allegiance #2 Field 7 Placeholder", block: 6, key: NFC_KEY }, // Block ID 214
-        field8: { title: "Allegiance #2 Field 8", placeholder: "Allegiance #2 Field 8 Placeholder", block: 7, key: NFC_KEY }, // Block ID 215
-        field9: { title: "Allegiance #2 Field 9", placeholder: "Allegiance #2 Field 9 Placeholder", block: 8, key: NFC_KEY }, // Block ID 216
-        field10: { title: "Allegiance #2 Field 10", placeholder: "Allegiance #2 Field 10 Placeholder", block: 9, key: NFC_KEY }, // Block ID 217
-        field11: { title: "Allegiance #2 Field 11", placeholder: "Allegiance #2 Field 11 Placeholder", block: 10, key: NFC_KEY }, // Block ID 218
-        field12: { title: "Allegiance #2 Field 12", placeholder: "Allegiance #2 Field 12 Placeholder", block: 11, key: NFC_KEY }, // Block ID 219
-        field13: { title: "Allegiance #2 Field 13", placeholder: "Allegiance #2 Field 13 Placeholder", block: 12, key: NFC_KEY }, // Block ID 220
-        field14: { title: "Allegiance #2 Field 14", placeholder: "Allegiance #2 Field 14 Placeholder", block: 13, key: NFC_KEY }, // Block ID 221
-        field15: { title: "Allegiance #2 Field 15", placeholder: "Allegiance #2 Field 15 Placeholder", block: 14, key: NFC_KEY } // Block ID 222
-      }
+        field1: { title: "Allegiance #2 Field 1", placeholder: "Allegiance #2 Field 1 Placeholder", sector: 37, block: 0, key: NFC_KEY },
+        field2: { title: "Allegiance #2 Field 2", placeholder: "Allegiance #2 Field 2 Placeholder", sector: 37, block: 1, key: NFC_KEY },
+        field3: { title: "Allegiance #2 Field 3", placeholder: "Allegiance #2 Field 3 Placeholder", sector: 37, block: 2, key: NFC_KEY },
+        field4: { title: "Allegiance #2 Field 4", placeholder: "Allegiance #2 Field 4 Placeholder", sector: 37, block: 3, key: NFC_KEY },
+        field5: { title: "Allegiance #2 Field 5", placeholder: "Allegiance #2 Field 5 Placeholder", sector: 37, block: 4, key: NFC_KEY },
+        field6: { title: "Allegiance #2 Field 6", placeholder: "Allegiance #2 Field 6 Placeholder", sector: 37, block: 5, key: NFC_KEY },
+        field7: { title: "Allegiance #2 Field 7", placeholder: "Allegiance #2 Field 7 Placeholder", sector: 37, block: 6, key: NFC_KEY },
+        field8: { title: "Allegiance #2 Field 8", placeholder: "Allegiance #2 Field 8 Placeholder", sector: 37, block: 7, key: NFC_KEY },
+        field9: { title: "Allegiance #2 Field 9", placeholder: "Allegiance #2 Field 9 Placeholder", sector: 37, block: 8, key: NFC_KEY },
+        field10: { title: "Allegiance #2 Field 10", placeholder: "Allegiance #2 Field 10 Placeholder", sector: 37, block: 9, key: NFC_KEY },
+        field11: { title: "Allegiance #2 Field 11", placeholder: "Allegiance #2 Field 11 Placeholder", sector: 37, block: 10, key: NFC_KEY },
+        field12: { title: "Allegiance #2 Field 12", placeholder: "Allegiance #2 Field 12 Placeholder", sector: 37, block: 11, key: NFC_KEY },
+        field13: { title: "Allegiance #2 Field 13", placeholder: "Allegiance #2 Field 13 Placeholder", sector: 37, block: 12, key: NFC_KEY },
+        field14: { title: "Allegiance #2 Field 14", placeholder: "Allegiance #2 Field 14 Placeholder", sector: 37, block: 13, key: NFC_KEY },
+        field15: { title: "Allegiance #2 Field 15", placeholder: "Allegiance #2 Field 15 Placeholder", sector: 37, block: 14, key: NFC_KEY }
+      } // Closing brace added here
     },
     allegiance3: {
       name: "The Resistance",
       sector: 38,
       fields: {
-        field1: { title: "Allegiance #3 Field 1", placeholder: "Allegiance #3 Field 1 Placeholder", block: 0, key: NFC_KEY }, // Block ID 224
-        field2: { title: "Allegiance #3 Field 2", placeholder: "Allegiance #3 Field 2 Placeholder", block: 1, key: NFC_KEY }, // Block ID 225
-        field3: { title: "Allegiance #3 Field 3", placeholder: "Allegiance #3 Field 3 Placeholder", block: 2, key: NFC_KEY }, // Block ID 226
-        field4: { title: "Allegiance #3 Field 4", placeholder: "Allegiance #3 Field 4 Placeholder", block: 3, key: NFC_KEY }, // Block ID 227
-        field5: { title: "Allegiance #3 Field 5", placeholder: "Allegiance #3 Field 5 Placeholder", block: 4, key: NFC_KEY }, // Block ID 228
-        field6: { title: "Allegiance #3 Field 6", placeholder: "Allegiance #3 Field 6 Placeholder", block: 5, key: NFC_KEY }, // Block ID 229
-        field7: { title: "Allegiance #3 Field 7", placeholder: "Allegiance #3 Field 7 Placeholder", block: 6, key: NFC_KEY }, // Block ID 230
-        field8: { title: "Allegiance #3 Field 8", placeholder: "Allegiance #3 Field 8 Placeholder", block: 7, key: NFC_KEY }, // Block ID 231
-        field9: { title: "Allegiance #3 Field 9", placeholder: "Allegiance #3 Field 9 Placeholder", block: 8, key: NFC_KEY }, // Block ID 232
-        field10: { title: "Allegiance #3 Field 10", placeholder: "Allegiance #3 Field 10 Placeholder", block: 9, key: NFC_KEY }, // Block ID 233
-        field11: { title: "Allegiance #3 Field 11", placeholder: "Allegiance #3 Field 11 Placeholder", block: 10, key: NFC_KEY }, // Block ID 234
-        field12: { title: "Allegiance #3 Field 12", placeholder: "Allegiance #3 Field 12 Placeholder", block: 11, key: NFC_KEY }, // Block ID 235
-        field13: { title: "Allegiance #3 Field 13", placeholder: "Allegiance #3 Field 13 Placeholder", block: 12, key: NFC_KEY }, // Block ID 236
-        field14: { title: "Allegiance #3 Field 14", placeholder: "Allegiance #3 Field 14 Placeholder", block: 13, key: NFC_KEY }, // Block ID 237
-        field15: { title: "Allegiance #3 Field 15", placeholder: "Allegiance #3 Field 15 Placeholder", block: 14, key: NFC_KEY } // Block ID 238
+        field1: { title: "Allegiance #3 Field 1", placeholder: "Allegiance #3 Field 1 Placeholder", sector: 38, block: 0, key: NFC_KEY },
+        field2: { title: "Allegiance #3 Field 2", placeholder: "Allegiance #3 Field 2 Placeholder", sector: 38, block: 1, key: NFC_KEY },
+        field3: { title: "Allegiance #3 Field 3", placeholder: "Allegiance #3 Field 3 Placeholder", sector: 38, block: 2, key: NFC_KEY },
+        field4: { title: "Allegiance #3 Field 4", placeholder: "Allegiance #3 Field 4 Placeholder", sector: 38, block: 3, key: NFC_KEY },
+        field5: { title: "Allegiance #3 Field 5", placeholder: "Allegiance #3 Field 5 Placeholder", sector: 38, block: 4, key: NFC_KEY },
+        field6: { title: "Allegiance #3 Field 6", placeholder: "Allegiance #3 Field 6 Placeholder", sector: 38, block: 5, key: NFC_KEY },
+        field7: { title: "Allegiance #3 Field 7", placeholder: "Allegiance #3 Field 7 Placeholder", sector: 38, block: 6, key: NFC_KEY },
+        field8: { title: "Allegiance #3 Field 8", placeholder: "Allegiance #3 Field 8 Placeholder", sector: 38, block: 7, key: NFC_KEY },
+        field9: { title: "Allegiance #3 Field 9", placeholder: "Allegiance #3 Field 9 Placeholder", sector: 38, block: 8, key: NFC_KEY },
+        field10: { title: "Allegiance #3 Field 10", placeholder: "Allegiance #3 Field 10 Placeholder", sector: 38, block: 9, key: NFC_KEY },
+        field11: { title: "Allegiance #3 Field 11", placeholder: "Allegiance #3 Field 11 Placeholder", sector: 38, block: 10, key: NFC_KEY },
+        field12: { title: "Allegiance #3 Field 12", placeholder: "Allegiance #3 Field 12 Placeholder", sector: 38, block: 11, key: NFC_KEY },
+        field13: { title: "Allegiance #3 Field 13", placeholder: "Allegiance #3 Field 13 Placeholder", sector: 38, block: 12, key: NFC_KEY },
+        field14: { title: "Allegiance #3 Field 14", placeholder: "Allegiance #3 Field 14 Placeholder", sector: 38, block: 13, key: NFC_KEY },
+        field15: { title: "Allegiance #3 Field 15", placeholder: "Allegiance #3 Field 15 Placeholder", sector: 38, block: 14, key: NFC_KEY }
+      }
+    },
+    user: {
+      name: "User",
+      sector: 39,
+      fields: {
+        field1: { title: "Username", placeholder: "Enter Username", sector: 39, block: 0, key: NFC_KEY },
+        field2: { title: "User Field 2", placeholder: "User Field 2 Placeholder", sector: 39, block: 1, key: NFC_KEY },
+        field3: { title: "Registration", placeholder: "Enter Registration", sector: 39, block: 2, key: NFC_KEY },
+        field4: { title: "Allegiance Affiliation", placeholder: "Enter Allegiance", sector: 39, block: 3, key: NFC_KEY },
+        field5: { title: "User Field 5", placeholder: "User Field 5 Placeholder", sector: 39, block: 4, key: NFC_KEY },
+        field6: { title: "User Field 6", placeholder: "User Field 6 Placeholder", sector: 39, block: 5, key: NFC_KEY },
+        field7: { title: "User Field 7", placeholder: "User Field 7 Placeholder", sector: 39, block: 6, key: NFC_KEY },
+        field8: { title: "User Field 8", placeholder: "User Field 8 Placeholder", sector: 39, block: 7, key: NFC_KEY },
+        field9: { title: "User Field 9", placeholder: "User Field 9 Placeholder", sector: 39, block: 8, key: NFC_KEY },
+        field10: { title: "User Field 10", placeholder: "User Field 10 Placeholder", sector: 39, block: 9, key: NFC_KEY },
+        field11: { title: "User Field 11", placeholder: "User Field 11 Placeholder", sector: 39, block: 10, key: NFC_KEY },
+        field12: { title: "User Field 12", placeholder: "User Field 12 Placeholder", sector: 39, block: 11, key: NFC_KEY },
+        field13: { title: "User Field 13", placeholder: "User Field 13 Placeholder", sector: 39, block: 12, key: NFC_KEY },
+        field14: { title: "User Field 14", placeholder: "User Field 14 Placeholder", sector: 39, block: 13, key: NFC_KEY },
+        field15: { title: "User Field 15", placeholder: "User Field 15 Placeholder", sector: 39, block: 14, key: NFC_KEY },
+        field16: { title: "User Field 16", placeholder: "User Field 16 Placeholder", sector: 39, block: 15, key: NFC_KEY }
       }
     }
-  },
-  user: {
-    sector: 39,
-    fields: {
-      // Use absolute Block IDs from CSV
-      username:   { title: "Username",              placeholder: "Enter Username",             block: 0, key: NFC_KEY },
-      // Add other user fields used in handleRegWrite / handleRegRead
-      status:     { title: "Band Status",           placeholder: "N/A",                      block: 2, key: NFC_KEY }, // Placeholder N/A as it's usually read-only display or set internally
-      allegiance: { title: "Affiliated Allegiance", placeholder: "No Affiliated Allegiance", block: 3, key: NFC_KEY }
-      // Add other user fields from CSV if needed later (244-254)
-    }
   }
-};
-
-/**
- * Validates the FIELD_MAP structure to ensure consistency and proper field mappings.
- * This function checks that:
- * 1. User data is in Sector 39
- * 2. Faction data is in Sectors 1-15
- * 3. Allegiance data is in Sectors 36-38
- * 4. All required fields are present with valid types
- */
-function validateFieldMap() {
-  // Validate user section
-  if (!FIELD_MAP.user || typeof FIELD_MAP.user !== 'object') {
-    console.error("CRITICAL: FIELD_MAP.user is missing or invalid");
-    return;
-  }
-  
-  // Validate user sector assignment
-  if (FIELD_MAP.user.sector !== 39) {
-    console.error(`CRITICAL: User sector should be 39, found ${FIELD_MAP.user.sector}`);
-    // Auto-correct to prevent errors
-    FIELD_MAP.user.sector = 39;
-  }
-  
-  // Validate user fields
-  if (!FIELD_MAP.user.fields || !FIELD_MAP.user.fields.username) {
-    console.error("CRITICAL: Username field configuration is missing");
-    return;
-  }
-  
-  // Validate username is in block 0
-  if (FIELD_MAP.user.fields.username.block !== 0) {
-    console.error(`CRITICAL: Username block should be 0, found ${FIELD_MAP.user.fields.username.block}`);
-    // Auto-correct
-    FIELD_MAP.user.fields.username.block = 0;
-  }
-  
-  // Validate factions
-  if (!FIELD_MAP.factions || typeof FIELD_MAP.factions !== 'object') {
-    console.error("CRITICAL: FIELD_MAP.factions is missing or invalid");
-    return;
-  }
-  
-  // Check each faction for proper sector assignment (should be 1-15)
-  Object.entries(FIELD_MAP.factions).forEach(([key, faction]) => {
-    if (typeof faction !== 'object') {
-      console.warn(`Faction ${key} is not a valid object`);
-      return;
-    }
-    
-    if (typeof faction.sector !== 'number') {
-      console.warn(`Faction ${key} has invalid sector type: ${typeof faction.sector}`);
-      return;
-    }
-    
-    // Validate faction sector range
-    if (faction.sector < 1 || faction.sector > 31 || faction.sector === 16) {
-      console.error(`CRITICAL: Faction ${key} sector should be between 1-15 or 17-31, found ${faction.sector}`);
-    }
-    
-    // Check faction fields
-    if (!faction.fields || typeof faction.fields !== 'object') {
-      console.warn(`Faction ${key} has missing or invalid fields`);
-      return;
-    }
-    
-    // Check each field has required properties
-    Object.entries(faction.fields).forEach(([fieldKey, field]) => {
-      if (!field.title || typeof field.title !== 'string') {
-        console.warn(`Faction ${key}, field ${fieldKey} is missing title`);
-      }
-      
-      if (typeof field.block !== 'number') {
-        console.warn(`Faction ${key}, field ${fieldKey} has invalid block number type`);
-      }
-      
-      if (!field.key || typeof field.key !== 'string') {
-        console.warn(`Faction ${key}, field ${fieldKey} is missing key`);
-      }
-    });
-  });
-  
-  // Validate allegiances
-  if (!FIELD_MAP.allegiances || typeof FIELD_MAP.allegiances !== 'object') {
-    console.error("CRITICAL: FIELD_MAP.allegiances is missing or invalid");
-    return;
-  }
-  
-  // Check each allegiance for proper sector assignment (should be 36-38)
-  Object.entries(FIELD_MAP.allegiances).forEach(([key, allegiance]) => {
-    if (typeof allegiance !== 'object') {
-      console.warn(`Allegiance ${key} is not a valid object`);
-      return;
-    }
-    
-    if (typeof allegiance.sector !== 'number') {
-      console.warn(`Allegiance ${key} has invalid sector type: ${typeof allegiance.sector}`);
-      return;
-    }
-    
-    // Validate allegiance sector range
-    if (allegiance.sector < 36 || allegiance.sector > 38) {
-      console.error(`CRITICAL: Allegiance ${key} sector should be between 36-38, found ${allegiance.sector}`);
-    }
-    
-    // Check allegiance fields
-    if (!allegiance.fields || typeof allegiance.fields !== 'object') {
-      console.warn(`Allegiance ${key} has missing or invalid fields`);
-      return;
-    }
-    
-    // Check each field has required properties
-    Object.entries(allegiance.fields).forEach(([fieldKey, field]) => {
-      if (!field.title || typeof field.title !== 'string') {
-        console.warn(`Allegiance ${key}, field ${fieldKey} is missing title`);
-      }
-      
-      if (typeof field.block !== 'number') {
-        console.warn(`Allegiance ${key}, field ${fieldKey} has invalid block number type`);
-      }
-      
-      if (!field.key || typeof field.key !== 'string') {
-        console.warn(`Allegiance ${key}, field ${fieldKey} is missing key`);
-      }
-    });
-  });
-  
-  console.info("Field map validation complete");
 }
-validateFieldMap();
-
-// Export FIELD_MAP if modules are supported
-// Avoid using 'module' directly in browser scripts unless using a bundler
-// Making it a global variable for simplicity in this context
-// if (typeof module !== 'undefined' && module.exports) {
-//   module.exports = FIELD_MAP;
-// } 

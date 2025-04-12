@@ -168,7 +168,8 @@ function initializeAdminInterface() {
         container.appendChild(allegiancesSection);
 
         // Create section for user data (limited view)
-        const userSection = createAdminSection("USER DATA (Sector 39)", FIELD_MAP.userData, 'user');
+        // FIX: Changed FIELD_MAP.userData to FIELD_MAP.user to match map.js structure
+        const userSection = createAdminSection("USER DATA (Sector 39)", FIELD_MAP.user, 'user');
         container.appendChild(userSection);
 
         console.log("Admin Interface Initialized Successfully.");
@@ -202,7 +203,8 @@ function createAdminSection(sectionTitle, mapData, category) {
     // Iterate over each entity in the mapData
     if (category === 'user') {
         // Special handling for user category as it's not nested by name
-        const btn = createEntityButton('userData', mapData, category);
+        // FIX: Changed entityKey from 'userData' to 'user' for consistency with FIELD_MAP
+        const btn = createEntityButton('user', mapData, category);
         grid.appendChild(btn);
     } else {
         for (const entityKey in mapData) {
@@ -274,13 +276,14 @@ function displayEntityDetails(entityKey, entityData, category) {
     
     // Handle userData differently since it has a different structure
     if (category === 'user') {
-        // For userData, each property is a field
+        // For user, each property is a field (FIX: updated comment for clarity)
         for (const fieldKey in entityData) {
             const field = entityData[fieldKey];
             // Skip if not a field object (e.g., might be a function or other property)
             if (!field || typeof field !== 'object' || !field.block) continue;
             
-            const absoluteBlockId = calculateAbsoluteBlockId(39, field.block - 0); // Adjust block to be relative to sector 39
+            // Deprecated: Absolute block calculation removed due to strict sector+block addressing.
+            // const absoluteBlockId = calculateAbsoluteBlockId(39, field.block - 0); // Adjust block to be relative to sector 39
             const relativeBlock = field.block - 0; // Calculate relative block within sector 39
             const inputId = `admin-input-39-${relativeBlock}`;
 
@@ -300,7 +303,8 @@ function displayEntityDetails(entityKey, entityData, category) {
         // For factions and allegiances, use the existing structure
         for (const fieldKey in entityData.fields) {
             const field = entityData.fields[fieldKey];
-            const absoluteBlockId = calculateAbsoluteBlockId(entityData.sector, field.block);
+            // Deprecated: Absolute block calculation removed due to strict sector+block addressing.
+            // const absoluteBlockId = calculateAbsoluteBlockId(entityData.sector, field.block);
             const inputId = `admin-input-${entityData.sector}-${field.block}`;
 
             fieldsHTML += `
@@ -335,6 +339,9 @@ function displayEntityDetails(entityKey, entityData, category) {
 }
 
 // Helper to calculate absolute block ID based on sector and relative block
+/*
+ * Deprecated: Absolute block calculation is no longer used.
+ * The app now uses strict sector+block addressing for clarity and reliability.
 function calculateAbsoluteBlockId(sector, relativeBlock) {
     if (sector < 0 || sector >= 40 || relativeBlock < 0 || relativeBlock >= 16) {
         return 'Invalid';
@@ -348,6 +355,7 @@ function calculateAbsoluteBlockId(sector, relativeBlock) {
         return 128 + (sector - 32) * 16 + relativeBlock;
     }
 }
+*/
 
 // Placeholder for Read Functionality
 async function readAdminData(entityKey, category) {
@@ -356,12 +364,17 @@ async function readAdminData(entityKey, category) {
     if (!detailView) return;
 
     const inputs = detailView.querySelectorAll('input[type="text"]');
-    ui.showOperationIndicator('Reading data...'); // Use ui namespace
+    if (typeof ui !== 'undefined' && typeof ui.showOperationIndicator === 'function') {
+        ui.showOperationIndicator('Reading data...');
+    } else {
+        console.warn('ui.showOperationIndicator is not available.');
+    }
 
     try {
         let entityData;
         if (category === 'user') {
-            entityData = FIELD_MAP.userData;
+            // FIX: Changed FIELD_MAP.userData to FIELD_MAP.user to match map.js structure
+            entityData = FIELD_MAP.user;
         } else {
             entityData = FIELD_MAP[category][entityKey];
         }
@@ -378,23 +391,45 @@ async function readAdminData(entityKey, category) {
             // Assume operations.readBlock exists and handles the uFR logic
             // It needs sector, block (relative to sector), authMode, and key
             // Using Key A (0x60) and the specific key from map.js by default
-            const data = await operations.readBlock(sector, block, 0x60, key);
+            let data = null;
+            if (typeof operations !== 'undefined' && typeof operations.readSectorBlock === 'function') {
+                data = await operations.readSectorBlock(sector, block, 0x60, key);
+            } else {
+                console.warn('operations.readSectorBlock is not available.');
+            }
 
             if (data) {
-                input.value = utils.hexToString(data); // Assuming hexToString exists
+                // Original call preserved as backup:
+                // input.value = utils.hexToString(data);
+                // Updated per static analysis: use correct function hexToText()
+                const textData = utils.hexToText(data);
+                utils.log(`Converted hex to text (admin read): ${textData}`, 'debug');
+                input.value = textData;
                 utils.log(`Read Success (Sector ${sector}, Block ${block}): ${input.value}`); // Use utils namespace
             } else {
                 input.value = ""; // Clear if read fails or returns null
                 utils.log(`Read Failed/Empty (Sector ${sector}, Block ${block})`, 'warn'); // Use utils namespace
             }
         }
-        ui.showVisualConfirmation("Read Complete", "Sector data read successfully (or empty)."); // Use ui namespace
+        if (typeof ui !== 'undefined' && typeof ui.showVisualConfirmation === 'function') {
+            ui.showVisualConfirmation("Read Complete", "Sector data read successfully (or empty).");
+        } else {
+            console.warn('ui.showVisualConfirmation is not available.');
+        }
     } catch (error) {
         console.error('Error reading admin data:', error);
         utils.log(`Error reading sector data for ${entityKey}: ${error.message}`, 'error'); // Use utils namespace
-        ui.showVisualConfirmation("Read Error", `Failed to read data: ${error.message}`, 'error'); // Use ui namespace
+        if (typeof ui !== 'undefined' && typeof ui.showVisualConfirmation === 'function') {
+            ui.showVisualConfirmation("Read Error", `Failed to read data: ${error.message}`, 'error');
+        } else {
+            console.warn('ui.showVisualConfirmation is not available.');
+        }
     } finally {
-        ui.hideOperationIndicator(); // Use ui namespace
+        if (typeof ui !== 'undefined' && typeof ui.hideOperationIndicator === 'function') {
+            ui.hideOperationIndicator();
+        } else {
+            console.warn('ui.hideOperationIndicator is not available.');
+        }
     }
 }
 
@@ -405,12 +440,17 @@ async function writeAdminData(entityKey, category) {
     if (!detailView) return;
 
     const inputs = detailView.querySelectorAll('input[type="text"]');
-    ui.showOperationIndicator('Writing data...'); // Use ui namespace
+    if (typeof ui !== 'undefined' && typeof ui.showOperationIndicator === 'function') {
+        ui.showOperationIndicator('Writing data...');
+    } else {
+        console.warn('ui.showOperationIndicator is not available.');
+    }
 
     try {
         let entityData;
         if (category === 'user') {
-            entityData = FIELD_MAP.userData;
+            // FIX: Changed FIELD_MAP.userData to FIELD_MAP.user to match map.js structure
+            entityData = FIELD_MAP.user;
         } else {
             entityData = FIELD_MAP[category][entityKey];
         }
@@ -423,11 +463,20 @@ async function writeAdminData(entityKey, category) {
             const block = parseInt(input.dataset.block);
             const key = input.dataset.key;
             const dataToWrite = input.value;
-            const hexData = utils.stringToHex(dataToWrite).padEnd(32, '0'); // Pad to 16 bytes (32 hex chars)
+            // Original call preserved as backup:
+            // const hexData = utils.stringToHex(dataToWrite).padEnd(32, '0');
+            // Updated per static analysis: use correct function textToHex()
+            const hexData = utils.textToHex(dataToWrite).padEnd(32, '0');
+            utils.log(`Converted admin input text to hex: ${hexData}`, 'debug');
 
             // Assume operations.writeBlock exists and handles the uFR logic
             // It needs sector, block (relative), data (hex), authMode, key
-            const success = await operations.writeBlock(sector, block, hexData, 0x60, key);
+            let success = false;
+            if (typeof operations !== 'undefined' && typeof operations.writeSectorBlock === 'function') {
+                success = await operations.writeSectorBlock(sector, block, hexData, 0x60, key);
+            } else {
+                console.warn('operations.writeSectorBlock is not available.');
+            }
 
             if (success) {
                 utils.log(`Write Success (Sector ${sector}, Block ${block}): ${dataToWrite}`); // Use utils namespace
@@ -437,13 +486,25 @@ async function writeAdminData(entityKey, category) {
                 throw new Error(`Failed to write to Sector ${sector}, Block ${block}.`);
             }
         }
-        ui.showVisualConfirmation("Write Complete", "Sector data written successfully."); // Use ui namespace
+        if (typeof ui !== 'undefined' && typeof ui.showVisualConfirmation === 'function') {
+            ui.showVisualConfirmation("Write Complete", "Sector data written successfully.");
+        } else {
+            console.warn('ui.showVisualConfirmation is not available.');
+        }
     } catch (error) {
         console.error('Error writing admin data:', error);
         utils.log(`Error writing sector data for ${entityKey}: ${error.message}`, 'error'); // Use utils namespace
-        ui.showVisualConfirmation("Write Error", `Failed to write data: ${error.message}`, 'error'); // Use ui namespace
+        if (typeof ui !== 'undefined' && typeof ui.showVisualConfirmation === 'function') {
+            ui.showVisualConfirmation("Write Error", `Failed to write data: ${error.message}`, 'error');
+        } else {
+            console.warn('ui.showVisualConfirmation is not available.');
+        }
     } finally {
-        ui.hideOperationIndicator(); // Use ui namespace
+        if (typeof ui !== 'undefined' && typeof ui.hideOperationIndicator === 'function') {
+            ui.hideOperationIndicator();
+        } else {
+            console.warn('ui.hideOperationIndicator is not available.');
+        }
     }
 }
 

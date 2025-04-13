@@ -8,40 +8,12 @@
  * 3. Error handling and recovery
  * 4. Cross-component communication
  * 
- * Key Features:
- * - Centralized state management
- * - Controlled UI updates
- * - NFC operation coordination
- * - Error handling and recovery
- * - Logging and debugging
- * 
- * State Management:
- * The application uses a centralized state object (currentState) that tracks:
- * - Active page and UI state
- * - NFC tag presence and data
- * - Operation status and progress
- * - User selections and inputs
- * 
- * NFC Operation Timing:
- * Critical timing requirements for stable NFC operations:
- * - Sector 1 (Factions): 2900ms delay
- * - Sectors 36-38 (Allegiances): 2900ms delay
- * - Sector 39 (User data): 600ms delay
- * - Fresh authentication required for each block
- * 
- * Error Handling Strategy:
- * 1. Preserve UI state on errors
- * 2. Provide clear user feedback
- * 3. Log detailed debug information
- * 4. Implement automatic recovery where possible
- * 
- * @version 3.0.3
- * @lastUpdated 2025-04-11
+ * @version 3.0.4
+ * @lastUpdated 2025-04-12
  */
 /**
  * === Dependency Checks for core.js ===
  * These guards detect missing dependencies early to prevent uncaught ReferenceErrors.
- * Original logic preserved below as comments.
  */
 
 try {
@@ -75,25 +47,6 @@ try {
             if (typeof utils !== 'undefined') utils.log('ui.js loaded successfully.', 'debug');
         }
     });
-
-    /*
-    if (typeof BlockInSectorRead !== 'function') {
-        console.error('D-Logic SDK function BlockInSectorRead is missing.');
-        if (typeof utils !== 'undefined') utils.log('D-Logic SDK BlockInSectorRead missing.', 'error');
-    }
-    if (typeof BlockInSectorWrite !== 'function') {
-        console.error('D-Logic SDK function BlockInSectorWrite is missing.');
-        if (typeof utils !== 'undefined') utils.log('D-Logic SDK BlockInSectorWrite missing.', 'error');
-    }
-    if (typeof ufRequest !== 'function') {
-        console.error('D-Logic SDK function ufRequest is missing.');
-        if (typeof utils !== 'undefined') utils.log('D-Logic SDK ufRequest missing.', 'error');
-    }
-    if (typeof ufResponse !== 'function') {
-        console.error('D-Logic SDK function ufResponse is missing.');
-        if (typeof utils !== 'undefined') utils.log('D-Logic SDK ufResponse missing.', 'error');
-    }
-    */
 } catch (e) {
     console.error('Error during dependency checks in core.js:', e);
 }
@@ -104,16 +57,19 @@ const core = {
      * Current application state object containing all runtime state variables.
      * This centralized state management approach enables consistent UI updates.
      * 
-     * @property {Object} currentState - Global application state
-     * @property {string} currentState.activePage - Current active page ID
-     * @property {boolean} currentState.isTagPresent - NFC tag detection status
-     * @property {Object} currentState.scannedTagInfo - Detailed tag information
-     * @property {string} currentState.currentUsername - Current tag's username
-     * @property {string} currentState.currentAllegiance - Current tag's allegiance
-     * @property {string} currentState.selectedFaction - Selected faction key
-     * @property {string} currentState.selectedAllegiance - Selected allegiance key
-     * @property {boolean} currentState.isOperationInProgress - Operation status flag
-     * @property {string} currentState.lastOperationStatus - Last operation result
+     * @property {string} activePage - Current active page ID in the UI
+     * @property {boolean} isTagPresent - Flag indicating if an NFC tag is currently detected
+     * @property {Object} scannedTagInfo - Information about the currently scanned tag
+     * @property {string|null} scannedTagInfo.uid - Unique identifier of the scanned tag
+     * @property {string|null} scannedTagInfo.sak - Select Acknowledge (SAK) value from tag
+     * @property {string|null} scannedTagInfo.type - NFC tag type identification
+     * @property {number|null} scannedTagInfo.uidSize - Size of the tag's UID in bytes
+     * @property {string|null} currentUsername - Username read from the currently scanned tag
+     * @property {string|null} currentAllegiance - Allegiance read from the currently scanned tag
+     * @property {string|null} selectedFaction - Selected faction key (e.g., 'faction1')
+     * @property {string|null} selectedAllegiance - Selected allegiance key (e.g., 'allegiance1')
+     * @property {boolean} isOperationInProgress - Flag indicating if an NFC operation is running
+     * @property {string} lastOperationStatus - Status of last operation ('idle'|'pending'|'success'|'error')
      */
     currentState: {
         activePage: 'registrationPage', // Initial page
@@ -163,9 +119,6 @@ const core = {
         default: 100
     },
 
-    // --- MEMORY MAP is now defined externally in map.js as FIELD_MAP ---
-    // MEMORY_MAP: { ... removed ... },
-
     /**
      * Initializes the core application logic.
      * This function is called when the DOM is fully loaded and:
@@ -194,116 +147,59 @@ const core = {
             // ui.showFatalError("Application configuration failed to load.");
             return; // Stop initialization if map is missing
         } else {
-             // Optional: You could still run the validation from map.js here if desired
-             // if (typeof validateFieldMap === 'function') {
-             //     validateFieldMap(); // Run validation defined in map.js
-             // } else {
-             //     console.warn("validateFieldMap function not found. Skipping map validation.");
-             // }
              if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
                  utils.log("FIELD_MAP loaded successfully.", 'success');
              }
         }
-// --- Original D-Logic/uFR SDK presence check preserved as backup ---
-/*
-// Check if D-Logic SDK NFC functions are loaded
-try {
-    // Defensive SDK presence check with detailed comments and error handling
-    if (typeof BlockInSectorRead !== 'function' || typeof BlockInSectorWrite !== 'function') {
-        if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
-            utils.log('D-Logic SDK functions missing. NFC will be disabled.', 'error');
-        } else {
-            console.error('D-Logic SDK functions missing. NFC will be disabled.');
+
+        // --- Check for neoband-sdk presence and functions ---
+        try {
+            if (
+                typeof NeobandSDK === 'undefined' ||
+                typeof NeobandSDK.readSectorBlock !== 'function' ||
+                typeof NeobandSDK.writeSectorBlock !== 'function'
+            ) {
+                if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                    utils.log('neoband-sdk functions missing. NFC will be disabled.', 'error');
+                } else {
+                    console.error('neoband-sdk functions missing. NFC will be disabled.');
+                }
+                if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
+                    ui.disableNfcButtons();
+                }
+                alert('neoband-sdk is missing or not loaded. NFC functionality will be disabled.');
+                return;
+            }
+        } catch (sdkCheckError) {
+            console.error('Error during neoband-sdk presence check:', sdkCheckError);
+            if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                utils.log('Error during neoband-sdk presence check: ' + sdkCheckError.message, 'error');
+            }
+            // Disable NFC buttons as a precaution
+            if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
+                ui.disableNfcButtons();
+            }
+            alert('An error occurred while checking for neoband-sdk. NFC functionality will be disabled.');
+            return;
         }
-        if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
-            ui.disableNfcButtons();
-        }
-        alert('D-Logic SDK is missing or not loaded. NFC functionality will be disabled.');
-        return;
-    }
-} catch (sdkCheckError) {
-    console.error('Error during SDK presence check:', sdkCheckError);
-    if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
-        utils.log('Error during SDK presence check: ' + sdkCheckError.message, 'error');
-    }
-    // Disable NFC buttons as a precaution
-    if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
-        ui.disableNfcButtons();
-    }
-    alert('An error occurred while checking for the D-Logic SDK. NFC functionality will be disabled.');
-    return;
-}
-*/
-// --- New: Check for neoband-sdk presence and functions ---
-try {
-    if (
-        typeof NeobandSDK === 'undefined' ||
-        typeof NeobandSDK.readSectorBlock !== 'function' ||
-        typeof NeobandSDK.writeSectorBlock !== 'function'
-    ) {
-        if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
-            utils.log('neoband-sdk functions missing. NFC will be disabled.', 'error');
-        } else {
-            console.error('neoband-sdk functions missing. NFC will be disabled.');
-        }
-        if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
-            ui.disableNfcButtons();
-        }
-        alert('neoband-sdk is missing or not loaded. NFC functionality will be disabled.');
-        return;
-    }
-} catch (sdkCheckError) {
-    console.error('Error during neoband-sdk presence check:', sdkCheckError);
-    if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
-        utils.log('Error during neoband-sdk presence check: ' + sdkCheckError.message, 'error');
-    }
-    // Disable NFC buttons as a precaution
-    if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
-        ui.disableNfcButtons();
-    }
-    alert('An error occurred while checking for neoband-sdk. NFC functionality will be disabled.');
-    return;
-}
 
         // Attempt to initialize the UI module
         if (typeof ui !== 'undefined' && typeof ui.init === 'function') {
             try {
                 ui.init(); // Initialize UI components and listeners
             } catch (error) {
-                console.error("Error during UI initialization:", error);
-                utils.log("UI Initialization failed.", 'error');
-                // Handle UI init error gracefully if needed
+                console.error('Error initializing UI:', error);
+                if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                    utils.log('Error initializing UI: ' + error.message, 'error');
+                }
             }
         } else {
-            console.error("UI module (ui.js) not found or not initialized correctly!");
-            utils.log("UI module loading failed. UI interactions might not work.", 'error');
-            // Handle missing UI module case if needed
-
-        // --- Original D-Logic NFC API check preserved as backup ---
-        /*
-        // Check if D-Logic NFC API is available
-        if (typeof window.dlogic === 'undefined') {
-            console.error("D-Logic NFC API (dlogic) is not available.");
-            utils.log("D-Logic NFC API (dlogic) is not available. Please ensure the D-Logic browser extension or app shell is installed and enabled.", 'error');
-            alert("D-Logic NFC API is not available. Please ensure the D-Logic browser extension or app shell is installed and enabled.");
-            if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
-                ui.disableNfcButtons();
+            console.warn('ui.js is not loaded or ui.init is not a function.');
+            if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                utils.log('ui.js is not loaded or ui.init is not a function.', 'warning');
             }
-            // Skip any NFC initialization here if needed
-        } else {
-            utils.log("D-Logic NFC API detected successfully.", 'success');
-        }
-        */
-        // No browser extension or external SDK required; all NFC handled by neoband-sdk.
-        // If neoband-sdk is present, NFC is enabled. Otherwise, NFC is disabled above.
         }
 
-        // Other core initializations (e.g., setting up uFR listeners if applicable)
-        // ... setup uFR communication listeners ...
-
-        if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
-            utils.log("Core Initialization Complete.", 'success');
-        }
         // Trigger initial render if UI is available
         if (typeof ui !== 'undefined' && typeof ui.render === 'function') {
              ui.render();

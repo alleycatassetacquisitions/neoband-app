@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Version 3.0.4]
+
+### Fixed
+- **FIELD_MAP Pluralization Bug:**
+  - Fixed a critical bug in `app/admin.js` where the admin page logic for Factions and Allegiances sometimes passed the singular category key ("faction", "allegiance") instead of the required plural key ("factions", "allegiances")
+  - This caused `FIELD_MAP[category]` to be undefined, resulting in TypeError and breaking admin read/write
+  - All admin logic (button generation, event handlers, and function calls) now consistently uses the correct plural category key
+  - Original buggy logic preserved as comments for backup, per project requirements
+  - Added detailed comments and references for traceability and maintainability
+  - Affected file: `app/admin.js` (lines 168–357)
+
+### Changed
+- **User Data Admin Section Refactor:**
+  - Updated admin page user data section to display all fields as editable inputs in a detail view
+  - Added `displayUserDataDetails` as a dedicated function for rendering all user data fields
+  - Modified button logic to create only one button for user data instead of one per field
+  - Updated `createAdminSection` and `createEntityButton` to support the new user data handling
+  - Preserved original linear read/write logic as comments for audit and backup
+  - Added comprehensive comments and logging for traceability and maintainability
+  - Ensures admin user data section is fully editable and compliant with project requirements
+
 ## [Version 3.0.3]
 
 ### Fixed

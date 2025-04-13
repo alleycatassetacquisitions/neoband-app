@@ -1,48 +1,15 @@
 /**
- * @file utils.js
- * @description Utility Functions and Data Conversion
+ * utils.js
+ * Utility functions for the Neoband App (hex conversion, padding, delays, logging, address calculations).
  * 
- * This module provides utility functions for:
- * 1. Data conversion between text and hex formats
- * 2. Logging and debugging
- * 3. Memory address calculations
- * 4. Error handling and validation
- * 
- * Data Conversion:
- * - Text to Hex: Converts text data to MIFARE-compatible hex format
- * - Hex to Text: Converts hex data back to readable text
- * - Padding: Handles FF padding for MIFARE blocks
- * 
- * Memory Addressing:
- * 1. Linear to Sector/Block:
- *    - Converts absolute block numbers to sector/block pairs
- *    - Handles different sector sizes (4 vs 16 blocks)
- *    - Validates address bounds
- * 
- * 2. Sector/Block to Linear:
- *    - Converts sector/block pairs to absolute block numbers
- *    - Accounts for sector trailer blocks
- *    - Validates input ranges
- * 
- * Logging System:
- * - Debug: Detailed operation information
- * - Info: Normal operation events
- * - Warning: Non-critical issues
- * - Error: Critical problems
- * 
- * Validation Functions:
- * - Input validation for all operations
- * - Address range checking
- * - Data format verification
- * 
- * @version 3.0.3
- * @lastUpdated 2025-04-11
+ * This file provides essential utility functions including:
+ * - MIFARE address calculations and validation
+ * - Text-to-hex and hex-to-text conversions for NFC data
+ * - Hex padding and formatting utilities
+ * - Logging infrastructure
+ * - Timeout and delay management for NFC operations
  */
 
-/**
- * Utility functions module
- * @namespace
- */
 const utils = {
     /**
      * Constants defining the physical limitations of MIFARE Classic 4K tags.
@@ -89,11 +56,13 @@ const utils = {
             result.blockInSector = logicalAddress % 4;
             result.isTrailerBlock = (result.blockInSector === 3);
         }
-        // Sectors 32-39: 16 blocks each (128-255)
+        // Sectors 32-39: 16 blocks each (128-255), but only 0-14 are usable
         else {
             const largeBlockOffset = logicalAddress - 128;
             result.sector = 32 + Math.floor(largeBlockOffset / 16);
             result.blockInSector = largeBlockOffset % 16;
+            // Block 15 is a trailer block, but we're treating it as unusable
+            // This ensures consistency with validateSectorBlockMapping
             result.isTrailerBlock = (result.blockInSector === 15);
         }
         return result;
@@ -122,10 +91,14 @@ const utils = {
             sector = Math.floor(linearBlock / 4);
             block = linearBlock % 4;
         } else {
-            // Large sectors: 16 blocks each
+            // Large sectors: 16 blocks each, but only 0-14 are usable
             const largeBlockOffset = linearBlock - 128;
             sector = 32 + Math.floor(largeBlockOffset / 16);
             block = largeBlockOffset % 16;
+            // Ensure block is within valid range (0-14) for sectors 32-39
+            if (block > 14) {
+                utils.log(`Warning: Block ${block} in sector ${sector} exceeds valid range (0-14)`, 'warning');
+            }
         }
         
         return { sector, block };
@@ -157,8 +130,8 @@ const utils = {
                 }
                 calculatedLinearBlock = (sector * 4) + block;
             } else {
-                // Large sectors: blocks 0-15 only
-                if (block < 0 || block > 15) {
+                // Large sectors: blocks 0-14 only (block 15 is not usable)
+                if (block < 0 || block > 14) {
                     return false;
                 }
                 calculatedLinearBlock = 128 + ((sector - 32) * 16) + block;
@@ -198,9 +171,13 @@ const utils = {
                   utils.log("ERROR: 'core' or 'core.RESERVED_SECTORS' is undefined in utils.isValidDataBlock(). Assuming reserved sector.", 'error');
                   return false; // Fail safe: treat as reserved/invalid
               }
-              // Original logic preserved for reference:
-              // if (core.RESERVED_SECTORS.has(addrInfo.sector)) { return false; }
-              if (core.RESERVED_SECTORS.has(addrInfo.sector)) {
+              // Check if sector is in the reserved set, but make an exception for sector 39
+              // which is used for username storage
+              if (core.RESERVED_SECTORS.has(addrInfo.sector) && addrInfo.sector !== 39) {
+                  return false;
+              }
+              // For sectors 32-39, only blocks 0-14 are usable (block 15 is a trailer block)
+              if (addrInfo.sector >= 32 && addrInfo.sector <= 39 && addrInfo.blockInSector > 14) {
                   return false;
               }
               // Trailer blocks - not usable for general data, especially writes
@@ -584,4 +561,4 @@ hexToBytes: function(hexStr){
 bytesToHex: function(byteArray){
     return Array.from(byteArray).map(b => ('0'+b.toString(16)).slice(-2)).join('').toUpperCase();
 },
-}; 
+};

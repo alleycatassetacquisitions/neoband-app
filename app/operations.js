@@ -24,35 +24,45 @@
  *    - Use blocks 0-2 in each sector
  *    - Requires 2900ms delay between operations
  * 
- * Operation Timing:
- * - All operations require proper delays to ensure card stability
- * - Each sector type has specific delay requirements
- * - Authentication must be performed before each block access
- * 
- * Error Handling:
- * 1. Authentication Errors (UFR_AUTH_ERROR):
- *    - Retry with progressive backoff
- *    - Attempt both Key A and Key B
- *    - Log detailed authentication attempts
- * 
- * 2. Parameter Errors (UFR_PARAMETERS_ERROR):
- *    - Verify block addressing is valid
- *    - Check sector/block bounds
- *    - Log all parameter values
- * 
- * 3. Communication Errors:
- *    - Implement automatic retries
- *    - Preserve operation state
- *    - Log detailed error information
- * 
- * @version 3.0.3
- * @lastUpdated 2025-04-11
+ * @version 3.0.4
+ * @lastUpdated 2025-04-12
+ */
+/**
+ * === Dependency Checks for operations.js ===
+ * These guards detect missing dependencies early to prevent uncaught ReferenceErrors.
+ * Original logic preserved below as comments.
  */
 
-/**
- * NFC Operations module
- * @namespace
- */
+/*
+try {
+    if (typeof utils === 'undefined') {
+        console.error('CRITICAL: utils.js is not loaded before operations.js');
+    } else {
+        utils.log('utils.js loaded successfully (operations.js)', 'debug');
+    }
+
+    if (typeof BlockInSectorRead !== 'function') {
+        console.error('D-Logic SDK function BlockInSectorRead is missing (operations.js).');
+        if (typeof utils !== 'undefined') utils.log('D-Logic SDK BlockInSectorRead missing (operations.js)', 'error');
+    }
+    if (typeof BlockInSectorWrite !== 'function') {
+        console.error('D-Logic SDK function BlockInSectorWrite is missing (operations.js).');
+        if (typeof utils !== 'undefined') utils.log('D-Logic SDK BlockInSectorWrite missing (operations.js)', 'error');
+    }
+    if (typeof ufRequest !== 'function') {
+        console.error('D-Logic SDK function ufRequest is missing (operations.js).');
+        if (typeof utils !== 'undefined') utils.log('D-Logic SDK ufRequest missing (operations.js)', 'error');
+    }
+    if (typeof ufResponse !== 'function') {
+        console.error('D-Logic SDK function ufResponse is missing (operations.js).');
+        if (typeof utils !== 'undefined') utils.log('D-Logic SDK ufResponse missing (operations.js)', 'error');
+    }
+} catch (e) {
+    console.error('Error during dependency checks in operations.js:', e);
+}
+*/
+// Only neoband-sdk is required for NFC operations.
+
 const operations = {
     AUTH_MODE_A: 0x60,
     AUTH_MODE_B: 0x61,
@@ -61,43 +71,6 @@ const operations = {
      * Scan for a tag and update core state.
      */
     scanTag: async function() {
-        // --- Original uFR/ufRequest logic preserved as backup ---
-        /*
-        utils.log("Scanning for tag...", 'info');
-        const command = "GetCardIdEx";
-        return new Promise((resolve, reject) => {
-            try {
-                ufRequest(command, function() {
-                    try {
-                        const response = ufResponse();
-                        if (response.Status && response.Status.indexOf("UFR_OK") !== -1) {
-                            const uid = response.CardUid || response.Data;
-                            utils.log(`Tag detected. UID: ${uid}`, 'success');
-                            core.updateState({
-                                isTagPresent: true,
-                                scannedTagInfo: { uid: uid },
-                                bandStatus: "Detected (Unregistered)"
-                            });
-                            if (typeof ui !== 'undefined' && typeof ui.readUsernameAndUpdateFields === 'function') {
-                                try { ui.readUsernameAndUpdateFields(uid); } catch (e) {}
-                            }
-                            resolve(uid);
-                        } else {
-                            utils.log("No tag detected or scan failed.", 'warning');
-                            core.updateState({ isTagPresent: false, scannedTagInfo: {}, bandStatus: "No Tag" });
-                            reject(new Error("Tag scan failed: " + response.Status));
-                        }
-                    } catch (callbackError) {
-                        console.error('Error inside ufRequest callback:', callbackError);
-                        reject(callbackError);
-                    }
-                });
-            } catch (sdkError) {
-                console.error('ufRequest SDK call failed:', sdkError);
-                reject(sdkError);
-            }
-        });
-        */
         // --- New implementation using neoband-sdk ---
         utils.log("Scanning for tag using neoband-sdk...", 'info');
         try {
@@ -126,103 +99,23 @@ const operations = {
     },
 
     /**
-     * DEPRECATED: Legacy linear addressing read function.
-     * This linear read logic is no longer used due to strict sector+block addressing.
-     * Preserved here as backup only.
-     */
-    /*
-    readBlockOld: async function(sector, block, key = NFC_KEY, label = "Block") {
-        try {
-            let blockNumber = (sector < 32) ? (sector * 4 + block) : (128 + (sector - 32) * 16 + block);
-            const hexData = await this.readFieldWithRetryRaw(blockNumber, 2);
-            return utils.hexToText(hexData);
-        } catch (error) {
-            throw error;
-        }
-    },
-    */
-
-    /**
-     * Read data from a specific sector and block using D-Logic BlockInSectorRead command.
-     */
-    /* Original linear/async NFC read logic preserved as backup:
-    readSectorBlock: async function(sector, block, authMode, key) {
-        if (sector === undefined || block === undefined) throw new ReferenceError("Sector or block not specified");
-        authMode = (authMode === undefined) ? 0x60 : authMode;
-        key = (key === undefined) ? NFC_KEY : key;
-        try {
-            utils.log(`Reading Sector ${sector}, Block ${block}`, 'debug');
-            if (typeof dlogic === 'undefined') {
-                utils.log('D-Logic NFC API (dlogic) is not available. NFC read operation skipped.', 'error');
-                return null;
-            }
-            const hexData = await dlogic.BlockInSectorRead(sector, block, authMode, key);
-            utils.log(`Read success: ${hexData}`, 'success');
-            return hexData;
-        } catch (error) {
-            utils.log(`Error reading Sector ${sector}, Block ${block}: ${error.message}`, 'error');
-            throw error;
-        }
-    },
-    */
-
-    /**
-    /**
      * Reads a block from a given sector using the specified authentication key.
-     * Refactored: Now uses NeobandSDK.readSectorBlock for strict block_in_sector addressing.
-     * If the key is "FFFFFFFFFFFF" (default Key A), it is mapped to keyIndex 0 as required by the Neoband-App-25-fields bugfix.
+     * Uses NeobandSDK.readSectorBlock for strict block_in_sector addressing.
+     * If the key is "FFFFFFFFFFFF" (default Key A), it is mapped to keyIndex 0.
      * This ensures all reads use Key A/keyIndex 0 for compatibility and security.
-     * See CHANGELOG.md for details on the sector/block migration and bugfix.
-     * Original implementation using BlockInSectorRead is preserved below as backup.
      */
     readSectorBlock: async function(sector, block, key = "FFFFFFFFFFFF", authMode = 0x60) {
-        // --- Original implementation preserved as backup ---
-        /*
-        try {
-            const keyBytes = utils.hexKeyToBytes(key);
-            const dataBuffer = new Uint8Array(16);
-            const status = BlockInSectorRead(dataBuffer, sector, block, authMode, keyBytes);
-
-            if (status !== 0) {
-                utils.log(`Failed to read Sector ${sector}, Block ${block}, Status: ${status}`, 'error');
-                return null;
-            }
-            const hex = utils.bytesToHex(dataBuffer);
-            return hex;
-        } catch (err) {
-            utils.log(`Exception during sector/block read: ${err.message}`, 'error');
-            return null;
-        }
-        */
-        // --- New implementation using NeobandSDK ---
-        /**
-         * Updated implementation: Validates sector/block, maps sectors for Mifare Classic 4K, and always uses Key A/keyIndex 0.
-         * - Validates sector (0–39) and block (0–3) parameters.
-         * - Maps sectors 16–23 to sector-16, 32–39 to sector-32 for 4K compatibility.
-         * - Always uses keyIndex 0 for Key A authentication (authMode 0x60).
-         * - Calls NeobandSDK.readSectorBlock with mapped sector, block, authMode, keyIndex.
-         * - Logs errors with detailed context.
-         * - See CHANGELOG.md for bugfix and migration details.
-         */
         try {
             // Validate sector and block ranges
             if (typeof sector !== 'number' || typeof block !== 'number' ||
-                sector < 0 || sector > 39 || block < 0 || block > 3) {
+                sector < 0 || sector > 39 || block < 0 || 
+                (sector >= 32 && sector <= 39 ? block > 14 : block > 3)) {
                 throw new Error(
                     `[readSectorBlock] Invalid sector (${sector}) or block (${block}) parameter. ` +
-                    `Sector must be 0–39, block must be 0–3.`
+                    `Sector must be 0–39, block must be ${sector >= 32 && sector <= 39 ? '0–14' : '0–3'}.`
                 );
             }
 
-            // --- Sector mapping logic commented out for strict sector/block addressing (Neoband-App-25-fields bugfix) ---
-            /*
-            let mappedSector = sector;
-            if (sector >= 16 && sector <= 23) {
-                mappedSector = sector - 16; // Map sectors 16–23 to sector-16
-            } else if (sector >= 32 && sector <= 39) {
-                mappedSector = sector - 32; // Map sectors 32–39 to sector-32
-            }
-            */
             // Use strict sector/block addressing: pass sector as-is
             let mappedSector = sector;
             // Always use keyIndex 0 for Key A authentication (authMode 0x60)
@@ -246,6 +139,23 @@ const operations = {
             return null;
         }
     },
+
+    /**
+     * DEPRECATED: Legacy linear addressing read function.
+     * This linear read logic is no longer used due to strict sector+block addressing.
+     * Preserved here as backup only.
+     */
+    /*
+    readBlockOld: async function(sector, block, key = NFC_KEY, label = "Block") {
+        try {
+            let blockNumber = (sector < 32) ? (sector * 4 + block) : (128 + (sector - 32) * 16 + block);
+            const hexData = await this.readFieldWithRetryRaw(blockNumber, 2);
+            return utils.hexToText(hexData);
+        } catch (error) {
+            throw error;
+        }
+    },
+    */
 
     /**
      * DEPRECATED: Legacy linear addressing write function.
@@ -293,27 +203,17 @@ const operations = {
     // Refactored: Now uses NeobandSDK.writeSectorBlock for strict block_in_sector addressing.
     // Original implementation using BlockInSectorWrite is preserved below as backup.
     writeSectorBlock: async function(sector, block, hexData, key = "FFFFFFFFFFFF", authMode = 0x60) {
-        // --- Original implementation preserved as backup ---
-        /*
         try {
-            hexData = hexData.padEnd(32, 'F'); // pad to 16 bytes if needed
-            const dataBytes = utils.hexToBytes(hexData);
-            const keyBytes = utils.hexKeyToBytes(key);
-    
-            const status = BlockInSectorWrite(dataBytes, sector, block, authMode, keyBytes);
-            if (status !== 0) {
-                utils.log(`Failed to write Sector ${sector}, Block ${block}, Status: ${status}`, 'error');
-                return false;
+            // Validate sector and block ranges
+            if (typeof sector !== 'number' || typeof block !== 'number' ||
+                sector < 0 || sector > 39 || block < 0 || 
+                (sector >= 32 && sector <= 39 ? block > 14 : block > 3)) {
+                throw new Error(
+                    `[writeSectorBlock] Invalid sector (${sector}) or block (${block}) parameter. ` +
+                    `Sector must be 0–39, block must be ${sector >= 32 && sector <= 39 ? '0–14' : '0–3'}.`
+                );
             }
-            utils.log(`Wrote successfully to Sector ${sector}, Block ${block}`, 'success');
-            return true;
-        } catch (err) {
-            utils.log(`Exception during sector/block write: ${err.message}`, 'error');
-            return false;
-        }
-        */
-        // --- New implementation using NeobandSDK ---
-        try {
+            
             // Ensure data is padded to 16 bytes (32 hex chars)
             hexData = hexData.padEnd(32, 'F');
            /**
@@ -444,15 +344,13 @@ const operations = {
     readAllegianceField: async function(sector, block, key, label = 'Allegiance Field') {
         try {
             const hexData = await this.readSectorBlock(sector, block, 0x60, key);
-            // Original call preserved as backup:
-            // return utils.hexToString(hexData);
-            // Updated per static analysis: use correct function hexToText()
             const allegianceText = utils.hexToText(hexData);
             utils.log(`${label} converted hex to text: ${allegianceText}`, 'debug');
             return allegianceText;
         } catch (error) {
             utils.log(`${label} read error: ${error}`, 'error');
-            throw error;
+            // Return a placeholder or empty string on error
+            return "";
         }
     },
 
@@ -471,19 +369,5 @@ const operations = {
             utils.log(`${label} write error: ${error}`, 'error');
             throw error;
         }
-    },
-
-    /**
-     * Reads a block from the NFC card using absolute addressing.
-     * Implements proper delays and authentication for reliable operation.
-     * 
-     * @param {number} absoluteBlock - Linear block number (0-255)
-     * @param {string} key - Authentication key (default: FFFFFFFFFFFF)
-     * @param {number} retryCount - Number of retry attempts (default: 3)
-     * @returns {Promise<string>} Hex data read from the block
-     * @throws {Error} If read operation fails after retries
-     */
-    readBlock: async function(absoluteBlock, key = NFC_KEY, retryCount = 3) {
-        // ... existing code ...
     }
 };

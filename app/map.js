@@ -26,21 +26,27 @@
  * Authentication:
  * - All operations use the same authentication key (FFFFFFFFFFFF)
  * - Each block requires fresh authentication before access
- * - Proper delays are crucial between operations (see core.js)
  * 
- * @version 3.0.3
- * @lastUpdated 2025-04-11
+ * @version 3.0.4
+ * @lastUpdated 2025-04-12
  */
 
 // Global authentication key used for all sectors
 const NFC_KEY = "FFFFFFFFFFFF";
 
 /**
- * FIELD_MAP restored and updated [2025-04-11]:
- * - Full restoration from old-map.js: all 30 factions and 3 allegiances, with correct sector/block/key addressing and metadata.
- * - All field objects now include both "sector" and "block" properties for compatibility with neoband-sdk.js and recent fixes.
- * - All comments, validation, and structure preserved per project requirements.
- * - See CHANGELOG.md for details.
+ * FIELD_MAP defines the complete memory layout for all factions, allegiances,
+ * and user data. Each field includes:
+ * 
+ * @property {string} name - Display name for the faction/allegiance
+ * @property {number} sector - MIFARE sector number (0-39)
+ * @property {Object} fields - Collection of data fields for this faction/allegiance
+ * @property {Object} fields.fieldN - Individual field definition
+ * @property {string} fields.fieldN.title - Display title for the field
+ * @property {string} fields.fieldN.placeholder - Input placeholder text
+ * @property {number} fields.fieldN.sector - MIFARE sector number for this field
+ * @property {number} fields.fieldN.block - Block number within the sector (0-2)
+ * @property {string} fields.fieldN.key - Authentication key for this block
  */
 const FIELD_MAP = {
   factions: {
@@ -358,7 +364,7 @@ const FIELD_MAP = {
         field13: { title: "Allegiance #2 Field 13", placeholder: "Allegiance #2 Field 13 Placeholder", sector: 37, block: 12, key: NFC_KEY },
         field14: { title: "Allegiance #2 Field 14", placeholder: "Allegiance #2 Field 14 Placeholder", sector: 37, block: 13, key: NFC_KEY },
         field15: { title: "Allegiance #2 Field 15", placeholder: "Allegiance #2 Field 15 Placeholder", sector: 37, block: 14, key: NFC_KEY }
-      } // Closing brace added here
+      }
     },
     allegiance3: {
       name: "The Resistance",
@@ -380,9 +386,10 @@ const FIELD_MAP = {
         field14: { title: "Allegiance #3 Field 14", placeholder: "Allegiance #3 Field 14 Placeholder", sector: 38, block: 13, key: NFC_KEY },
         field15: { title: "Allegiance #3 Field 15", placeholder: "Allegiance #3 Field 15 Placeholder", sector: 38, block: 14, key: NFC_KEY }
       }
-    },
+    }
+  },
     user: {
-      name: "User",
+      name: "User Data",
       sector: 39,
       fields: {
         field1: { title: "Username", placeholder: "Enter Username", sector: 39, block: 0, key: NFC_KEY },
@@ -400,8 +407,6 @@ const FIELD_MAP = {
         field13: { title: "User Field 13", placeholder: "User Field 13 Placeholder", sector: 39, block: 12, key: NFC_KEY },
         field14: { title: "User Field 14", placeholder: "User Field 14 Placeholder", sector: 39, block: 13, key: NFC_KEY },
         field15: { title: "User Field 15", placeholder: "User Field 15 Placeholder", sector: 39, block: 14, key: NFC_KEY },
-        field16: { title: "User Field 16", placeholder: "User Field 16 Placeholder", sector: 39, block: 15, key: NFC_KEY }
       }
     }
-  }
-}
+  };

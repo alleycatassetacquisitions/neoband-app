@@ -1,14 +1,55 @@
 /**
- * core.js
- * Main application logic, state management, memory map definition, and initialization for the Neoband App.
+ * @file core.js
+ * @description Core Application Logic and State Management
  * 
- * This file provides the central functionality for the Neoband App, including:
- * - Application state management and initialization
- * - Constants and configuration for NFC operations
- * - Interface with memory map defined in map.js
- * - Tag state tracking and management
- * - Operation status tracking
+ * This module serves as the central controller for the Neoband App, managing:
+ * 1. Application state and UI synchronization
+ * 2. NFC operation timing and coordination
+ * 3. Error handling and recovery
+ * 4. Cross-component communication
+ * 
+ * @version 3.0.4
+ * @lastUpdated 2025-04-12
  */
+/**
+ * === Dependency Checks for core.js ===
+ * These guards detect missing dependencies early to prevent uncaught ReferenceErrors.
+ */
+
+try {
+    if (typeof utils === 'undefined') {
+        console.error('CRITICAL: utils.js is not loaded before core.js');
+    } else {
+        utils.log('utils.js loaded successfully.', 'debug');
+    }
+
+    if (typeof FIELD_MAP === 'undefined') {
+        console.error('CRITICAL: FIELD_MAP is not defined. map.js may be missing.');
+        if (typeof utils !== 'undefined') utils.log('FIELD_MAP missing.', 'error');
+    } else {
+        if (typeof utils !== 'undefined') utils.log('FIELD_MAP loaded successfully.', 'debug');
+    }
+
+    if (typeof operations === 'undefined') {
+        console.error('CRITICAL: operations.js is not loaded before core.js');
+        if (typeof utils !== 'undefined') utils.log('operations.js missing.', 'error');
+    } else {
+        if (typeof utils !== 'undefined') utils.log('operations.js loaded successfully.', 'debug');
+    }
+
+    // The check for ui.js must be deferred until after all scripts are loaded.
+    // This warning is expected at initial load and does not indicate an error.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof ui === 'undefined') {
+            console.error('CRITICAL: ui.js is missing after DOMContentLoaded.');
+            if (typeof utils !== 'undefined') utils.log('ui.js missing after DOMContentLoaded.', 'error');
+        } else {
+            if (typeof utils !== 'undefined') utils.log('ui.js loaded successfully.', 'debug');
+        }
+    });
+} catch (e) {
+    console.error('Error during dependency checks in core.js:', e);
+}
 
 const core = {
     // --- Application State ---
@@ -78,9 +119,6 @@ const core = {
         default: 100
     },
 
-    // --- MEMORY MAP is now defined externally in map.js as FIELD_MAP ---
-    // MEMORY_MAP: { ... removed ... },
-
     /**
      * Initializes the core application logic.
      * This function is called when the DOM is fully loaded and:
@@ -93,23 +131,56 @@ const core = {
      * @returns {void}
      */
     init: function() {
-        utils.log("Rival App Core Initializing...", 'info');
+        if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+            utils.log("Rival App Core Initializing...", 'info');
+        } else {
+            console.log("Rival App Core Initializing...");
+        }
 
         // Check if FIELD_MAP from map.js is loaded
         if (typeof FIELD_MAP === 'undefined') {
             console.error("CRITICAL ERROR: FIELD_MAP is not defined. Ensure map.js is loaded before core.js.");
-            utils.log("FIELD_MAP loading failed. Application might not function correctly.", 'error');
+            if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                utils.log("FIELD_MAP loading failed. Application might not function correctly.", 'error');
+            }
             // Optionally, display a user-facing error and halt further initialization
             // ui.showFatalError("Application configuration failed to load.");
             return; // Stop initialization if map is missing
         } else {
-             // Optional: You could still run the validation from map.js here if desired
-             // if (typeof validateFieldMap === 'function') {
-             //     validateFieldMap(); // Run validation defined in map.js
-             // } else {
-             //     console.warn("validateFieldMap function not found. Skipping map validation.");
-             // }
-             utils.log("FIELD_MAP loaded successfully.", 'success');
+             if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                 utils.log("FIELD_MAP loaded successfully.", 'success');
+             }
+        }
+
+        // --- Check for neoband-sdk presence and functions ---
+        try {
+            if (
+                typeof NeobandSDK === 'undefined' ||
+                typeof NeobandSDK.readSectorBlock !== 'function' ||
+                typeof NeobandSDK.writeSectorBlock !== 'function'
+            ) {
+                if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                    utils.log('neoband-sdk functions missing. NFC will be disabled.', 'error');
+                } else {
+                    console.error('neoband-sdk functions missing. NFC will be disabled.');
+                }
+                if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
+                    ui.disableNfcButtons();
+                }
+                alert('neoband-sdk is missing or not loaded. NFC functionality will be disabled.');
+                return;
+            }
+        } catch (sdkCheckError) {
+            console.error('Error during neoband-sdk presence check:', sdkCheckError);
+            if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                utils.log('Error during neoband-sdk presence check: ' + sdkCheckError.message, 'error');
+            }
+            // Disable NFC buttons as a precaution
+            if (typeof ui !== 'undefined' && typeof ui.disableNfcButtons === 'function') {
+                ui.disableNfcButtons();
+            }
+            alert('An error occurred while checking for neoband-sdk. NFC functionality will be disabled.');
+            return;
         }
 
         // Attempt to initialize the UI module
@@ -117,20 +188,18 @@ const core = {
             try {
                 ui.init(); // Initialize UI components and listeners
             } catch (error) {
-                console.error("Error during UI initialization:", error);
-                utils.log("UI Initialization failed.", 'error');
-                // Handle UI init error gracefully if needed
+                console.error('Error initializing UI:', error);
+                if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                    utils.log('Error initializing UI: ' + error.message, 'error');
+                }
             }
         } else {
-            console.error("UI module (ui.js) not found or not initialized correctly!");
-            utils.log("UI module loading failed. UI interactions might not work.", 'error');
-            // Handle missing UI module case if needed
+            console.warn('ui.js is not loaded or ui.init is not a function.');
+            if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+                utils.log('ui.js is not loaded or ui.init is not a function.', 'warning');
+            }
         }
 
-        // Other core initializations (e.g., setting up uFR listeners if applicable)
-        // ... setup uFR communication listeners ...
-
-        utils.log("Core Initialization Complete.", 'success');
         // Trigger initial render if UI is available
         if (typeof ui !== 'undefined' && typeof ui.render === 'function') {
              ui.render();
@@ -234,7 +303,24 @@ const core = {
  * 3. Core init() is called, which then initializes UI and other components
  */
 document.addEventListener('DOMContentLoaded', () => {
-    utils.log("DOM fully loaded and parsed.", 'debug');
-    utils.initLogger(); // Initialize logger after DOM is ready
-    core.init();
+    if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+        utils.log("DOM fully loaded and parsed.", 'debug');
+    } else {
+        console.warn('utils.log is not available.');
+    }
+
+    if (typeof utils !== 'undefined' && typeof utils.initLogger === 'function') {
+        utils.initLogger(); // Initialize logger after DOM is ready
+    } else {
+        console.warn('utils.initLogger is not available.');
+    }
+
+    try {
+        core.init();
+    } catch (error) {
+        console.error('Error during core.init():', error);
+        if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
+            utils.log(`Error during core.init(): ${error.message}`, 'error');
+        }
+    }
 });

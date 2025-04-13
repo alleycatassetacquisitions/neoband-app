@@ -56,14 +56,92 @@ const utils = {
             result.blockInSector = logicalAddress % 4;
             result.isTrailerBlock = (result.blockInSector === 3);
         }
-        // Sectors 32-39: 16 blocks each (128-255)
+        // Sectors 32-39: 16 blocks each (128-255), but only 0-14 are usable
         else {
             const largeBlockOffset = logicalAddress - 128;
             result.sector = 32 + Math.floor(largeBlockOffset / 16);
             result.blockInSector = largeBlockOffset % 16;
+            // Block 15 is a trailer block, but we're treating it as unusable
+            // This ensures consistency with validateSectorBlockMapping
             result.isTrailerBlock = (result.blockInSector === 15);
         }
         return result;
+    },
+
+    /**
+     * Converts a linear block number to sector and block coordinates within that sector.
+     * This is the reverse operation of the linear block calculation.
+     * 
+     * @param {number} linearBlock - The linear block address (0-255)
+     * @returns {Object} An object with sector and block properties
+     * @throws {RangeError} If the linear block number is invalid
+     */
+    reverseLinearToSectorBlock: function(linearBlock) {
+        // Ensure we have a valid number
+        linearBlock = parseInt(linearBlock);
+        if (isNaN(linearBlock) || linearBlock < 0 || linearBlock > this.MAX_BLOCK_ADDRESS) {
+            throw new RangeError('Invalid linear block address: ' + linearBlock);
+        }
+        
+        let sector, block;
+        
+        // Check if block is in the small sectors (0-31) or large sectors (32-39)
+        if (linearBlock < 128) {
+            // Small sectors: 4 blocks each
+            sector = Math.floor(linearBlock / 4);
+            block = linearBlock % 4;
+        } else {
+            // Large sectors: 16 blocks each, but only 0-14 are usable
+            const largeBlockOffset = linearBlock - 128;
+            sector = 32 + Math.floor(largeBlockOffset / 16);
+            block = largeBlockOffset % 16;
+            // Ensure block is within valid range (0-14) for sectors 32-39
+            if (block > 14) {
+                utils.log(`Warning: Block ${block} in sector ${sector} exceeds valid range (0-14)`, 'warning');
+            }
+        }
+        
+        return { sector, block };
+    },
+    
+    /**
+     * Validate if a sector/block combination maps to the expected linear block address.
+     * This function helps catch inconsistencies between sector/block addressing and linear addressing.
+     * 
+     * @param {number} sector - The sector number (0-39)
+     * @param {number} block - The block number within the sector
+     * @param {number} expectedLinearBlock - The expected linear block address
+     * @returns {boolean} True if the sector/block correctly maps to the expected linear address
+     */
+    validateSectorBlockMapping: function(sector, block, expectedLinearBlock) {
+        try {
+            // Calculate what the linear block should be
+            let calculatedLinearBlock;
+            
+            // Validate sector and block ranges
+            if (sector < 0 || sector > 39) {
+                return false;
+            }
+            
+            if (sector < 32) {
+                // Small sectors: blocks 0-3 only
+                if (block < 0 || block > 3) {
+                    return false;
+                }
+                calculatedLinearBlock = (sector * 4) + block;
+            } else {
+                // Large sectors: blocks 0-14 only (block 15 is not usable)
+                if (block < 0 || block > 14) {
+                    return false;
+                }
+                calculatedLinearBlock = 128 + ((sector - 32) * 16) + block;
+            }
+            
+            // Check if calculated linear block matches the expected one
+            return calculatedLinearBlock === parseInt(expectedLinearBlock);
+        } catch (e) {
+            return false; // Any error means validation failed
+        }
     },
 
     /**
@@ -88,7 +166,18 @@ const utils = {
                  return false;
              }
               // Reserved sectors - never usable
-              if (core.RESERVED_SECTORS.has(addrInfo.sector)) {
+              // Guard against undefined 'core' or 'core.RESERVED_SECTORS'
+              if (typeof core === 'undefined' || !core.RESERVED_SECTORS) {
+                  utils.log("ERROR: 'core' or 'core.RESERVED_SECTORS' is undefined in utils.isValidDataBlock(). Assuming reserved sector.", 'error');
+                  return false; // Fail safe: treat as reserved/invalid
+              }
+              // Check if sector is in the reserved set, but make an exception for sector 39
+              // which is used for username storage
+              if (core.RESERVED_SECTORS.has(addrInfo.sector) && addrInfo.sector !== 39) {
+                  return false;
+              }
+              // For sectors 32-39, only blocks 0-14 are usable (block 15 is a trailer block)
+              if (addrInfo.sector >= 32 && addrInfo.sector <= 39 && addrInfo.blockInSector > 14) {
                   return false;
               }
               // Trailer blocks - not usable for general data, especially writes
@@ -287,9 +376,13 @@ const utils = {
      * Initializes the logger by getting the log display element.
      */
     initLogger: function() {
-        this.logElement = document.getElementById('logDisplay');
-        if (!this.logElement) {
-            console.error("Log display element (#logDisplay) not found!");
+        try {
+            this.logElement = document.getElementById('logDisplay');
+            if (!this.logElement) {
+                console.error("Log display element (#logDisplay) not found!");
+            }
+        } catch (e) {
+            console.error("Error initializing logger:", e);
         }
     },
 
@@ -338,13 +431,17 @@ const utils = {
         }
 
         if (levelNum <= this.logLevelThreshold && this.logElement) {
-            const logEntry = document.createElement('div');
-            logEntry.style.color = color;
-             const timestamp = new Date().toLocaleTimeString();
-             logEntry.textContent = `[${timestamp}] [${prefix}] ${message}`;
-             this.logElement.appendChild(logEntry);
-             // Auto-scroll to the bottom
-             this.logElement.scrollTop = this.logElement.scrollHeight;
+            try {
+                const logEntry = document.createElement('div');
+                logEntry.style.color = color;
+                const timestamp = new Date().toLocaleTimeString();
+                logEntry.textContent = `[${timestamp}] [${prefix}] ${message}`;
+                this.logElement.appendChild(logEntry);
+                // Auto-scroll to the bottom
+                this.logElement.scrollTop = this.logElement.scrollHeight;
+            } catch (e) {
+                console.error("Error updating log display:", e);
+            }
         }
     },
 
@@ -356,5 +453,112 @@ const utils = {
             this.logElement.innerHTML = '';
             this.log("Log cleared.", 'info');
         }
+    },
+
+    /**
+     * Identifies inconsistencies between block address systems and provides corrected mappings.
+     * This utility function is used to help migrate data between different block addressing schemes
+     * and to detect potential issues with block addressing.
+     * 
+     * @param {Object} blockMap - Map of block addresses to check { "linearBlock": expectedSector, ... }
+     * @returns {Object} Report of inconsistencies with corrected mappings
+     */
+    detectBlockMappingIssues: function(blockMap) {
+        const report = {
+            validMappings: [],
+            invalidMappings: [],
+            correctedMappings: []
+        };
+        
+        for (const [linearBlock, expectedSector] of Object.entries(blockMap)) {
+            try {
+                const blockNum = parseInt(linearBlock);
+                const calculatedInfo = this.reverseLinearToSectorBlock(blockNum);
+                
+                if (calculatedInfo.sector === parseInt(expectedSector)) {
+                    report.validMappings.push({
+                        linearBlock: blockNum,
+                        sector: calculatedInfo.sector,
+                        block: calculatedInfo.block,
+                        status: 'valid'
+                    });
+                } else {
+                    report.invalidMappings.push({
+                        linearBlock: blockNum,
+                        expectedSector: parseInt(expectedSector),
+                        actualSector: calculatedInfo.sector,
+                        actualBlock: calculatedInfo.block,
+                        status: 'invalid'
+                    });
+                    
+                    // Calculate the correct linear block for the expected sector and same block
+                    let correctedLinearBlock;
+                    if (parseInt(expectedSector) < 32) {
+                        correctedLinearBlock = (parseInt(expectedSector) * 4) + calculatedInfo.block;
+                    } else {
+                        correctedLinearBlock = 128 + ((parseInt(expectedSector) - 32) * 16) + calculatedInfo.block;
+                    }
+                    
+                    report.correctedMappings.push({
+                        originalLinearBlock: blockNum,
+                        correctedLinearBlock: correctedLinearBlock,
+                        sector: parseInt(expectedSector),
+                        block: calculatedInfo.block
+                    });
+                }
+            } catch (error) {
+                this.log(`Error checking block mapping for ${linearBlock}: ${error.message}`, 'error');
+            }
+        }
+        
+        return report;
+    },
+/**
+ * Converts a 12-character hex key string (e.g., "FFFFFFFFFFFF") to a 6-byte Uint8Array.
+ * @param {string} hexStr - 12-character hex string representing the key.
+ * @returns {Uint8Array} 6-byte key array.
+ */
+hexKeyToBytes: function(hexStr) {
+    const result = new Uint8Array(6);
+    for(let i = 0; i < 6; i++){
+        const byteStr = hexStr.substr(i*2,2);
+        const byteVal = parseInt(byteStr, 16);
+        if (isNaN(byteVal)) {
+            utils.log(`Invalid hex byte '${byteStr}' in hexKeyToBytes() at position ${i}`, 'warning');
+            result[i] = 0; // Default to 0 on invalid byte
+        } else {
+            result[i] = byteVal;
+        }
     }
-}; 
+    return result;
+},
+
+/**
+ * Converts a hex string (any length) to a Uint8Array.
+ * @param {string} hexStr - Hex string.
+ * @returns {Uint8Array} Byte array.
+ */
+hexToBytes: function(hexStr){
+    const result = [];
+    for(let i=0; i<hexStr.length; i+=2){
+        const byteStr = hexStr.substr(i,2);
+        const byteVal = parseInt(byteStr, 16);
+        if (isNaN(byteVal)) {
+            utils.log(`Invalid hex byte '${byteStr}' in hexToBytes() at position ${i}`, 'warning');
+            result.push(0); // Default to 0 on invalid byte
+        } else {
+            result.push(byteVal);
+        }
+    }
+    return new Uint8Array(result);
+},
+
+/**
+ * Converts a byte array (Uint8Array) to a hex string (uppercase).
+ * @param {Uint8Array} byteArray - Byte array.
+ * @returns {string} Hex string.
+ */
+bytesToHex: function(byteArray){
+    return Array.from(byteArray).map(b => ('0'+b.toString(16)).slice(-2)).join('').toUpperCase();
+},
+};

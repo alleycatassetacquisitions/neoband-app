@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Version 3.0.5]
+
+### Added
+- **Admin Page: Server IP Settings Section**
+  - Added a new "Settings" section to the Admin page with a "Server IP" input field and a "Save" button.
+  - Allows users to enter and persist the backend server's IP address in localStorage.
+  - The current server IP is loaded from localStorage and displayed in the input field on page load.
+  - All API sync operations now use the configured server IP instead of a hardcoded value.
+  - UI feedback is provided on save (success or error).
+  - Affected files: `app/admin.js`, `app/operations.js`
+
+### Changed
+- **Dynamic Server IP for Sync**
+  - Refactored `syncFaction1DataToServer` in `app/operations.js` to use the server IP from localStorage via `getServerBaseUrl()`.
+  - Exposed `getServerBaseUrl` and `setServerBaseUrl` on the global window object for use by the admin UI.
+  - Improved logging for server IP changes and sync operations.
+
 ## [Version 3.0.4]
 
 ### Fixed

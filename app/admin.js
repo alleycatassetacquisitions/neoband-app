@@ -35,10 +35,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /**
  * Initializes the admin interface by building the UI components.
- * Creates a dynamic admin interface based on the FIELD_MAP structure,
- * organizing content by category (factions, allegiances, user data).
- * 
- * @returns {void}
+ *
+ * This function dynamically generates the Admin page UI, including:
+ *   - The Settings section for server IP configuration (see below)
+ *   - Faction, Allegiance, and User Data admin controls
+ *   - Sync Server button for manual sync enablement
+ *
+ * The Settings section allows the user to enter and save the backend server IP address.
+ * This value is stored in localStorage and used by all sync/API operations (see operations.js).
+ *
+ * The UI loads the current server IP from localStorage on page load, and updates it when the user clicks Save.
+ * All changes are logged for traceability. User feedback is provided for success/error.
  */
 function initializeAdminInterface() {
     const adminPage = document.getElementById('adminPage');
@@ -159,6 +166,58 @@ function initializeAdminInterface() {
     styleSheet.type = "text/css";
     styleSheet.innerText = adminStyles;
     document.head.appendChild(styleSheet);
+
+    // === SETTINGS SECTION: Server IP ===
+    // This section allows the user to configure the backend server IP address used for all sync/API operations.
+    // The value is stored in localStorage and accessed via operations.getServerBaseUrl/setServerBaseUrl.
+    // The input is pre-filled with the current value, and updates are saved on button click.
+    // This enables the app to work on any network or device without code changes.
+    const settingsSection = document.createElement('div');
+    settingsSection.className = 'admin-section';
+    settingsSection.style.marginBottom = '30px';
+    settingsSection.innerHTML = `
+        <h3>Settings</h3>
+        <div class="form-group">
+            <label for="server-ip-input">Server IP</label>
+            <input type="text" id="server-ip-input" class="input" placeholder="e.g. http://192.168.0.100:3000" style="width: 320px; max-width: 100%;" />
+        </div>
+        <button id="save-server-ip-btn" class="btn" style="margin-top: 10px;">Save</button>
+        <span id="server-ip-status" style="margin-left: 15px; color: var(--cyan);"></span>
+    `;
+    container.appendChild(settingsSection);
+
+    // Set initial value from localStorage (via operations.js)
+    setTimeout(() => {
+        const serverIpInput = document.getElementById('server-ip-input');
+        if (serverIpInput && typeof window.getServerBaseUrl === 'function') {
+            serverIpInput.value = window.getServerBaseUrl();
+        }
+    }, 0);
+
+    // Save button event: updates localStorage and logs the change
+    setTimeout(() => {
+        const saveBtn = document.getElementById('save-server-ip-btn');
+        const serverIpInput = document.getElementById('server-ip-input');
+        const statusSpan = document.getElementById('server-ip-status');
+        if (saveBtn && serverIpInput) {
+            saveBtn.onclick = function() {
+                const url = serverIpInput.value.trim();
+                if (!url) {
+                    statusSpan.textContent = 'Please enter a valid server URL.';
+                    statusSpan.style.color = 'var(--error-color)';
+                    return;
+                }
+                if (typeof window.setServerBaseUrl === 'function') {
+                    window.setServerBaseUrl(url);
+                    statusSpan.textContent = 'Saved!';
+                    statusSpan.style.color = 'var(--cyan)';
+                } else {
+                    statusSpan.textContent = 'Error: Unable to save.';
+                    statusSpan.style.color = 'var(--error-color)';
+                }
+            };
+        }
+    }, 0);
 
     // --- Create UI sections ---
     try {

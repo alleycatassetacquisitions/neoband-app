@@ -350,3 +350,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// NOTE: Server sync operations (e.g., triggered after tag scan or data update)
+// use operations.syncFaction1DataToServer, which sends data to the backend server
+// using the dynamic server IP set in the Admin page (stored in localStorage).
+// See admin.js and operations.js for configuration and logging details.

@@ -298,4 +298,67 @@ When modifying the application:
 - Follow the established memory mapping in map.js
 - Add comprehensive logging for any new operations
 - Test all NFC operations with actual MIFARE Classic 4K tags
-- Update the CHANGELOG.md file with any changes 
+- Update the CHANGELOG.md file with any changes
+
+## Server Integration & Dynamic Server IP
+
+### Setting the Server IP (Frontend)
+
+- The Neoband App allows you to configure the backend server IP address directly from the Admin page.
+- **To set the server IP:**
+  1. Navigate to the **Admin** page in the app.
+  2. In the **Settings** section at the top, enter your backend server's address (e.g., `http://192.168.0.42:3000`).
+  3. Click **Save**. The app will use this address for all sync/API operations.
+  4. The value is stored in your browser's localStorage and persists across sessions.
+- This makes the app compatible with any network or device IP configuration—no code changes are needed for different networks.
+
+### Backend Server Requirements
+
+- The backend server must accept requests from any frontend IP (since the frontend IP is set by the uFR device and may change).
+- **CORS (Cross-Origin Resource Sharing) must be enabled** on the backend.
+- For Hono (Node.js/Bun) servers, add the following to your main server file (e.g., `main.tsx`):
+
+```ts
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { nfcSync } from "./routes/api/nfc-sync";
+
+const app = new Hono();
+
+// Allow all origins (no hardcoded IP)
+app.use("*", cors({
+  origin: "*", // Accept requests from any frontend IP
+  allowMethods: ["POST", "OPTIONS"],
+  allowHeaders: ["Content-Type"],
+}));
+
+app.route("/", nfcSync);
+
+export default app;
+```
+
+- This will allow the browser app to POST to `/api/nfc-sync` from any device or network.
+- For production, consider restricting `origin` to trusted addresses or adding authentication as needed.
+
+### NFC Sync Endpoint Example
+
+**File:** `routes/api/nfc-sync.ts`
+```ts
+import { Hono } from "hono";
+
+export const nfcSync = new Hono();
+
+nfcSync.post("/api/nfc-sync", async (c) => {
+  const body = await c.req.json();
+  console.log("✅ NFC Data Received from App:", body);
+  // Store to DB, log, or trigger match
+  return c.json({ status: "received" });
+});
+```
+
+## Comments and Logging for New Features
+
+- All new code related to server IP settings and sync operations is thoroughly commented.
+- The Admin page's Settings section is dynamically generated and includes detailed inline comments for maintainability.
+- All server sync operations log the current server IP and payload for traceability.
+- Error handling and user feedback are provided for all server sync and settings operations. 

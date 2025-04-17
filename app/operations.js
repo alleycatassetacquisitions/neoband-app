@@ -380,6 +380,48 @@ const operations = {
         }
     },
     
+    /**
+     * === Server IP Configuration ===
+     *
+     * These functions manage the backend server IP address used for all sync/API operations.
+     * The server IP is set by the user in the Admin page Settings section and stored in localStorage.
+     * This allows the app to work on any network or device without code changes.
+     *
+     * - getServerBaseUrl: Returns the current server base URL from localStorage, or a default if unset.
+     * - setServerBaseUrl: Updates the server base URL in localStorage and logs the change.
+     *
+     * Usage:
+     *   - The Admin page UI calls setServerBaseUrl() when the user saves a new server IP.
+     *   - All sync operations call getServerBaseUrl() to determine where to send API requests.
+     */
+    getServerBaseUrl: function() {
+        // Retrieve the server base URL from localStorage, or use the default (localhost) if not set
+        return localStorage.getItem('serverBaseUrl') || 'http://localhost:3000';
+    },
+
+    setServerBaseUrl: function(url) {
+        // Save the server base URL to localStorage for persistent use across sessions
+        localStorage.setItem('serverBaseUrl', url);
+        utils.log(`[Settings] Server base URL set to: ${url}`, 'info');
+    },
+
+    /**
+     * syncFaction1DataToServer
+     *
+     * Sends the current state (username, allegiance, faction fields, etc.) to the backend server for syncing.
+     * The server URL is dynamically determined by getServerBaseUrl(), allowing for flexible network setups.
+     *
+     * - Constructs a payload from the current application state.
+     * - Logs the payload and the server URL for traceability.
+     * - Handles network errors and logs failures for debugging.
+     * - Provides user feedback via the log system.
+     *
+     * This function is called after any read or write operation that updates the relevant state.
+     *
+     * Error Handling:
+     *   - Catches and logs network/CORS errors (e.g., if the server is not running or CORS is not enabled).
+     *   - Does not block the UI or throw uncaught errors; all failures are logged for review.
+     */
     syncFaction1DataToServer: async function (uid) {
         const state = core.currentState;
 
@@ -390,11 +432,13 @@ const operations = {
         const field2 = state.field2;
         const field3 = state.field3;
 
+        // Determine the display name for the faction (default to 'Alleycat' if not found)
         let factionDisplay = 'Alleycat';
         if (typeof FIELD_MAP !== 'undefined' && FIELD_MAP.factions && FIELD_MAP.factions.faction1) {
             factionDisplay = FIELD_MAP.factions.faction1.title || 'Alleycat';
         }
 
+        // Construct the payload to send to the server
         const payload = {
             uid,
             timestamp: Date.now(),
@@ -406,15 +450,18 @@ const operations = {
             field3
         };
 
-        utils.log("[NFC Sync] Sending data to server: " + JSON.stringify(payload), "debug");
+        // Log the outgoing payload and server URL for debugging and traceability
+        utils.log(`[NFC Sync] Sending data to server (${this.getServerBaseUrl()}): ` + JSON.stringify(payload), "debug");
 
         try {
-            const response = await fetch("http://localhost:3000/api/nfc-sync", {
+            // Get the current server URL from localStorage (or default)
+            const serverUrl = this.getServerBaseUrl();
+            // Send the payload to the backend server's /api/nfc-sync endpoint
+            const response = await fetch(`${serverUrl}/api/nfc-sync`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
-
             utils.log(`[NFC Sync] Server responded with ${response.status}`, "info");
             if (response.ok) {
                 utils.log("✅ Synced NFC data with server (Alleycat only).", "success");
@@ -422,6 +469,7 @@ const operations = {
                 throw new Error("Server returned non-200 status");
             }
         } catch (err) {
+            // Log network or CORS errors for troubleshooting
             utils.log("[NFC Sync] Failed to sync data: " + err.message, "error");
         }
     },
@@ -447,3 +495,7 @@ const operations = {
         }
     }
 };
+
+// Expose config functions for admin.js
+window.getServerBaseUrl = operations.getServerBaseUrl;
+window.setServerBaseUrl = operations.setServerBaseUrl;

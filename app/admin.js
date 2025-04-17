@@ -247,6 +247,17 @@ function initializeAdminInterface() {
     
           container.appendChild(syncButton);
     
+          // Add Provision Card button (Admin Page)
+          const provisionButton = document.createElement('button');
+          provisionButton.id = 'admin-provision-card-btn'; // Unique ID for admin button
+          provisionButton.textContent = 'Provision Card (Format + Set Keys)';
+          provisionButton.className = 'btn btn-warning'; // Use warning style for potentially destructive action
+          provisionButton.style.marginTop = '20px';
+          provisionButton.style.marginLeft = '10px'; // Add some space from sync button
+          // Call the global handler function directly
+          provisionButton.onclick = window.handleGlobalProvisionCard; 
+          container.appendChild(provisionButton);
+    
           console.log("Admin Interface Initialized Successfully.");
     
     } catch (error) {
@@ -551,12 +562,11 @@ async function readAdminData(entityKey, category) {
             const block = parseInt(input.dataset.block);
             const key = input.dataset.key; // Key should be hex string
 
-            // Assume operations.readBlock exists and handles the uFR logic
-            // It needs sector, block (relative to sector), authMode, and key
-            // Using Key A (0x60) and the specific key from map.js by default
+            // Always use admin role for admin reads (default key is handled in operations.js)
             let data = null;
             if (typeof operations !== 'undefined' && typeof operations.readSectorBlock === 'function') {
-                data = await operations.readSectorBlock(sector, block, 0x60, key);
+                // Corrected: Reads are universal, no role needed.
+                data = await operations.readSectorBlock(sector, block);
             } else {
                 console.warn('operations.readSectorBlock is not available.');
             }
@@ -632,22 +642,45 @@ async function writeAdminData(entityKey, category) {
             const hexData = utils.textToHex(dataToWrite).padEnd(32, '0');
             utils.log(`Converted admin input text to hex: ${hexData}`, 'debug');
 
-            // Assume operations.writeBlock exists and handles the uFR logic
-            // It needs sector, block (relative), data (hex), authMode, key
-            let success = false;
-            if (typeof operations !== 'undefined' && typeof operations.writeSectorBlock === 'function') {
-                success = await operations.writeSectorBlock(sector, block, hexData, 0x60, key);
+            // Corrected: Determine target role based on sector and pass that role for writing.
+            let targetRole = null;
+            if (sector === 39) {
+                targetRole = 'staff'; // User data sector uses staff key
             } else {
-                console.warn('operations.writeSectorBlock is not available.');
+                // Find faction/allegiance associated with this sector
+                const findRole = (map) => Object.entries(map || {}).find(([, data]) => data.sector === sector)?.[0];
+                targetRole = findRole(FIELD_MAP.factions) || findRole(FIELD_MAP.allegiances);
             }
 
-            if (success) {
-                utils.log(`Write Success (Sector ${sector}, Block ${block}): ${dataToWrite}`); // Use utils namespace
-            } else {
-                utils.log(`Write Failed (Sector ${sector}, Block ${block})`, 'error'); // Use utils namespace
-                // Optionally stop writing on first failure
-                throw new Error(`Failed to write to Sector ${sector}, Block ${block}.`);
+            if (!targetRole) {
+                throw new Error(`Could not determine target role for writing to Sector ${sector}`);
             }
+
+            utils.log(`Admin writing to Sector ${sector} using target role: ${targetRole}`, 'debug');
+
+            // Fetch the actual hex key based on the determined role identifier (targetRole)
+            let targetKeyHex = null;
+            if (targetRole === 'staff') {
+                targetKeyHex = window.NEOBAND_KEYS?.staff?.user?.neokey;
+            } else if (window.NEOBAND_KEYS?.factions?.[targetRole]?.neoKey) {
+                targetKeyHex = window.NEOBAND_KEYS.factions[targetRole].neoKey;
+            } else if (window.NEOBAND_KEYS?.allegiances?.[targetRole]?.neoKey) {
+                targetKeyHex = window.NEOBAND_KEYS.allegiances[targetRole].neoKey;
+            }
+
+            if (!targetKeyHex) {
+                utils.log(`[writeAdminData] Could not determine target role/key for sector ${sector}.`, 'error');
+                throw new Error(`Cannot write to sector ${sector}: Unable to determine the associated faction, allegiance, or if it's the staff sector.`);
+            }
+
+            utils.log(`[writeAdminData] Determined target role: ${targetRole} for sector ${sector}. Attempting write...`, 'info');
+
+            utils.log(`[writeAdminData] Using key ${targetKeyHex} for target role ${targetRole} on sector ${sector}.`, 'debug');
+
+            // Pass the fetched keyHex to the modified writeSectorBlock
+            await operations.writeSectorBlock(sector, block, hexData, targetKeyHex);
+
+            utils.log(`[writeAdminData] Wrote ${hexData} to Sector ${sector}, Block ${block} successfully.`, 'success');
         }
         if (typeof ui !== 'undefined' && typeof ui.showVisualConfirmation === 'function') {
             ui.showVisualConfirmation("Write Complete", "Sector data written successfully.");

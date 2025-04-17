@@ -82,9 +82,10 @@ const ui = {
     init: function() {
         utils.log("UI Initializing...", 'info');
 
-        // NEW: Login/Logout Button Listeners
-        document.getElementById('login-btn')?.addEventListener('click', this.handleLogin.bind(this));
-        document.getElementById('logout-btn')?.addEventListener('click', this.handleLogout.bind(this));
+        //Login Page Button Listeners
+        document.getElementById('staff-login-btn')?.addEventListener('click', this.handleLogin);
+        document.getElementById('admin-login-btn')?.addEventListener('click', this.handleLogout);
+        document.getElementById('group-login-btn')?.addEventListener('click', this.handleReset);
 
         // Navigation Link Listeners
         document.getElementById('nav-login')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('loginPage'); });
@@ -98,6 +99,7 @@ const ui = {
         document.getElementById('reg-read-btn')?.addEventListener('click', this.handleRegRead);
         document.getElementById('reg-write-btn')?.addEventListener('click', this.handleRegWrite);
         document.getElementById('reg-reset-btn')?.addEventListener('click', this.handleRegReset);
+        document.getElementById('reg-provision-btn')?.addEventListener('click', window.handleGlobalProvisionCard);
 
         // Faction Page Button & Select Listeners
         document.getElementById('faction-select')?.addEventListener('change', this.handleFactionSelectChange);
@@ -110,8 +112,6 @@ const ui = {
         document.getElementById('allegiance-scan-btn')?.addEventListener('click', this.handleAllegianceScan);
         document.getElementById('allegiance-read-btn')?.addEventListener('click', this.handleAllegianceRead);
         document.getElementById('allegiance-write-btn')?.addEventListener('click', this.handleAllegianceWrite);
-        // Add listener for the new Assign Allegiance to User button
-        document.getElementById('allegiance-assign-user-btn')?.addEventListener('click', this.handleAllegianceAssignUser.bind(this));
 
         // Log Toggle Button Listener
         document.getElementById('log-toggle')?.addEventListener('click', this.toggleLogDisplay);
@@ -119,15 +119,16 @@ const ui = {
         // Visual Confirmation Button Listener
         document.getElementById('confirmButton')?.addEventListener('click', this.hideVisualConfirmation);
 
+
         // Populate dynamic dropdowns
-        this.populateLoginRoleSelect();
         this.populateFactionSelect();
         this.populateAllegianceSelect();
-        this.populateAllegianceAssignSelect();
+        this.populateAllegianceAssignSelect(); // Populate registration allegiance dropdown
+
 
         utils.log("UI Initialized.", 'success');
-        this.showPage(core.currentState.activePage || 'loginPage');
-        this.render();
+        this.showPage(core.currentState.activePage); // Show initial page
+        this.render(); // Initial render based on default state
     },
 
     /**
@@ -194,60 +195,6 @@ const ui = {
         ui.setButtonDisabled('allegiance-scan-btn', isOpRunning);
         ui.setButtonDisabled('allegiance-read-btn', isOpRunning);
         ui.setButtonDisabled('allegiance-write-btn', isOpRunning);
-
-        // --- Access Control Logic ---
-        const activeCredential = CredentialMgr.active();
-        const activeType = activeCredential?.type;
-        const activeId = activeCredential?.id;
-
-        // Default: Disable most write/edit actions if not logged in
-        let canWriteReg = false;
-        let canWriteAdmin = false;
-        let canWriteFaction = false;
-        let canWriteAllegiance = false;
-        let canEditFactionTitles = false;
-        let canEditAllegianceTitles = false;
-
-        if (activeType === 'staff') {
-            canWriteReg = true;
-        } else if (activeType === 'admin') {
-            canWriteAdmin = true;
-            canEditFactionTitles = true; // Admin can edit all titles
-            canEditAllegianceTitles = true;
-            // Enable all faction/allegiance writes for admin (handled within their respective pages/buttons)
-            canWriteFaction = true;
-            canWriteAllegiance = true;
-        } else if (activeType === 'faction') {
-            if (state.selectedFaction === activeId) {
-                canWriteFaction = true;
-                canEditFactionTitles = true; // Can edit own faction titles
-            }
-        } else if (activeType === 'allegiance') {
-            if (state.selectedAllegiance === activeId) {
-                canWriteAllegiance = true;
-                canEditAllegianceTitles = true; // Can edit own allegiance titles
-            }
-        }
-
-        // Apply access control to buttons
-        ui.setButtonDisabled('reg-write-btn', isOpRunning || !isTagScanned || !canWriteReg);
-        ui.setButtonDisabled('reg-reset-btn', isOpRunning || !isTagScanned || !canWriteReg);
-
-        // Faction write button depends on selected faction matching logged-in faction OR admin
-        ui.setButtonDisabled('faction-write-btn', isOpRunning || !isTagScanned || !isFactionSelected || !canWriteFaction);
-
-        // Allegiance write button depends on selected allegiance matching logged-in allegiance OR admin
-        ui.setButtonDisabled('allegiance-write-btn', isOpRunning || !isTagScanned || !isAllegianceSelected || !canWriteAllegiance);
-
-        // Apply access control to editable fields (titles, etc.)
-        this.setFactionTitleEditable(canEditFactionTitles);
-        this.setAllegianceTitleEditable(canEditAllegianceTitles);
-
-        // Show/Hide Logout button
-        const logoutBtn = document.getElementById('logout-btn');
-        if (logoutBtn) {
-            logoutBtn.style.display = activeCredential ? 'inline-block' : 'none';
-        }
 
         // --- Update active page ---
         this.showPage(state.activePage || 'loginPage'); // Default to login page
@@ -391,57 +338,77 @@ const ui = {
     },
 
     /**
-     * Sets the editable state (readonly attribute) of faction name and field title inputs.
-     * @param {boolean} isEditable - True to make editable, false to make readonly.
+     * Handles reading allegiance data from NFC tags.
+     * Validates tag presence and allegiance selection before reading.
+     * Provides visual feedback for operation status.
+     * 
+     * @returns {Promise<void>}
      */
-    setFactionTitleEditable: function(isEditable) {
-        const factionKey = core.currentState.selectedFaction;
-        if (!factionKey) return;
-
-        // Faction Name
-        const nameInput = document.getElementById(`faction-${factionKey}-name-input`);
-        if (nameInput) nameInput.readOnly = !isEditable;
-
-        // Field Titles
-        const titleInputs = document.querySelectorAll(`#faction-fields-container .field-title-input`);
-        titleInputs.forEach(input => input.readOnly = !isEditable);
-    },
-
-    /**
-     * Sets the editable state (readonly attribute) of allegiance name and field title inputs.
-     * @param {boolean} isEditable - True to make editable, false to make readonly.
-     */
-    setAllegianceTitleEditable: function(isEditable) {
+    handleAllegianceRead: async function() {
         const allegianceKey = core.currentState.selectedAllegiance;
-        if (!allegianceKey) return;
+        utils.log(`[Allegiance] Read initiated for key: ${allegianceKey}`, 'info');
+        if (!core.currentState.isTagPresent) {
+            utils.log("[Allegiance] Read failed: No tag present.", 'warning');
+            ui.showVisualConfirmation("Read Error", "Scan a tag first.", 'error');
+            return;
+        }
+        if (!allegianceKey) {
+            utils.log("[Allegiance] Read failed: No allegiance selected.", 'warning');
+            ui.showVisualConfirmation("Read Error", "Select an allegiance first.", 'error');
+            return;
+        }
 
-        // Allegiance Name
-        const nameInput = document.getElementById(`allegiance-${allegianceKey}-name-input`);
-        if (nameInput) nameInput.readOnly = !isEditable;
+        // Check if FIELD_MAP is defined
+        if (typeof FIELD_MAP === 'undefined') {
+            utils.log("[Allegiance] Read failed: FIELD_MAP is not defined. Ensure map.js is loaded.", 'error');
+            ui.showVisualConfirmation("Read Error", "Configuration data is missing. Please refresh the page.", 'error');
+            return;
+        }
 
-        // Field Titles
-        const titleInputs = document.querySelectorAll(`#allegiance-fields-container .field-title-input`);
-        titleInputs.forEach(input => input.readOnly = !isEditable);
-    },
+        const allegianceData = FIELD_MAP.allegiances[allegianceKey];
+        if (!allegianceData) {
+            utils.log(`[Allegiance] Read failed: No data found for key ${allegianceKey}`, 'error');
+            return;
+        }
 
-    /**
-     * Populates the login role select dropdown using CredentialMgr.
-     */
-    populateLoginRoleSelect: function() {
-        const select = document.getElementById('login-role-select');
-        if (!select) return;
-        select.innerHTML = '<option value="">-- Select Role --</option>'; // Clear existing
+        // Use per-field sector/block addressing for each allegiance field (MIFARE Classic compliance)
         try {
-            const roles = CredentialMgr.getAllLoginRoles();
-            roles.forEach(role => {
-                const option = document.createElement('option');
-                option.value = role;
-                option.textContent = role;
-                select.appendChild(option);
-            });
-            utils.log("Login role select populated.", 'debug');
+            let readCount = 0;
+            for (const [fieldKey, fieldConfig] of Object.entries(allegianceData.fields)) {
+                const inputId = `allegiance-${allegianceKey}-${fieldKey}-input`;
+                try {
+                    // Log SDK call parameters
+                    utils.log(`[Allegiance] SDK readAllegianceField params: sector=${fieldConfig.sector}, block=${fieldConfig.block}, key=${fieldConfig.key}, label=Allegiance Field ${fieldKey}`, 'debug');
+                    // Use readAllegianceField which directly returns text (like username)
+                    const textData = await operations.readAllegianceField(
+                        fieldConfig.sector,
+                        fieldConfig.block,
+                        `Allegiance Field ${fieldKey}`
+                    );
+                    // Log SDK call result
+                    utils.log(`[Allegiance] SDK readAllegianceField result for ${fieldKey}: "${textData}"`, 'debug');
+                    // Update the UI with the text data
+                    ui.updateInputValue(inputId, textData);
+                    utils.log(`[Allegiance] UI updated: set ${inputId} = "${textData}"`, 'debug');
+                    if (textData) readCount++;
+                } catch (fieldError) {
+                    utils.log(`[Allegiance] Failed to read field ${fieldKey} (Block ${fieldConfig.block}): ${fieldError.message}`, 'error');
+                    // Do NOT clear the field on error; preserve previous value.
+                    // Display an error message to the user.
+                    ui.showVisualConfirmation(
+                        `Allegiance Field Read Error`,
+                        `Failed to read ${fieldConfig.title}: ${fieldError.message}`,
+                        "error"
+                    );
+                    utils.log(`[Allegiance] UI error displayed for field ${fieldKey}: ${fieldError.message}`, 'debug');
+                }
+            }
+            ui.showVisualConfirmation("Allegiance Read Complete", `Read ${readCount} fields for ${allegianceData.name}.`, 'success');
+            // --- Update Player Data Allegiance field ---
+            await ui.readAndUpdateCurrentAllegiance();
         } catch (error) {
-            utils.log("Error populating login roles: " + error, 'error');
+            utils.log(`[Allegiance] Read error: ${error.message}`, 'error');
+            ui.showVisualConfirmation("Allegiance Read Error", error.message || "Failed to read allegiance data.", 'error');
         }
     },
 
@@ -733,106 +700,6 @@ const ui = {
 
     // --- Event Handlers (Link UI actions to core/operations) ---
 
-    /**
-     * Handles the login button click.
-     * Authenticates using CredentialMgr and navigates to the appropriate page.
-     */
-    handleLogin: function() {
-        const roleSelect = document.getElementById('login-role-select');
-        const keyInput = document.getElementById('login-key-input');
-
-        if (!roleSelect || !keyInput) {
-            utils.log("Login elements not found", 'error');
-            return;
-        }
-
-        const role = roleSelect.value;
-        const passwordOrKey = keyInput.value;
-
-        if (!role) {
-            ui.showVisualConfirmation("Login Error", "Please select a role.", "error");
-            return;
-        }
-
-        // Staff login doesn't strictly require a key based on CredentialMgr logic, but UI should prompt.
-        // Admin, Faction, Allegiance require key/password.
-        if (role !== 'Staff' && !passwordOrKey) {
-            const prompt = role === 'Admin' ? 'Password' : 'Key';
-            ui.showVisualConfirmation("Login Error", `Please enter the ${prompt}.`, "error");
-            return;
-        }
-
-        utils.log(`Attempting login for role: ${role}`, 'info');
-        const credential = CredentialMgr.login(role, passwordOrKey);
-
-        if (credential) {
-            utils.log(`Login successful for ${role} (${credential.type})`, 'success');
-            keyInput.value = ''; // Clear password/key field
-            let targetPage = 'loginPage';
-            let preselectValue = null;
-
-            // Determine target page and preselect value first
-            switch (credential.type) {
-                case 'staff':
-                    targetPage = 'registrationPage';
-                    break;
-                case 'admin':
-                    targetPage = 'adminPage';
-                    break;
-                case 'faction':
-                    targetPage = 'factionPage';
-                    preselectValue = credential.id; // Faction name/id
-                    core.updateState({ selectedFaction: preselectValue }); // Update state before navigation
-                    // DO NOT call displayFactionFields here yet
-                    break;
-                case 'allegiance':
-                    targetPage = 'allegiancesPage';
-                    preselectValue = credential.id; // Allegiance name/id
-                    core.updateState({ selectedAllegiance: preselectValue }); // Update state before navigation
-                    // DO NOT call displayAllegianceFields here yet
-                    break;
-            }
-
-            // Navigate to the correct page
-            this.showPage(targetPage);
-
-            // NOW, display fields and pre-select dropdown AFTER the page is shown
-            if (credential.type === 'faction') {
-                this.displayFactionFields(preselectValue); // Display fields now
-                this.updateSelectValue('faction-select', preselectValue); // Then select dropdown
-            } else if (credential.type === 'allegiance') {
-                this.displayAllegianceFields(preselectValue); // Display fields now
-                this.updateSelectValue('allegiance-select', preselectValue); // Then select dropdown
-            }
-
-            // Re-render to apply access controls and show logout button
-            this.render(); 
-            ui.showVisualConfirmation("Login Successful", `Welcome, ${role}!`, "success");
-
-        } else {
-            const errorMsg = CredentialMgr.getLastError() || "Invalid credentials.";
-            utils.log(`Login failed for ${role}: ${errorMsg}`, 'error');
-            ui.showVisualConfirmation("Login Failed", errorMsg, "error");
-        }
-    },
-
-    /**
-     * Handles the logout button click.
-     */
-    handleLogout: function() {
-        const activeCredential = CredentialMgr.active();
-        if (activeCredential) {
-            utils.log(`Logging out ${activeCredential.id || activeCredential.type}`, 'info');
-            CredentialMgr.logout();
-            core.updateState({ selectedFaction: null, selectedAllegiance: null }); // Clear selections
-            this.showPage('loginPage');
-            this.render(); // Re-render to update UI state (hide logout, disable buttons)
-            ui.showVisualConfirmation("Logged Out", "You have been logged out.", "success");
-        } else {
-            utils.log("Logout clicked but no active credential found.", 'warning');
-        }
-    },
-
     // Registration Page
     /**
      * IMPORTANT FOR AI DEVELOPERS: The Registration page functionality is fully implemented and meets all requirements.
@@ -1079,13 +946,13 @@ const ui = {
 
             // Clear all user data blocks
             logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing username block...</div>`;
-            await operations.writeBlock(39, 0, "", NFC_KEY, 'Username Clear'); // Sector 39, Block 0 (Username)
+            await operations.writeSectorBlock(39, 0, utils.textToHex("").padEnd(32, '0'), 'admin');
             
             logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing status block...</div>`;
-            await operations.writeBlock(39, 2, "", NFC_KEY, 'Status Clear'); // Sector 39, Block 2 (Status)
+            await operations.writeSectorBlock(39, 2, utils.textToHex("").padEnd(32, '0'), 'admin');
             
             logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing allegiance block...</div>`;
-            await operations.writeBlock(39, 3, "", NFC_KEY, 'Allegiance Clear'); // Sector 39, Block 3 (Allegiance)
+            await operations.writeSectorBlock(39, 3, utils.textToHex("").padEnd(32, '0'), 'admin');
 
             // Update UI
             ui.updateInputValue('reg-status', "Unregistered");
@@ -1210,7 +1077,6 @@ const ui = {
                     let blockText = await operations.readFactionField(
                         factionSector,
                         fieldConfig.block,
-                        fieldConfig.key,
                         `Faction Field ${fieldKey}`
                     );
 
@@ -1309,7 +1175,7 @@ const ui = {
                               factionSector, 
                               fieldConfig.block, 
                               textData, 
-                              fieldConfig.key, 
+                              factionKey, // Pass the selected faction key as the role
                               `Faction Field ${fieldKey}`
                           );
                           utils.log(`Wrote Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
@@ -1417,7 +1283,6 @@ const ui = {
                     const textData = await operations.readAllegianceField(
                         fieldConfig.sector,
                         fieldConfig.block,
-                        fieldConfig.key,
                         `Allegiance Field ${fieldKey}`
                     );
                     // Log SDK call result
@@ -1508,7 +1373,7 @@ const ui = {
                             allegianceSector,
                             fieldConfig.block,
                             textData,
-                            fieldConfig.key,
+                            allegianceKey, // Pass the selected allegiance key as the role
                             `Allegiance Field ${fieldKey}`
                         );
                         utils.log(`[Allegiance] SDK writeAllegianceField success for ${fieldKey}`, 'debug');
@@ -1545,94 +1410,6 @@ const ui = {
         } catch (error) {
             utils.log(`[Allegiance] Write error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Allegiance Write Error", error.message || "Failed to write allegiance data.", 'error');
-        }
-    },
-
-    /**
-     * Handles the 'Assign Allegiance to User' button click.
-     * Writes the name of the selected allegiance from the dropdown to Sector 39, Block 3.
-     * Requires allegiance or admin login.
-     * Uses a dedicated operation function to handle the specific write permissions.
-     */
-    handleAllegianceAssignUser: async function() {
-        utils.log("[Assign User Allegiance] Button clicked.", 'info');
-        const logDisplay = document.getElementById("logDisplay");
-        if (logDisplay) {
-            logDisplay.style.display = "block";
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Starting Assign Allegiance to User operation...</div>`;
-        }
-
-        const activeCredential = CredentialMgr.active();
-        const allegianceSelect = document.getElementById('allegiance-select');
-
-        // 1. Check Login and Tag Presence
-        if (!activeCredential || (activeCredential.type !== 'allegiance' && activeCredential.type !== 'admin')) {
-            utils.log("[Assign User Allegiance] Access denied: Allegiance or Admin login required.", 'warning');
-            ui.showVisualConfirmation("Access Denied", "Allegiance or Admin login required to assign allegiance.", "error");
-            return;
-        }
-        if (!core.currentState.isTagPresent) {
-            utils.log("[Assign User Allegiance] Failed: No tag present.", 'warning');
-            ui.showVisualConfirmation("Operation Failed", "Scan a tag first.", 'error');
-            return;
-        }
-        if (!allegianceSelect || !allegianceSelect.value) {
-            utils.log("[Assign User Allegiance] Failed: No allegiance selected in dropdown.", 'warning');
-            ui.showVisualConfirmation("Operation Failed", "Select an allegiance from the dropdown first.", 'error');
-            return;
-        }
-
-        // 2. Get Selected Allegiance Name
-        const selectedAllegianceKey = allegianceSelect.value;
-        const selectedAllegianceName = FIELD_MAP.allegiances[selectedAllegianceKey]?.name;
-
-        if (!selectedAllegianceName) {
-            utils.log(`[Assign User Allegiance] Error: Could not find name for selected allegiance key: ${selectedAllegianceKey}`, 'error');
-            ui.showVisualConfirmation("Operation Failed", "Internal error: Could not find allegiance name.", 'error');
-            return;
-        }
-
-        utils.log(`[Assign User Allegiance] Attempting to write allegiance "${selectedAllegianceName}" to user data (Sector 39, Block 3).`, 'info');
-        if (logDisplay) {
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Writing allegiance "${selectedAllegianceName}" to Sector 39, Block 3...</div>`;
-        }
-
-        ui.showOperationIndicator(`Assigning ${selectedAllegianceName}...`);
-
-        // 3. Call Specialized Write Operation
-        try {
-            // Call a new specific operation function for this task
-            const success = await operations.writeUserAllegiance(selectedAllegianceName);
-
-            if (success) {
-                utils.log(`[Assign User Allegiance] Successfully wrote "${selectedAllegianceName}" to Sector 39, Block 3.`, 'success');
-                if (logDisplay) {
-                    logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Allegiance "${selectedAllegianceName}" assigned successfully.</div>`;
-                }
-                // Update UI state if necessary (e.g., re-read allegiance display)
-                core.updateState({ currentAllegiance: selectedAllegianceName });
-                ui.updateInputValue('allegiance-current-allegiance', selectedAllegianceName);
-                ui.updateInputValue('faction-current-allegiance', selectedAllegianceName);
-                ui.showVisualConfirmation("Assign Complete", `User allegiance set to "${selectedAllegianceName}".`, 'success');
-            } else {
-                // Error handled within writeUserAllegiance, log already happened
-                utils.log("[Assign User Allegiance] Write operation returned false.", 'error');
-                if (logDisplay) {
-                    logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Failed to assign allegiance. Check logs.</div>`;
-                }
-                 ui.showVisualConfirmation("Assign Failed", "Could not assign allegiance. See logs for details.", "error");
-            }
-        } catch (error) {
-            utils.log(`[Assign User Allegiance] Critical error during write: ${error.message}`, 'error');
-            if (logDisplay) {
-                logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Critical error assigning allegiance: ${error.message}</div>`;
-            }
-            ui.showVisualConfirmation("Assign Error", `Error: ${error.message}`, 'error');
-        } finally {
-            ui.hideOperationIndicator();
-            if (logDisplay) {
-                logDisplay.scrollTop = logDisplay.scrollHeight;
-            }
         }
     },
 

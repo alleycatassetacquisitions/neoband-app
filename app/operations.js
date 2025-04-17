@@ -108,12 +108,15 @@ const operations = {
     
 
     /**
-     * Reads a block from a given sector using the specified authentication key.
-     * Uses NeobandSDK.readSectorBlock for strict block_in_sector addressing.
-     * If the key is "FFFFFFFFFFFFFFFF" (default Key A), it is mapped to keyIndex 0.
-     * This ensures all reads use Key A/keyIndex 0 for compatibility and security.
+     * Reads a block from a given sector using the specified role.
+     * Uses NeobandSDK.readUserSectorBlock for per-user access, or blockInSectorRead for admin.
+     *
+     * @param {number} sector - Sector number (0-39)
+     * @param {number} block - Block number within sector
+     * @returns {Promise<string|null>} Hex data or null on error
      */
-    readSectorBlock: async function(sector, block, key = "FFFFFFFFFFFF", authMode = 0x60) {
+    readSectorBlock: async function(sector, block) {
+        // Access control removed for reads, as all roles use the universal read key.
         try {
             // Validate sector and block ranges
             if (typeof sector !== 'number' || typeof block !== 'number' ||
@@ -124,23 +127,9 @@ const operations = {
                     `Sector must be 0–39, block must be ${sector >= 32 && sector <= 39 ? '0–14' : '0–3'}.`
                 );
             }
-
-            // Use strict sector/block addressing: pass sector as-is
-            let mappedSector = sector;
-            // Always use keyIndex 0 for Key A authentication (authMode 0x60)
-            const keyIndex = 0;
-            const usedAuthMode = 0x60; // Enforce Key A
-
-            // Log the actual parameters passed to the SDK for traceability
-            utils.log(
-                `[SDK Call] NeobandSDK.readSectorBlock called with sector=${mappedSector}, block=${block}, authMode=${usedAuthMode}, keyIndex=${keyIndex}`,
-                'debug'
-            );
-            // Attempt to read using NeobandSDK
-            const hex = await NeobandSDK.readSectorBlock(mappedSector, block, usedAuthMode, keyIndex);
-            return hex;
+            // Call the updated SDK function which now uses the universal read key internally
+            return await NeobandSDK.readSectorBlock(sector, block);
         } catch (err) {
-            // Log error with detailed context for debugging and changelog traceability
             utils.log(
                 `NeobandSDK.readSectorBlock error (Sector ${sector}, Block ${block}): ${err.message}`,
                 'error'
@@ -185,33 +174,14 @@ const operations = {
     */
 
     /**
-     * Write data to a specific sector and block using D-Logic BlockInSectorWrite command.
+     * Write data to a specific sector and block using the correct SDK function.
+     * Uses NeobandSDK.writeUserSectorBlock for per-user access, or blockInSectorWrite for admin.
      */
-    /* Original linear/async NFC write logic preserved as backup:
-    writeSectorBlock: async function(sector, block, hexData, authMode, key) {
-        if (sector === undefined || block === undefined) throw new ReferenceError("Sector or block not specified");
-        authMode = (authMode === undefined) ? 0x60 : authMode;
-        key = (key === undefined) ? NFC_KEY : key;
-        try {
-            utils.log(`Writing to Sector ${sector}, Block ${block}`, 'debug');
-            if (typeof dlogic === 'undefined') {
-                utils.log('D-Logic NFC API (dlogic) is not available. NFC write operation skipped.', 'error');
-                return false;
-            }
-            const success = await dlogic.BlockInSectorWrite(sector, block, hexData, authMode, key);
-            if (success) utils.log(`Write success`, 'success');
-            else utils.log(`Write failed`, 'error');
-            return success;
-        } catch (error) {
-            utils.log(`Error writing Sector ${sector}, Block ${block}: ${error.message}`, 'error');
-            throw error;
-        }
-    },
-    */
+    writeSectorBlock: async function(sector, block, hexData, keyHex) {
+        // Access control (CredentialMgr check removed) assumes the calling function has validated appropriately.
 
-    // Refactored: Now uses NeobandSDK.writeSectorBlock for strict block_in_sector addressing.
-    // Original implementation using BlockInSectorWrite is preserved below as backup.
-    writeSectorBlock: async function(sector, block, hexData, key = "FFFFFFFFFFFF", authMode = 0x60) {
+        // The primary role/sector check should happen BEFORE calling this, when retrieving the keyHex.
+
         try {
             // Validate sector and block ranges
             if (typeof sector !== 'number' || typeof block !== 'number' ||
@@ -222,25 +192,19 @@ const operations = {
                     `Sector must be 0–39, block must be ${sector >= 32 && sector <= 39 ? '0–14' : '0–3'}.`
                 );
             }
-            
+            // Validate the provided key
+            if (!keyHex || !/^[0-9A-Fa-f]{12}$/i.test(keyHex)) {
+                throw new Error(`[writeSectorBlock] Invalid or missing keyHex provided for Sector ${sector}, Block ${block}.`);
+            }
             // Ensure data is padded to 16 bytes (32 hex chars)
             hexData = hexData.padEnd(32, 'F');
-           /**
-            * [BUGFIX] UFR_MAX_KEY_INDEX_EXCEEDED error workaround:
-            * Always use keyIndex = 0 for MIFARE Classic authentication with reader keys (Sector 1, Key A).
-            * This addresses a bug where keyIndex was incorrectly set to 96 (invalid), causing authentication failure.
-            * Error observed in logs: "UFR_MAX_KEY_INDEX_EXCEEDED" when attempting to write to Sector 1 with Key A.
-            * Reference: uFR_Series_NFC_reader_API.pdf, Section "BlockInSectorWrite", "Key Index" parameter (valid range: 0-15).
-            * For Sector 1, Key A, keyIndex must be 0 per D-Logic documentation and confirmed by error logs.
-            * The original logic is preserved below for backup, as required by project policy.
-            */
-            // --- Original logic (preserved for backup) ---
-            // const keyIndex = (key === "FFFFFFFFFFFF") ? 0 : key;
-            // --- End original logic ---
-            const keyIndex = 0;
-            utils.log(`[writeFactionField] Using keyIndex=${keyIndex} for Sector ${sector}, Block ${block}`, 'info');
-            // Note: SDK expects parameters in the order (sector, block, hexData, authMode, keyIndex)
-            const status = await NeobandSDK.writeSectorBlock(sector, block, hexData, authMode, keyIndex);
+            // Call SDK PK function directly with the provided key and Key B auth mode
+            const status = await NeobandSDK.blockInSectorWrite_PK(sector, block, hexData, operations.AUTH_MODE_B, keyHex);
+            // Check status (optional, SDK might throw on error)
+            const success = status && status.includes('UFR_OK');
+            if (!success) {
+                throw new Error(`Write operation failed for Sector ${sector}, Block ${block}. SDK Status: ${status}`);
+            }
             utils.log(`Wrote successfully to Sector ${sector}, Block ${block} via NeobandSDK`, 'success');
             return true;
         } catch (err) {
@@ -260,14 +224,8 @@ const operations = {
     readUsername: async function() {
         try {
             utils.log("[Username Read] Reading username from Sector 39, Block 0...", 'info');
-            // Read username from Sector 39, Block 0 (current standard)
+            // Read using universal read key (role no longer needed)
             const hexData = await this.readSectorBlock(39, 0);
-
-            // Original linear read logic preserved as backup:
-            // const linearHexData = await this.linearRead(0, 16);
-            // return utils.hexToString(linearHexData);
-
-            // Convert hex to text using the correct utility
             const usernameText = utils.hexToText(hexData);
             utils.log("[Username Read] Converted hex to text (username): " + usernameText, 'debug');
             return usernameText;
@@ -296,7 +254,12 @@ const operations = {
             // await this.linearWrite(0, linearHexData);
 
             utils.log("[Username Write] Converted username text to hex: " + hexData, 'debug');
-            return await this.writeSectorBlock(39, 0, hexData);
+            // Get staff key and call the modified writeSectorBlock
+            if (!window.NEOBAND_KEYS?.staff?.user?.neokey) {
+                throw new Error("[writeUsername] Staff key not found in configuration.");
+            }
+            const staffKeyHex = window.NEOBAND_KEYS.staff.user.neokey;
+            return await this.writeSectorBlock(39, 0, hexData, staffKeyHex);
         } catch (error) {
             utils.log("[Username Write] Username write error: " + error, 'error');
             throw error;
@@ -314,13 +277,10 @@ const operations = {
     * See CHANGELOG.md for details on the sector/block migration and bugfix.
     * The original linear logic is preserved as a backup (see commented code).
     */
-   readFactionField: async function(sector, block, key, label = 'Faction Field') {
+   readFactionField: async function(sector, block, label = 'Faction Field') {
        try {
-           // Always uses Key A (0x60) and maps "FFFFFFFFFFFF" to keyIndex 0.
-           const hexData = await this.readSectorBlock(sector, block, 0x60, key);
-           // Original call preserved as backup:
-           // return utils.hexToString(hexData);
-           // Updated per static analysis: use correct function hexToText()
+           // Read using universal read key (role no longer needed)
+           const hexData = await this.readSectorBlock(sector, block);
            const factionText = utils.hexToText(hexData);
            utils.log(`${label} converted hex to text: ${factionText}`, 'debug');
            return factionText;
@@ -332,15 +292,22 @@ const operations = {
 
     /**
      * Write faction field.
+     *
+     * Uses role-based access. For admin writes, pass 'admin' as the role. For user/faction writes, pass the appropriate role string.
+     * The default key is handled internally by writeSectorBlock based on the role.
      */
-    writeFactionField: async function(sector, block, data, key, label = 'Faction Field') {
+    writeFactionField: async function(sector, block, data, role, label = 'Faction Field') {
         try {
-            // Original call preserved as backup:
-            // const hexData = utils.stringToHex(data).padEnd(32, '0');
-            // Updated per static analysis: use correct function textToHex()
+            // Convert data to hex and pad to 32 characters
             const hexData = utils.textToHex(data).padEnd(32, '0');
             utils.log(`${label} converted text to hex: ${hexData}`, 'debug');
-            return await this.writeSectorBlock(sector, block, hexData, 0x60, key);
+            // Get the specific faction key based on the role identifier
+            const factionKeyHex = window.NEOBAND_KEYS?.factions?.[role]?.neoKey;
+            if (!factionKeyHex) {
+                throw new Error(`[writeFactionField] Faction key not found for role: ${role}`);
+            }
+            // Call the modified writeSectorBlock with the specific key
+            return await this.writeSectorBlock(sector, block, hexData, factionKeyHex);
         } catch (error) {
             utils.log(`${label} write error: ${error}`, 'error');
             throw error;
@@ -350,15 +317,15 @@ const operations = {
     /**
      * Read allegiance field.
      */
-    readAllegianceField: async function(sector, block, key, label = 'Allegiance Field') {
+    readAllegianceField: async function(sector, block, label = 'Allegiance Field') {
         try {
-            const hexData = await this.readSectorBlock(sector, block, 0x60, key);
+            // Read using universal read key (role no longer needed)
+            const hexData = await this.readSectorBlock(sector, block);
             const allegianceText = utils.hexToText(hexData);
             utils.log(`${label} converted hex to text: ${allegianceText}`, 'debug');
             return allegianceText;
         } catch (error) {
             utils.log(`${label} read error: ${error}`, 'error');
-            // Return a placeholder or empty string on error
             return "";
         }
     },
@@ -366,14 +333,24 @@ const operations = {
     /**
      * Write allegiance field.
      */
-    writeAllegianceField: async function(sector, block, data, key, label = 'Allegiance Field') {
+    writeAllegianceField: async function(sector, block, data, role, label = 'Allegiance Field') {
         try {
             // Original call preserved as backup:
             // const hexData = utils.stringToHex(data).padEnd(32, '0');
             // Updated per static analysis: use correct function textToHex()
             const hexData = utils.textToHex(data).padEnd(32, '0');
             utils.log(`${label} converted text to hex: ${hexData}`, 'debug');
-            return await this.writeSectorBlock(sector, block, hexData, 0x60, key);
+            // Reverted & Corrected: Assume 'role' holds the role string (e.g., 'allegiance1') needed for role-based write.
+            if (typeof role !== 'string' || !role) {
+                throw new Error(`Invalid or missing role name provided for ${label}: ${role}`);
+            }
+            // Get the specific allegiance key based on the role identifier
+            const allegianceKeyHex = window.NEOBAND_KEYS?.allegiances?.[role]?.neoKey;
+            if (!allegianceKeyHex) {
+                throw new Error(`[writeAllegianceField] Allegiance key not found for role: ${role}`);
+            }
+            // Call the modified writeSectorBlock with the specific key
+            return await this.writeSectorBlock(sector, block, hexData, allegianceKeyHex);
         } catch (error) {
             utils.log(`${label} write error: ${error}`, 'error');
             throw error;
@@ -475,22 +452,38 @@ const operations = {
     },
 
     /**
-     * Read current allegiance from Sector 39, Block 3.
-     *
-     * This reads the user's current allegiance as stored in the user data sector.
-     * Returns the allegiance as a string, or throws on error.
+     * Reads the user's currently assigned allegiance from Sector 39, Block 3
+     * Uses the FIELD_MAP to ensure the correct sector and block are accessed.
+     * 
+     * @returns {Promise<string>} - The allegiance name, or '(None)' if no allegiance is assigned
      */
     readCurrentAllegiance: async function() {
+        const sector = FIELD_MAP.user.fields.field4.sector; // Should be 39
+        const block = FIELD_MAP.user.fields.field4.block;   // Should be 3
+
+        utils.log(`[readCurrentAllegiance] Reading allegiance from Sector ${sector}, Block ${block}`, 'info');
+
         try {
-            utils.log("[Allegiance Read] Reading current allegiance from Sector 39, Block 3...", 'info');
-            // Read allegiance from Sector 39, Block 3
-            const hexData = await this.readSectorBlock(39, 3);
-            // Convert hex to text using the correct utility
-            const allegianceText = utils.hexToText(hexData);
-            utils.log("[Allegiance Read] Converted hex to text (allegiance): " + allegianceText, 'debug');
+            // Read hex data from the allegiance block
+            const hexData = await this.readSectorBlock(sector, block);
+            
+            if (!hexData || hexData.trim() === '') {
+                utils.log("[readCurrentAllegiance] No data found in allegiance block", 'warning');
+                return "(None)";
+            }
+
+            // Convert hex to text
+            const allegianceText = utils.hexToText(hexData).trim();
+            
+            if (!allegianceText || allegianceText === '') {
+                utils.log("[readCurrentAllegiance] Empty allegiance data", 'info');
+                return "(None)";
+            }
+            
+            utils.log("[readCurrentAllegiance] Converted hex to text (allegiance): " + allegianceText, 'debug');
             return allegianceText;
         } catch (error) {
-            utils.log("[Allegiance Read] Allegiance read error: " + error, 'error');
+            utils.log("[readCurrentAllegiance] Allegiance read error: " + error, 'error');
             throw error;
         }
     },
@@ -505,8 +498,9 @@ const operations = {
      * @returns {Promise<boolean>} - True if the write was successful, false otherwise.
      */
     writeUserAllegiance: async function(allegianceName) {
-        const sector = 39;
-        const block = 3;
+        // Get the correct sector and block from FIELD_MAP for allegiance field
+        const sector = FIELD_MAP.user.fields.field4.sector; // Should be 39
+        const block = FIELD_MAP.user.fields.field4.block;   // Should be 3
         // Use the default staff key (defined in keys.js, often FFFFFFFFFFFF)
         // Assume this key is set as Key B for Sector 39 and allows writing to Block 3.
         const key = NEOBAND_KEYS.staffKey; 
@@ -528,17 +522,17 @@ const operations = {
             utils.log(`[writeUserAllegiance] Writing hex data: ${hexData} to Sector ${sector}, Block ${block}`, 'debug');
 
             // Use the existing writeSectorBlock via NeobandSDK, specifying Key B auth
-            const success = await NeobandSDK.writeSectorBlock(sector, block, hexData, authMode, keyIndex, key);
+            const successStatus = await NeobandSDK.blockInSectorWrite_PK(sector, block, hexData, authMode, key);
+            // Check status based on expected SDK response format
+            const success = successStatus && successStatus.includes('UFR_OK');
 
             if (success) {
                 utils.log(`[writeUserAllegiance] Successfully wrote allegiance to Sector ${sector}, Block ${block}.`, 'success');
                 return true;
             } else {
                 utils.log(`[writeUserAllegiance] NeobandSDK.writeSectorBlock failed for Sector ${sector}, Block ${block}.`, 'error');
-                // Attempting to provide more specific error feedback
-                const lastError = NeobandSDK.getLastError ? NeobandSDK.getLastError() : 'Unknown SDK error';
-                utils.log(`[writeUserAllegiance] SDK Last Error: ${lastError}`, 'error');
-                throw new Error(`NFC write failed for user allegiance. SDK Error: ${lastError}`); 
+                // Removed non-existent getLastError call. Error is logged by SDK/readSectorBlock.
+                throw new Error(`NFC write failed for user allegiance. Check SDK logs for details.`);
             }
         } catch (error) {
             utils.log(`[writeUserAllegiance] Error writing allegiance to Sector ${sector}, Block ${block}: ${error.message}`, 'error');
@@ -547,8 +541,158 @@ const operations = {
             throw error; 
         }
     },
+
+    /**
+     * Provisions a MIFARE Classic 4K card by formatting it and setting custom keys.
+     * Performs a two-stage process:
+     * 1. Formats the card using NeobandSDK.formatCard(), setting universalReadKeyA and default Key B.
+     * 2. Iterates through factions, allegiances, and staff definitions in NEOBAND_KEYS,
+     *    calling NeobandSDK.setUserSectorTrailer() for each to set the specific neoKey (Key B).
+     * Includes delays between trailer writes for stability.
+     * @returns {Promise<{success: boolean, message: string}>} Object indicating success status and a summary message.
+     */
+    provisionCardWithCustomKeys: async function() {
+        utils.log("[Provisioning] Starting card provisioning process...", 'info');
+        let sectorsUpdated = 0;
+
+        try {
+            // === Stage 1: Format Card ===
+            utils.log("[Provisioning] Stage 1: Formatting card to defaults...", 'info');
+            const formatStatus = await NeobandSDK.formatCard();
+            if (formatStatus !== 'Success' && !formatStatus?.includes('UFR_OK')) {
+                // Check various possible success indicators from SDK responses
+                throw new Error(`Card formatting failed. Status: ${formatStatus}`);
+            }
+            utils.log("[Provisioning] Stage 1: Formatting successful.", 'success');
+
+            // Short delay after formatting
+            await utils.sleep(200);
+
+            // === Stage 2: Set Custom Keys ===
+            utils.log("[Provisioning] Stage 2: Setting custom keys for defined roles...", 'info');
+
+            // Check if keys are loaded
+            if (!window.NEOBAND_KEYS) {
+                throw new Error("NEOBAND_KEYS configuration not loaded.");
+            }
+
+            const keySettingDelay = 150; // ms delay between sector trailer writes
+
+            // Set Faction Keys
+            if (window.NEOBAND_KEYS.factions) {
+                utils.log("[Provisioning] Setting faction keys...", 'debug');
+                for (const factionKey in window.NEOBAND_KEYS.factions) {
+                    const faction = window.NEOBAND_KEYS.factions[factionKey];
+                    if (faction && typeof faction.sector === 'number' && faction.name) {
+                        utils.log(`[Provisioning] Setting key for Sector ${faction.sector} (Role: ${faction.name})`, 'debug');
+                        await NeobandSDK.setUserSectorTrailer(faction.sector, faction.name);
+                        sectorsUpdated++;
+                        await utils.sleep(keySettingDelay);
+                    } else {
+                        utils.log(`[Provisioning] Skipping invalid faction entry: ${factionKey}`, 'warning');
+                    }
+                }
+            }
+
+            // Set Allegiance Keys
+            if (window.NEOBAND_KEYS.allegiances) {
+                utils.log("[Provisioning] Setting allegiance keys...", 'debug');
+                for (const allegianceKey in window.NEOBAND_KEYS.allegiances) {
+                    const allegiance = window.NEOBAND_KEYS.allegiances[allegianceKey];
+                    if (allegiance && typeof allegiance.sector === 'number' && allegiance.name) {
+                        utils.log(`[Provisioning] Setting key for Sector ${allegiance.sector} (Role: ${allegiance.name})`, 'debug');
+                        await NeobandSDK.setUserSectorTrailer(allegiance.sector, allegiance.name);
+                        sectorsUpdated++;
+                        await utils.sleep(keySettingDelay);
+                    } else {
+                        utils.log(`[Provisioning] Skipping invalid allegiance entry: ${allegianceKey}`, 'warning');
+                    }
+                }
+            }
+
+            // Set Staff Key
+            if (window.NEOBAND_KEYS.staff && window.NEOBAND_KEYS.staff.user && typeof window.NEOBAND_KEYS.staff.user.sector === 'number') {
+                utils.log("[Provisioning] Setting staff key...", 'debug');
+                const staffSector = window.NEOBAND_KEYS.staff.user.sector;
+                utils.log(`[Provisioning] Setting key for Sector ${staffSector} (Role: staff)`, 'debug');
+                await NeobandSDK.setUserSectorTrailer(staffSector, 'staff');
+                sectorsUpdated++;
+                await utils.sleep(keySettingDelay);
+            } else {
+                utils.log(`[Provisioning] Skipping staff key - configuration missing`, 'warning');
+            }
+
+            const successMsg = `Card provisioning complete. Format OK. Custom keys set for ${sectorsUpdated} sectors.`;
+            utils.log(`[Provisioning] ${successMsg}`, 'success');
+            return { success: true, message: successMsg };
+
+        } catch (error) {
+            const errorMsg = `Card provisioning failed: ${error.message}`;
+            utils.log(`[Provisioning] ${errorMsg}`, 'error');
+            console.error("[Provisioning] Detailed error:", error);
+            return { success: false, message: errorMsg };
+        }
+    },
 };
 
 // Expose config functions for admin.js
 window.getServerBaseUrl = operations.getServerBaseUrl;
 window.setServerBaseUrl = operations.setServerBaseUrl;
+
+/**
+ * Globally accessible event handler for the "Provision Card" button.
+ * Calls the operations.provisionCardWithCustomKeys function and provides UI feedback.
+ * Intended to be called directly from button onclick attributes.
+ */
+window.handleGlobalProvisionCard = async function() {
+    // Use try-catch to ensure dependencies are available
+    try {
+        if (typeof utils === 'undefined' || typeof core === 'undefined' || typeof ui === 'undefined' || typeof operations === 'undefined') {
+            console.error("[Global Provision Handler] Missing critical dependency (utils, core, ui, or operations). Provisioning aborted.");
+            alert("Critical error: Application components missing. Cannot provision card.");
+            return;
+        }
+
+        utils.log("[Global Provision Handler] Provision Card button clicked.", 'info');
+
+        // Ensure a tag is present before attempting provisioning
+        if (!core.currentState.isTagPresent || !core.currentState.scannedTagInfo?.uid) {
+            utils.log("[Global Provision Handler] Provisioning failed: No tag scanned.", 'warning');
+            ui.showVisualConfirmation("Provisioning Error", "Please scan a tag before provisioning.", 'error');
+            return;
+        }
+
+        // Confirm with the user
+        if (!confirm("Are you sure you want to provision this card?\n\nThis will ERASE ALL existing data and set default + custom keys according to the configuration.\n\nTHIS CANNOT BE UNDONE.")) {
+            utils.log("[Global Provision Handler] Provisioning cancelled by user.", 'info');
+            return;
+        }
+
+        ui.showOperationIndicator('Provisioning card...');
+
+        // Ensure the core provisioning function exists
+        if (typeof operations.provisionCardWithCustomKeys !== 'function') {
+            throw new Error("Provisioning function (operations.provisionCardWithCustomKeys) is not available.");
+        }
+
+        const result = await operations.provisionCardWithCustomKeys();
+
+        if (result.success) {
+            ui.showVisualConfirmation("Provisioning Complete", result.message, 'success');
+        } else {
+            throw new Error(result.message || "Provisioning failed for an unknown reason.");
+        }
+    } catch (error) {
+        console.error('Error during card provisioning:', error);
+        if (typeof utils !== 'undefined') {
+             utils.log(`[Global Provision Handler] Error during card provisioning: ${error.message}`, 'error');
+        }
+        if (typeof ui !== 'undefined') {
+            ui.showVisualConfirmation("Provisioning Error", `Failed: ${error.message}`, 'error');
+        }
+    } finally {
+        if (typeof ui !== 'undefined') {
+             ui.hideOperationIndicator();
+        }
+    }
+};

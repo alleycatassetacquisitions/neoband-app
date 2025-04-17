@@ -11,7 +11,6 @@
   - Allegiance data read/write capabilities
   - Administrator interface for advanced memory control
   - Comprehensive logging system
-  - Role-based login and access control
   
   This application works offline and requires the D-Logic uFR browser extension to communicate
   with the physical NFC reader hardware.
@@ -19,7 +18,6 @@
 <html ufr lang="en"><!-- The 'ufr' attribute enables integration with the uFR browser extension -->
     <head>
     <meta charset="UTF-8">
-    <!-- Added viewport meta tag to fix linter error -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
    
     <!-- 
@@ -36,25 +34,22 @@
       This is a requirement of the D-Logic app shell.
       
       Load sequence:
-      1. keys.js - Defines NEOBAND_KEYS (used by credentialManager)
-      2. credentialManager.js - Handles login logic and access control state
-      3. neoband-sdk.js - Low-level hardware communication wrapper
-      4. map.js - Defines the MIFARE memory map structure (FIELD_MAP)
-      5. utils.js - Utility functions (logging, hex conversion, etc.)
-      6. operations.js - NFC communication and card operations
-      7. core.js - Application state management and initialization
-      8. ui.js - UI manipulation and event handling (depends on others)
-      9. admin.js - Administrative interface functionality (depends on others)
+      1. map.js - Defines the MIFARE memory map structure (FIELD_MAP)
+      2. utils.js - Utility functions for hex conversion, logging, etc.
+      3. ui.js - UI manipulation and event handling
+      4. core.js - Application state management and initialization
+      5. operations.js - NFC communication and card operations
+      6. admin.js - Administrative interface functionality
     -->
     <script src="app/keys.js"></script>
     <script src="app/credentialManager.js"></script>
     <script src="app/neoband-sdk.js"></script>
-    <script src="app/map.js"></script>
-    <script src="app/utils.js"></script>
-    <script src="app/operations.js"></script>
-    <script src="app/core.js"></script>
-    <script src="app/ui.js"></script>
-    <script src="app/admin.js"></script>
+    <script src="app/map.js"></script>        <!-- Load map.js FIRST to make FIELD_MAP available to other modules -->
+    <script src="app/utils.js"></script>      <!-- Utility functions used by all other modules -->
+    <script src="app/operations.js"></script> <!-- NFC read/write operations -->
+    <script src="app/core.js"></script>       <!-- Core application logic and state management -->
+    <script src="app/ui.js"></script>         <!-- UI components and event handlers -->
+    <script src="app/admin.js"></script>      <!-- Administrative functionality -->
 
     <!-- 
       Title positioning is important - must be placed after script tags for the D-Logic reader
@@ -68,7 +63,6 @@
     <!--
       Application Header and Navigation
       The navigation menu provides access to the four main sections of the application:
-      - Login: User authentication
       - Registration: User data management
       - Factions: Faction-specific data
       - Allegiances: Allegiance-specific data
@@ -90,31 +84,38 @@
     <main>
         <!-- 
           Login Page
-          This section handles user login using role selection and key/password input.
+          This section handles user login 
         -->
          <div id="loginPage" class="page active">
-            <h2>Neoband App Login</h2>
+                    
+           <h2>Neoband App Login</h2>
 
             <div class="form-group">
-                <label for="login-role-select">Login As:</label>
-                <select id="login-role-select" class="input">
-                    <option value="">-- Select Role --</option>
-                    <!-- Options populated by ui.js -->
+                    <label for="staff-login-btn">Staff Login:</label>
+                    <button id="staff-login-btn" class="btn">Staff Login</button>
+                    <button id="admin-login-btn" class="btn">Admin Login</button>
+            </div>
+            <div class="form-group">
+                        <label for="groupSelect">Select Faction/Allegiance:</label>
+                        <select id="groupSelect">
+                            <option value="">-- Select --</option>
+                            <!-- We'll populate these options dynamically, or hardcode them -->
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="login-key-input">Key / Password:</label>
-                <input id="login-key-input" class="input" type="password" placeholder="Enter Key or Password">
+                        <label for="group-login-user">Username:</label>
+                        <input id="group-login-user" type="text" placeholder="Username (optional)">
+            </div>
+                
+            <div class="form-group">
+                        <label for="group-login-pass">Password:</label>
+                        <input id="group-login-pass" type="password" placeholder="Password (optional)">
             </div>
 
-            <div class="button-group">
-                <button id="login-btn" class="btn">Login</button>
-            </div>
-            <!-- Logout Button - Initially hidden -->
-            <div class="button-group logout-button-group"> <!-- Removed inline style, use class -->
-                 <button id="logout-btn" class="btn btn-secondary hidden">Logout</button> <!-- Added hidden class -->
-            </div>
+          <div class="button-group">
+                        <button id="group-login-btn" class="btn">Faction/Allegiance Login</button>
+          </div>    
         </div>
     
 
@@ -147,15 +148,6 @@
                  <label>Current Username:</label>
                  <input id="reg-current-username" class="input" type="text" readonly="" placeholder="(Not Read)">
              </div>
-             
-            <!-- Added Allegiance dropdown for registration -->
-            <div class="form-group">
-                <label for="reg-allegiance-select">Assign Allegiance:</label>
-                <select id="reg-allegiance-select" class="input">
-                    <option value="">-- Select Allegiance --</option>
-                    <!-- Options dynamically populated by ui.js -->
-                </select>
-            </div>
 
             <div class="form-group">
                 <label for="reg-status">Band Status:</label>
@@ -164,9 +156,10 @@
 
             <div class="button-group">
                 <button id="reg-scan-btn" class="btn">Scan Tag</button>
-                <button id="reg-read-btn" class="btn btn-secondary" disabled="">Read Tag</button>
-                <button id="reg-write-btn" class="btn" disabled="">Register / Update</button>
-                <button id="reg-reset-btn" class="btn btn-danger" disabled="">!!! Clear User Data !!!</button>
+                <button id="reg-read-btn" class="btn btn-secondary">Read</button>
+                <button id="reg-write-btn" class="btn">Write</button>
+                <button id="reg-reset-btn" class="btn btn-danger">Reset</button>
+                <button id="reg-provision-btn" class="btn btn-warning" onclick="handleGlobalProvisionCard()">Provision Card</button>
             </div>
         </div>
 
@@ -209,7 +202,7 @@
 
             <!-- Faction Details Section (Initially Hidden) -->
             <div id="faction-details" class="details-section">
-                 <h3 id="faction-name-display">Faction Fields</h3> <!-- Title populated by ui.js -->
+                 <h3 id="faction-name-display">Faction Fields</h3>
                  <div id="faction-fields-container" class="fields-grid">
                      <!-- Faction-specific fields are dynamically generated here by ui.js -->
                  </div>
@@ -219,8 +212,7 @@
                  <button id="faction-scan-btn" class="btn">Scan Tag</button>
                  <button id="faction-read-btn" class="btn btn-secondary" disabled>Read Faction Data</button>
                  <button id="faction-write-btn" class="btn" disabled>Write Faction Data</button>
-                 <!-- Removed Faction Save button as per previous instructions/state -->
-                 <!-- <button id="faction-save-btn" class="btn btn-secondary" disabled>Save UI Edits</button> -->
+                 <button id="faction-save-btn" class="btn btn-secondary" disabled>Save UI Edits</button>
             </div>
         </div>
 
@@ -259,13 +251,11 @@
                     <option value="">-- Select Allegiance --</option>
                     <!-- Options dynamically populated by ui.js from FIELD_MAP.allegiances -->
                 </select>
-                <!-- Added button to assign the selected allegiance to the current user's tag (Sector 39, Block 3) -->
-                <button id="allegiance-assign-user-btn" class="btn btn-secondary" disabled title="Assign selected allegiance to the current user's tag">Assign to User</button>
             </div>
 
              <!-- Allegiance Details Section (Initially Hidden) -->
              <div id="allegiance-details" class="details-section">
-                 <h3 id="allegiance-name-display">Allegiance Fields</h3> <!-- Title populated by ui.js -->
+                 <h3 id="allegiance-name-display">Allegiance Fields</h3>
                  <div id="allegiance-fields-container" class="fields-grid">
                      <!-- Allegiance-specific fields are dynamically generated here by ui.js -->
                  </div>

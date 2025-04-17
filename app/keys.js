@@ -6,25 +6,23 @@
 // "neoKey" is the name used for each group's unique MIFARE Key B (write key).
 
 window.NEOBAND_KEYS = {
-    // The universal read key (Key A for all sectors) - read-only:
+    // All users can read all sectors and blocks using the universal read key (Key A for all sectors) - read-only:
     universalReadKeyA: "A0A1A2A3A4A5",
    
-    // The default staff key for writing to the "public" sector(s):
-    staffKey: "FFFFFFFFFFFF",
-   
-    // Admin credentials & key:
+    // The default staff key for writing to the sector 39:
+  staff: {
+    user: {name: "User Data", neokey:"FFFFFFFFFFFF", sector: 39 },
+  },
     // Admin can read/write all sectors by either:
     //  1) Knowing all factions' neoKeys, or
-    //  2) Setting each sector’s Key B to this same admin key (less common).
+    //  2) Setting each sector's Key B to this same admin key (less common).
     // Usually you'd store references to all 30 faction + 3 allegiance keys in memory for the admin user.
     admin: {
-      username: "admin",
-      password: "supersecret",
-      // One universal admin key (if you want each sector's Key B to also be set to ADADADADADAD).
-      // Otherwise, the admin can hold references to each faction's neoKey if they need them all.
-      neoKey: "ADADADADADAD"
+      name: "admin", 
+      password: "supersecret"
     },
-   
+    //All factions and allegiances have their own unique NFC key for writing to their own data sectors and blocks and are also their password to the app
+    // 
     // 30 factions
     factions: {
       faction1:  { name: "Alleycat",  neoKey: "010101010101", sector: 1 },
@@ -61,9 +59,9 @@ window.NEOBAND_KEYS = {
    
     // 3 allegiances
     allegiances: {
-      allegiance1: { name: "Allegiance #1", neoKey: "A1A1A1A1A1A1", sector: 31 },
-      allegiance2: { name: "Allegiance #2", neoKey: "A2A2A2A2A2A2", sector: 32 },
-      allegiance3: { name: "Allegiance #3", neoKey: "A3A3A3A3A3A3", sector: 33 }
+      allegiance1: { name: "Endline", neoKey: "A1A1A1A1A1A1", sector: 36 },
+      allegiance2: { name: "Helix", neoKey: "A2A2A2A2A2A2", sector: 37 },
+      allegiance3: { name: "The Resistance", neoKey: "A3A3A3A3A3A3", sector: 38 }
     }
    };
   

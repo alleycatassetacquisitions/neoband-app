@@ -388,6 +388,7 @@ const FIELD_MAP = {
       }
     }
   },
+  //User data is stored in sector 39, Staff will have the ability to write to this sector
     user: {
       name: "User Data",
       sector: 39,

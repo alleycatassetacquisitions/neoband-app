@@ -493,7 +493,60 @@ const operations = {
             utils.log("[Allegiance Read] Allegiance read error: " + error, 'error');
             throw error;
         }
-    }
+    },
+
+    /**
+     * Writes the user's allegiance affiliation to Sector 39, Block 3.
+     * This is a special operation allowed for Allegiance-level users (via app logic) 
+     * targeting a block normally managed by Staff/Registration.
+     * Uses the universal staff key for writing, assuming Sector 39 allows Key B writes.
+     * 
+     * @param {string} allegianceName - The name of the allegiance to write.
+     * @returns {Promise<boolean>} - True if the write was successful, false otherwise.
+     */
+    writeUserAllegiance: async function(allegianceName) {
+        const sector = 39;
+        const block = 3;
+        // Use the default staff key (defined in keys.js, often FFFFFFFFFFFF)
+        // Assume this key is set as Key B for Sector 39 and allows writing to Block 3.
+        const key = NEOBAND_KEYS.staffKey; 
+        const authMode = this.AUTH_MODE_B; // Use Key B for writing
+        const keyIndex = 0; // Key index for reader-stored keys (0 = default Key A/B slot)
+
+        utils.log(`[writeUserAllegiance] Preparing to write "${allegianceName}" to Sector ${sector}, Block ${block} using Key B (staff key).`, 'info');
+
+        if (!allegianceName) {
+            utils.log("[writeUserAllegiance] Error: Allegiance name cannot be empty.", 'error');
+            return false; // Or clear the block if empty name means removal?
+        }
+
+        try {
+            // Convert allegiance name to hex, pad to 16 bytes (32 hex chars)
+            let hexData = utils.textToHex(allegianceName.slice(0, 16)); // Ensure max 16 chars
+            hexData = hexData.padEnd(32, '0'); // Pad with nulls (0x00)
+
+            utils.log(`[writeUserAllegiance] Writing hex data: ${hexData} to Sector ${sector}, Block ${block}`, 'debug');
+
+            // Use the existing writeSectorBlock via NeobandSDK, specifying Key B auth
+            const success = await NeobandSDK.writeSectorBlock(sector, block, hexData, authMode, keyIndex, key);
+
+            if (success) {
+                utils.log(`[writeUserAllegiance] Successfully wrote allegiance to Sector ${sector}, Block ${block}.`, 'success');
+                return true;
+            } else {
+                utils.log(`[writeUserAllegiance] NeobandSDK.writeSectorBlock failed for Sector ${sector}, Block ${block}.`, 'error');
+                // Attempting to provide more specific error feedback
+                const lastError = NeobandSDK.getLastError ? NeobandSDK.getLastError() : 'Unknown SDK error';
+                utils.log(`[writeUserAllegiance] SDK Last Error: ${lastError}`, 'error');
+                throw new Error(`NFC write failed for user allegiance. SDK Error: ${lastError}`); 
+            }
+        } catch (error) {
+            utils.log(`[writeUserAllegiance] Error writing allegiance to Sector ${sector}, Block ${block}: ${error.message}`, 'error');
+            // Consider re-throwing or returning false based on desired error handling
+            // Re-throwing allows the UI handler to catch and display the specific error
+            throw error; 
+        }
+    },
 };
 
 // Expose config functions for admin.js

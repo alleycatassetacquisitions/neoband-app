@@ -66,4 +66,4 @@ window.NEOBAND_KEYS = {
       allegiance3: { name: "Allegiance #3", neoKey: "A3A3A3A3A3A3", sector: 33 }
     }
    };
-   
+  

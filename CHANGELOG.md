@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] - YYYY-MM-DD
+### Added
+- Implemented role-based login system using `credentialManager.js`.
+- Updated Login page UI with role dropdown, unified key/password input, and login/logout buttons.
+- Added `CredentialMgr.getAllLoginRoles()` to populate the login dropdown.
+- Implemented login logic in `ui.js` (`handleLogin`) to authenticate users (Admin with password, others with keys) and navigate to appropriate pages.
+- Implemented logout logic (`handleLogout`) in `ui.js`.
+- Integrated Role-Based Access Control (RBAC) into `ui.js` render function:
+  - Staff: Can write/reset on Registration page (Sector 39 only).
+  - Admin: Can access Admin page and edit all faction/allegiance titles/fields.
+  - Faction/Allegiance: Can only write to their specific page/data and edit their own titles/names.
+  - Access control enforced by disabling relevant buttons and making title fields readonly based on logged-in role.
+- Added CSS styles for new login elements to match the application theme.
+
+### Changed
+- Refactored `ui.js` `init` function to use new login/logout event listeners.
+- Modified `credentialManager.js` `login` function to handle password for Admin and keys for other roles (case-insensitive key check).
+- Updated `ui.js` `render` function to conditionally enable/disable UI elements based on active credential.
+
+### Removed
+- Removed old login elements and corresponding event listeners from `index.html` and `ui.js`.
+
+### Security
+- Implemented basic access control based on logged-in role. Write operations are restricted.
+- Note: Key writing during registration was deferred due to complexity and security concerns.
+
 ## [Version 3.0.5]
 
 ### Added
@@ -373,20 +399,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 Initial project setup and basic functionality implementation.
 
-## [Unreleased] - 2025-04-13
+## [Unreleased] - 2024-06-10
 ### Added
-- Player Data section at the top of Faction and Allegiance pages, with a cyan frame.
-- Moved Current User field into Player Data section on both pages.
-- Added 'Current Allegiance' field (readonly, auto-filled from sector 39, block 3) to Player Data section on both pages.
-- New CSS class `.player-data-frame` (add to style.css) for cyan frame.
-- New function `operations.readCurrentAllegiance` to read current allegiance from sector 39, block 3.
-- New function `ui.readAndUpdateCurrentAllegiance` to update Player Data allegiance fields and core state.
-- UI now updates Player Data allegiance field after every scan or read on Faction and Allegiance pages.
+- Fully implemented `credentialManager.js` as the Credential Manager for the NeoBand App.
+- Added robust authentication logic for admin (with password), staff, factions, and allegiances.
+- Added state management for active credential, error tracking, and operation logging.
+- Exposed new public methods: `login`, `logout`, `getLastError`, and `getLog` in addition to `lookup`, `use`, and `active`.
+- Integrated detailed logging and error reporting for all credential operations, using `utils.log` when available.
+- Comprehensive inline documentation and defensive error handling per project standards.
+- Ensured compliance with Clean Code, modularity, and D-Logic app shell requirements.
 
 ### Changed
-- All Faction and Allegiance page content (dropdowns, tables, fields, buttons) now appears under the Player Data section.
-- UI render logic updated to set new allegiance fields.
+- Refactored credential lookup and state logic for clarity and maintainability.
 
-### Notes
-- No changes to Registration or Admin pages.
-- See code comments for required CSS for `.player-data-frame`.
+### Technical Notes
+- All credential operations are now logged and errors are accessible for UI feedback.
+- Admin login requires password; staff/faction/allegiance do not.
+- No UI or styling changes were made.
+
+## [3.0.5] - 2025-07-30
+### Added
+- Added an "Assign to User" button on the Allegiance page.
+- Implemented functionality (`handleAllegianceAssignUser` in `ui.js` and `writeUserAllegiance` in `operations.js`) allowing users logged in with Allegiance or Admin credentials to write the selected Allegiance name to the user's data block (Sector 39, Block 3) using the staff key.
+
+### Changed
+- Modified `index.html` to include the new button next to the allegiance selection dropdown.
+- Updated `ui.js` to add an event listener and handler for the new button, and to update the displayed current allegiance in the Player Data section after a successful assignment.
+- Updated `operations.js` to include the `writeUserAllegiance` function, which specifically targets Sector 39, Block 3 for writing the allegiance name using the staff key (Key B authentication).
+
+### Fixed
+- N/A

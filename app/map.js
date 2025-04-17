@@ -60,7 +60,7 @@ const FIELD_MAP = {
       }
     },
     faction2: {
-      name: "Faction #2",
+      name: "The Thirteens",
       sector: 2,
       fields: {
         field1: { title: "Faction #2 Field #1", placeholder: "Faction #2 Field #1 Placeholder", sector: 2, block: 0, key: NFC_KEY },
@@ -69,7 +69,7 @@ const FIELD_MAP = {
       }
     },
     faction3: {
-      name: "Faction #3",
+      name: "Wayward Communication Corporation",
       sector: 3,
       fields: {
         field1: { title: "Faction #3 Field #1", placeholder: "Faction #3 Field #1 Placeholder", sector: 3, block: 0, key: NFC_KEY },
@@ -78,7 +78,7 @@ const FIELD_MAP = {
       }
     },
     faction4: {
-      name: "Faction #4",
+      name: "Terminal 418",
       sector: 4,
       fields: {
         field1: { title: "Faction #4 Field #1", placeholder: "Faction #4 Field #1 Placeholder", sector: 4, block: 0, key: NFC_KEY },
@@ -87,7 +87,7 @@ const FIELD_MAP = {
       }
     },
     faction5: {
-      name: "Faction #5",
+      name: "The Sentinels",
       sector: 5,
       fields: {
         field1: { title: "Faction #5 Field #1", placeholder: "Faction #5 Field #1 Placeholder", sector: 5, block: 0, key: NFC_KEY },

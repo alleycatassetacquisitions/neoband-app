@@ -70,38 +70,47 @@ const operations = {
     /**
      * Scan for a tag and update core state.
      */
-    scanTag: async function() {
-        // --- New implementation using neoband-sdk ---
+    scanTag: async function () {
         utils.log("Scanning for tag using neoband-sdk...", 'info');
         try {
-            // The getUID function in NeobandSDK returns the UID string directly, not a response object
             const uid = await NeobandSDK.getUID();
             if (uid) {
                 utils.log(`[neoband-sdk] Tag detected. UID: ${uid}`, 'success');
+                // Always set selectedFaction to 'faction1' and enableNfcSync for debug/testing
                 core.updateState({
                     isTagPresent: true,
-                    scannedTagInfo: { uid: uid },
-                    bandStatus: "Detected (Unregistered)"
+                    scannedTagInfo: { uid },
+                    bandStatus: "Detected (Unregistered)",
+                    selectedFaction: 'faction1',
+                    enableNfcSync: true
                 });
+
                 if (typeof ui !== 'undefined' && typeof ui.readUsernameAndUpdateFields === 'function') {
                     try { ui.readUsernameAndUpdateFields(uid); } catch (e) {}
                 }
+
+                // Always run sync for faction1
+                utils.log(`[NFC Sync] Triggering syncFaction1DataToServer for UID: ${uid} (forced for faction1)`, 'info');
+                await operations.syncFaction1DataToServer(uid);
                 return uid;
-            } else {
+            } 
+            else {
                 utils.log("[neoband-sdk] No tag detected or scan failed.", 'warning');
                 core.updateState({ isTagPresent: false, scannedTagInfo: {}, bandStatus: "No Tag" });
                 throw new Error("[neoband-sdk] Tag scan failed");
             }
-        } catch (sdkError) {
+        } 
+        catch (sdkError) {
             utils.log('[neoband-sdk] Error during tag scan: ' + sdkError, 'error');
             throw sdkError;
         }
     },
+    
 
     /**
      * Reads a block from a given sector using the specified authentication key.
      * Uses NeobandSDK.readSectorBlock for strict block_in_sector addressing.
-     * If the key is "FFFFFFFFFFFF" (default Key A), it is mapped to keyIndex 0.
+     * If the key is "FFFFFFFFFFFFFFFF" (default Key A), it is mapped to keyIndex 0.
      * This ensures all reads use Key A/keyIndex 0 for compatibility and security.
      */
     readSectorBlock: async function(sector, block, key = "FFFFFFFFFFFF", authMode = 0x60) {
@@ -367,6 +376,73 @@ const operations = {
             return await this.writeSectorBlock(sector, block, hexData, 0x60, key);
         } catch (error) {
             utils.log(`${label} write error: ${error}`, 'error');
+            throw error;
+        }
+    },
+    
+    syncFaction1DataToServer: async function (uid) {
+        const state = core.currentState;
+
+        // Get values from state (populated by the UI after read/write)
+        const username = state.currentUsername;
+        const allegiance = state.currentAllegiance;
+        const field1 = state.field1;
+        const field2 = state.field2;
+        const field3 = state.field3;
+
+        let factionDisplay = 'Alleycat';
+        if (typeof FIELD_MAP !== 'undefined' && FIELD_MAP.factions && FIELD_MAP.factions.faction1) {
+            factionDisplay = FIELD_MAP.factions.faction1.title || 'Alleycat';
+        }
+
+        const payload = {
+            uid,
+            timestamp: Date.now(),
+            faction: factionDisplay,
+            username,
+            allegiance,
+            field1,
+            field2,
+            field3
+        };
+
+        utils.log("[NFC Sync] Sending data to server: " + JSON.stringify(payload), "debug");
+
+        try {
+            const response = await fetch("http://localhost:3000/api/nfc-sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            utils.log(`[NFC Sync] Server responded with ${response.status}`, "info");
+            if (response.ok) {
+                utils.log("✅ Synced NFC data with server (Alleycat only).", "success");
+            } else {
+                throw new Error("Server returned non-200 status");
+            }
+        } catch (err) {
+            utils.log("[NFC Sync] Failed to sync data: " + err.message, "error");
+        }
+    },
+
+    /**
+     * Read current allegiance from Sector 39, Block 3.
+     *
+     * This reads the user's current allegiance as stored in the user data sector.
+     * Returns the allegiance as a string, or throws on error.
+     */
+    readCurrentAllegiance: async function() {
+        try {
+            utils.log("[Allegiance Read] Reading current allegiance from Sector 39, Block 3...", 'info');
+            // Read allegiance from Sector 39, Block 3
+            const hexData = await this.readSectorBlock(39, 3);
+            // Convert hex to text using the correct utility
+            const allegianceText = utils.hexToText(hexData);
+            utils.log("[Allegiance Read] Converted hex to text (allegiance): " + allegianceText, 'debug');
+            return allegianceText;
+        } catch (error) {
+            utils.log("[Allegiance Read] Allegiance read error: " + error, 'error');
             throw error;
         }
     }

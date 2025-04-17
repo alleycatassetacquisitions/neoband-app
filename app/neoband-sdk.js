@@ -12,6 +12,7 @@ const NeobandSDK = (() => {
   const DEFAULT_KEY_INDEX = 0;
   const MAX_SECTOR = 39;
   const MAX_BLOCKS_PER_SECTOR = (sector) => sector < 32 ? 4 : 16;
+  const DEFAULT_AUTH_STR = '0x60'; // Key A as string for D-Logic commands
 
   function validateSectorBlock(sector, block, write = false) {
     const maxBlocksPerSector = (sector < 32) ? 4 : 16;
@@ -125,12 +126,15 @@ const NeobandSDK = (() => {
 
   const readBlock = (sector, block) => {
     validateSectorBlock(sector, block);
-    return sendRequest(`BlockRead ${sector} ${block} ${DEFAULT_AUTH} ${DEFAULT_KEY_INDEX}`).then(r => r.Data);
+    // Use BlockInSectorRead for sector/block addressing
+    return sendRequest(`BlockInSectorRead h ${sector} ${block} ${DEFAULT_AUTH_STR} ${DEFAULT_KEY_INDEX}`).then(r => r.Data);
   };
 
   const writeBlock = (sector, block, hexData) => {
     validateSectorBlock(sector, block, true);
-    return sendRequest(`BlockWrite ${sector} ${block} ${hexData} ${DEFAULT_AUTH} ${DEFAULT_KEY_INDEX}`).then(r => r.Status);
+    // Use BlockInSectorWrite for sector/block addressing
+    const dataHex = hexData.startsWith('0x') ? hexData : '0x' + hexData;
+    return sendRequest(`BlockInSectorWrite ${dataHex} ${sector} ${block} ${DEFAULT_AUTH_STR} ${DEFAULT_KEY_INDEX}`).then(r => r.Status);
   };
 
   const readSectorBlock = (sector, block, authMode = DEFAULT_AUTH, keyIndex = DEFAULT_KEY_INDEX) => {

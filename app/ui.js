@@ -82,7 +82,13 @@ const ui = {
     init: function() {
         utils.log("UI Initializing...", 'info');
 
+        //Login Page Button Listeners
+        document.getElementById('staff-login-btn')?.addEventListener('click', this.handleLogin);
+        document.getElementById('admin-login-btn')?.addEventListener('click', this.handleLogout);
+        document.getElementById('group-login-btn')?.addEventListener('click', this.handleReset);
+
         // Navigation Link Listeners
+        document.getElementById('nav-login')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('loginPage'); });
         document.getElementById('nav-reg')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('registrationPage'); });
         document.getElementById('nav-faction')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('factionPage'); });
         document.getElementById('nav-allegiance')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('allegiancesPage'); });
@@ -144,7 +150,7 @@ const ui = {
 
         // --- Update common elements ---
         // Update Band ID / Username fields across relevant pages if tag is present
-        const currentUid = state.scannedTagInfo.uid || "N/A";
+        const currentUid = state.scannedTagInfo?.uid || "N/A"; // Safe null check
         const currentUsername = state.currentUsername || "(Not Read)";
         const currentAllegiance = state.currentAllegiance || "(Not Read)";
         const displayUsername = state.currentUsername ? state.currentUsername : (currentUid !== "N/A" ? `${currentUid} (Unreg)` : "Scan Tag...");
@@ -154,6 +160,10 @@ const ui = {
         ui.updateInputValue('reg-current-allegiance', currentAllegiance);
         ui.updateInputValue('faction-current-username', displayUsername);
         ui.updateInputValue('allegiance-current-username', displayUsername);
+        // --- New: Update Player Data Allegiance fields on Faction/Allegiance pages ---
+        ui.updateInputValue('faction-current-allegiance', currentAllegiance);
+        ui.updateInputValue('allegiance-current-allegiance', currentAllegiance);
+        utils.log(`Player Data: Set currentAllegiance to '${currentAllegiance}' on Faction/Allegiance pages.`, 'debug');
 
         // Update registration status display
         let regStatus = "Unknown";
@@ -186,7 +196,7 @@ const ui = {
         ui.setButtonDisabled('allegiance-write-btn', isOpRunning);
 
         // --- Update active page ---
-        this.showPage(state.activePage);
+        this.showPage(state.activePage || 'loginPage'); // Default to login page
         utils.log(`UI Render complete for page: ${state.activePage}`, 'debug');
     },
 
@@ -204,7 +214,7 @@ const ui = {
      * @param {string} pageId - The ID of the page to display.
      * @returns {void}
      */
-    showPage: function(pageId) {
+    showPage: function(pageId = 'loginPage') { // Default parameter
         utils.log(`Navigating to page: ${pageId}`, 'debug');
         core.updateState({ activePage: pageId }, false); // Update state without triggering re-render yet
 
@@ -217,8 +227,8 @@ const ui = {
         } else {
             console.error(`Page with ID ${pageId} not found!`);
             // Show default page as fallback
-            document.getElementById('registrationPage')?.classList.add('active');
-            core.updateState({ activePage: 'registrationPage' }, false);
+            document.getElementById('loginPage')?.classList.add('active');
+            core.updateState({ activePage: 'loginPage' }, false);
         }
 
         // Update navigation menu highlighting
@@ -227,6 +237,12 @@ const ui = {
         if (activeNavLink) {
             activeNavLink.classList.add('active-nav');
         }
+        // To avoid accidental syncing when users return to the Faction page later
+        if (pageId !== 'adminPage' && core.currentState.admin?.enableNfcSync) {
+            utils.log('Leaving Admin Page — Sync flag auto-disabled', 'debug');
+            core.updateState({ enableNfcSync: false });
+        }
+        
     },
 
     // --- UI Element Updaters ---
@@ -354,6 +370,7 @@ const ui = {
             return;
         }
 
+        // Use per-field sector/block addressing for each allegiance field (MIFARE Classic compliance)
         try {
             let readCount = 0;
             for (const [fieldKey, fieldConfig] of Object.entries(allegianceData.fields)) {
@@ -368,23 +385,30 @@ const ui = {
                         fieldConfig.key,
                         `Allegiance Field ${fieldKey}`
                     );
-                    // Only update UI if data is not empty
-                    if (textData) {
-                        ui.updateInputValue(inputId, textData);
-                    }
-                    readCount++;
-                } catch (error) {
-                    utils.log(`Error reading field ${fieldKey}: ${error}`, 'error');
+                    // Log SDK call result
+                    utils.log(`[Allegiance] SDK readAllegianceField result for ${fieldKey}: "${textData}"`, 'debug');
+                    // Update the UI with the text data
+                    ui.updateInputValue(inputId, textData);
+                    utils.log(`[Allegiance] UI updated: set ${inputId} = "${textData}"`, 'debug');
+                    if (textData) readCount++;
+                } catch (fieldError) {
+                    utils.log(`[Allegiance] Failed to read field ${fieldKey} (Block ${fieldConfig.block}): ${fieldError.message}`, 'error');
+                    // Do NOT clear the field on error; preserve previous value.
+                    // Display an error message to the user.
+                    ui.showVisualConfirmation(
+                        `Allegiance Field Read Error`,
+                        `Failed to read ${fieldConfig.title}: ${fieldError.message}`,
+                        "error"
+                    );
+                    utils.log(`[Allegiance] UI error displayed for field ${fieldKey}: ${fieldError.message}`, 'debug');
                 }
             }
-            if (readCount > 0) {
-                ui.showVisualConfirmation("Read Successful", "Allegiance data read completed.", 'success');
-            } else {
-                ui.showVisualConfirmation("Read Error", "Failed to read allegiance data.", 'error');
-            }
+            ui.showVisualConfirmation("Allegiance Read Complete", `Read ${readCount} fields for ${allegianceData.name}.`, 'success');
+            // --- Update Player Data Allegiance field ---
+            await ui.readAndUpdateCurrentAllegiance();
         } catch (error) {
-            utils.log(`[Allegiance] Read failed: ${error}`, 'error');
-            ui.showVisualConfirmation("Read Error", "An error occurred during data read.", 'error');
+            utils.log(`[Allegiance] Read error: ${error.message}`, 'error');
+            ui.showVisualConfirmation("Allegiance Read Error", error.message || "Failed to read allegiance data.", 'error');
         }
     },
 
@@ -983,6 +1007,21 @@ const ui = {
                 // After a successful scan, the scanTag function already tries to read username 
                 // through readUsernameAndUpdateFields, so we don't need to do it again here
                 ui.render();
+                // --- Update Player Data Allegiance field ---
+                await ui.readAndUpdateCurrentAllegiance();
+
+                // --- Update state with latest field values and sync ---
+                // Only update for the first three fields (field1, field2, field3)
+                const fieldInputs = ['field1', 'field2', 'field3'].map(
+                    key => document.getElementById(`faction-${selectedFactionKey}-${key}-input`)
+                );
+                core.updateState({
+                    field1: fieldInputs[0] ? fieldInputs[0].value : '',
+                    field2: fieldInputs[1] ? fieldInputs[1].value : '',
+                    field3: fieldInputs[2] ? fieldInputs[2].value : ''
+                });
+                const uid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
+                if (uid) operations.syncFaction1DataToServer(uid);
            } catch (error) {
                ui.showVisualConfirmation("Scan Error", error.message || "Failed to scan tag.", 'error');
            }
@@ -1063,6 +1102,21 @@ const ui = {
                 }
             }
             ui.showVisualConfirmation("Faction Read Complete", `Read ${readCount} fields for ${factionData.name}.`, 'success');
+            // --- Update Player Data Allegiance field ---
+            await ui.readAndUpdateCurrentAllegiance();
+
+            // --- Update state with latest field values and sync ---
+            // Only update for the first three fields (field1, field2, field3)
+            const fieldInputs = ['field1', 'field2', 'field3'].map(
+                key => document.getElementById(`faction-${factionKey}-${key}-input`)
+            );
+            core.updateState({
+                field1: fieldInputs[0] ? fieldInputs[0].value : '',
+                field2: fieldInputs[1] ? fieldInputs[1].value : '',
+                field3: fieldInputs[2] ? fieldInputs[2].value : ''
+            });
+            const uid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
+            if (uid) operations.syncFaction1DataToServer(uid);
         } catch (error) { // Catch potential errors from Promise.allSettled itself (unlikely)
             utils.log(`Faction read error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Faction Read Error", error.message || "Failed to read faction data.", 'error');
@@ -1135,6 +1189,19 @@ const ui = {
                   }
              }
              ui.showVisualConfirmation("Faction Write Complete", `Wrote ${writeCount} fields for ${factionData.name}.`, 'success');
+
+             // --- Update state with latest field values and sync ---
+             // Only update for the first three fields (field1, field2, field3)
+             const writeFieldInputs = ['field1', 'field2', 'field3'].map(
+                 key => document.getElementById(`faction-${factionKey}-${key}-input`)
+             );
+             core.updateState({
+                 field1: writeFieldInputs[0] ? writeFieldInputs[0].value : '',
+                 field2: writeFieldInputs[1] ? writeFieldInputs[1].value : '',
+                 field3: writeFieldInputs[2] ? writeFieldInputs[2].value : ''
+             });
+             const writeUid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
+             if (writeUid) operations.syncFaction1DataToServer(writeUid);
          } catch (error) {
               utils.log(`Faction write error: ${error.message}`, 'error');
               ui.showVisualConfirmation("Faction Write Error", error.message || "Failed to write faction data.", 'error');
@@ -1167,6 +1234,8 @@ const ui = {
                 // After a successful scan, the scanTag function already tries to read username 
                 // through readUsernameAndUpdateFields, so we don't need to do it again here
                  ui.render();
+                // --- Update Player Data Allegiance field ---
+                await ui.readAndUpdateCurrentAllegiance();
            } catch (error) {
                ui.showVisualConfirmation("Scan Error", error.message || "Failed to scan tag.", 'error');
            }
@@ -1237,7 +1306,8 @@ const ui = {
                 }
             }
             ui.showVisualConfirmation("Allegiance Read Complete", `Read ${readCount} fields for ${allegianceData.name}.`, 'success');
-            utils.log(`[Allegiance] Read complete: ${readCount} fields read for ${allegianceData.name}`, 'info');
+            // --- Update Player Data Allegiance field ---
+            await ui.readAndUpdateCurrentAllegiance();
         } catch (error) {
             utils.log(`[Allegiance] Read error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Allegiance Read Error", error.message || "Failed to read allegiance data.", 'error');
@@ -1326,7 +1396,19 @@ const ui = {
                 }
             }
             ui.showVisualConfirmation("Allegiance Write Complete", `Wrote ${writeCount} fields for ${allegianceData.name}.`, 'success');
-            utils.log(`[Allegiance] Write complete: ${writeCount} fields written for ${allegianceData.name}`, 'info');
+
+            // --- Update state with latest field values and sync ---
+            // Only update for the first three fields (field1, field2, field3)
+            const writeFieldInputs = ['field1', 'field2', 'field3'].map(
+                key => document.getElementById(`allegiance-${allegianceKey}-${key}-input`)
+            );
+            core.updateState({
+                field1: writeFieldInputs[0] ? writeFieldInputs[0].value : '',
+                field2: writeFieldInputs[1] ? writeFieldInputs[1].value : '',
+                field3: writeFieldInputs[2] ? writeFieldInputs[2].value : ''
+            });
+            const writeUid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
+            if (writeUid) operations.syncFaction1DataToServer(writeUid);
         } catch (error) {
             utils.log(`[Allegiance] Write error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Allegiance Write Error", error.message || "Failed to write allegiance data.", 'error');
@@ -1404,6 +1486,28 @@ const ui = {
         
         // Scroll log to bottom
         logDisplay.scrollTop = logDisplay.scrollHeight;
+    },
+
+    /**
+     * Reads the current allegiance from sector 39, block 3 and updates the Player Data fields on Faction and Allegiance pages.
+     * Uses operations.readCurrentAllegiance and updates both the UI and core state.
+     * Logs all steps and errors.
+     */
+    readAndUpdateCurrentAllegiance: async function() {
+        try {
+            utils.log('[UI] Reading current allegiance for Player Data section...', 'info');
+            const allegiance = await operations.readCurrentAllegiance();
+            // Update both Player Data fields
+            ui.updateInputValue('faction-current-allegiance', allegiance);
+            ui.updateInputValue('allegiance-current-allegiance', allegiance);
+            // Update core state
+            core.updateState({ currentAllegiance: allegiance });
+            utils.log(`[UI] Updated Player Data allegiance fields to: '${allegiance}'`, 'success');
+        } catch (error) {
+            utils.log(`[UI] Error reading current allegiance: ${error}`, 'error');
+            ui.updateInputValue('faction-current-allegiance', '(Read Error)');
+            ui.updateInputValue('allegiance-current-allegiance', '(Read Error)');
+        }
     },
 
 };

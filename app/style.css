@@ -500,4 +500,13 @@ select {
     width: 100%;
     max-width: 400px;
     margin-bottom: 0;
+}
+
+.player-data-frame {
+    border: 2px solid var(--cyan);
+    border-radius: 8px;
+    background: transparent;
+    padding: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 0 8px rgba(11, 220, 243, 0.15);
 } 

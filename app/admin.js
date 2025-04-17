@@ -165,20 +165,44 @@ function initializeAdminInterface() {
           // Use plural keys for category parameter to ensure FIELD_MAP[category] is defined
           const factionsSection = createAdminSection("FACTION CONTROL", FIELD_MAP.factions, 'factions');
           container.appendChild(factionsSection);
-
+    
           const allegiancesSection = createAdminSection("ALLEGIANCE CONTROL", FIELD_MAP.allegiances, 'allegiances');
           container.appendChild(allegiancesSection);
-  
+    
           // Create section for user data (limited view)
           const userSection = createAdminSection("USER DATA (Sector 39)", FIELD_MAP.user, 'user', true);
           container.appendChild(userSection);
-  
+    
+          // Add Sync Server button
+          const syncButton = document.createElement('button');
+          syncButton.textContent = 'Sync Server';
+          syncButton.className = 'admin-button';
+          syncButton.style.marginTop = '20px';
+          syncButton.onclick = () => {
+              try {
+                  enableNfcServerSync();
+              } catch (error) {
+                  utils.log('Error enabling NFC sync: ' + error.message, 'error');
+              }
+          };
+    
+          container.appendChild(syncButton);
+    
           console.log("Admin Interface Initialized Successfully.");
-
+    
     } catch (error) {
         console.error("Error initializing admin sections:", error);
         container.innerHTML = `<p style="color: var(--error-color);">Error building admin interface. Check console for details.</p>`;
     }
+}
+
+function enableNfcServerSync() {
+    core.updateState({ 
+        enableNfcSync: true, 
+        selectedFaction: 'faction1',
+        persist: true // Ensure state survives page navigation
+    });
+    utils.log("✅ Server sync enabled for Alleycat scans", "success");
 }
 
 /**

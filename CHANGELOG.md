@@ -293,6 +293,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Implemented sector-specific delays in read/write operations to match the original app's timing adjustments for different sector types
 - Unified error handling and visual feedback to match the original app's user experience
 - Refactored `readBlock` and `writeBlock` functions to use absolute addressing with LinearRead/LinearWrite instead of sector-based addressing
+- Server sync is now initialized at app start in `core.js`, immediately after UI initialization, by calling `operations.syncFaction1DataToServer` with a placeholder UID. This ensures the sync function is always available and can be triggered or retried as needed.
+- `scanTag` now always sets `selectedFaction` to `'faction1'` and `enableNfcSync` to `true` after a successful tag scan, and always triggers `syncFaction1DataToServer` for faction1 tags. Added detailed logging in `syncFaction1DataToServer` to confirm invocation and parameters for traceability and debugging.
+- `syncFaction1DataToServer` now reads `username` (sector 39, block 0), `allegiance` (sector 39, block 2), and faction fields (sector 1, blocks 0-2) directly from the tag, and uses the display name for the faction from `FIELD_MAP` if available. This ensures the sync payload always matches the actual tag data, not possibly stale state.
 
 ### Fixed
 - Fixed consistency issues between absolute and sector-based block addressing by preferring absolute addressing for user operations
@@ -352,3 +355,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Milestone 1]
 
 Initial project setup and basic functionality implementation.
+
+## [Unreleased] - 2025-04-13
+### Added
+- Player Data section at the top of Faction and Allegiance pages, with a cyan frame.
+- Moved Current User field into Player Data section on both pages.
+- Added 'Current Allegiance' field (readonly, auto-filled from sector 39, block 3) to Player Data section on both pages.
+- New CSS class `.player-data-frame` (add to style.css) for cyan frame.
+- New function `operations.readCurrentAllegiance` to read current allegiance from sector 39, block 3.
+- New function `ui.readAndUpdateCurrentAllegiance` to update Player Data allegiance fields and core state.
+- UI now updates Player Data allegiance field after every scan or read on Faction and Allegiance pages.
+
+### Changed
+- All Faction and Allegiance page content (dropdowns, tables, fields, buttons) now appears under the Player Data section.
+- UI render logic updated to set new allegiance fields.
+
+### Notes
+- No changes to Registration or Admin pages.
+- See code comments for required CSS for `.player-data-frame`.

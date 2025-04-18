@@ -1,5 +1,4 @@
 // keys.js
-// This file lives on the LOCAL MACHINE (not on the D-Logic device).
 // It contains all the keys we need: admin, staff, 30 factions, 3 allegiances,
 // plus a universal read key for Key A if desired.
 //
@@ -11,7 +10,7 @@ window.NEOBAND_KEYS = {
    
     // The default staff key for writing to the sector 39:
   staff: {
-    user: {name: "User Data", neokey:"FFFFFFFFFFFF", sector: 39 },
+    user: {name: "User Data", neoKey:"FFFFFFFFFFFF", sector: 39 },
   },
     // Admin can read/write all sectors by either:
     //  1) Knowing all factions' neoKeys, or

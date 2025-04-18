@@ -82,10 +82,8 @@ const ui = {
     init: function() {
         utils.log("UI Initializing...", 'info');
 
-        //Login Page Button Listeners
-        document.getElementById('staff-login-btn')?.addEventListener('click', this.handleLogin);
-        document.getElementById('admin-login-btn')?.addEventListener('click', this.handleLogout);
-        document.getElementById('group-login-btn')?.addEventListener('click', this.handleReset);
+        //Login Page Elements & Listeners
+        document.getElementById('login-submit-btn')?.addEventListener('click', this.handleLoginSubmit.bind(this)); // Use bind(this) to maintain context
 
         // Navigation Link Listeners
         document.getElementById('nav-login')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('loginPage'); });
@@ -121,6 +119,7 @@ const ui = {
 
 
         // Populate dynamic dropdowns
+        this.populateLoginUserSelect(); // Add this line
         this.populateFactionSelect();
         this.populateAllegianceSelect();
         this.populateAllegianceAssignSelect(); // Populate registration allegiance dropdown
@@ -199,6 +198,148 @@ const ui = {
         // --- Update active page ---
         this.showPage(state.activePage || 'loginPage'); // Default to login page
         utils.log(`UI Render complete for page: ${state.activePage}`, 'debug');
+    },
+
+    /**
+     * Populates the login user select dropdown.
+     */
+    populateLoginUserSelect: function() {
+        const selectElement = document.getElementById('login-user-select');
+        if (!selectElement) {
+            utils.log('Login user select element not found.', 'error');
+            return;
+        }
+
+        // Clear existing options except the placeholder
+        while (selectElement.options.length > 1) {
+            selectElement.remove(1);
+        }
+
+        // Add Staff
+        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.staff && window.NEOBAND_KEYS.staff.user) {
+            const staffOption = document.createElement('option');
+            staffOption.value = 'staff';
+            staffOption.textContent = 'Staff (' + window.NEOBAND_KEYS.staff.user.name + ')';
+            selectElement.appendChild(staffOption);
+        }
+
+        // Add Admin
+        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.admin) {
+            const adminOption = document.createElement('option');
+            adminOption.value = 'admin';
+            adminOption.textContent = 'Admin (' + window.NEOBAND_KEYS.admin.name + ')';
+            selectElement.appendChild(adminOption);
+        }
+
+        // Add Factions
+        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.factions) {
+            for (const factionKey in window.NEOBAND_KEYS.factions) {
+                const faction = window.NEOBAND_KEYS.factions[factionKey];
+                const option = document.createElement('option');
+                option.value = `faction_${factionKey}`; // Unique value for each faction
+                option.textContent = `Faction: ${faction.name}`;
+                selectElement.appendChild(option);
+            }
+        }
+
+        // Add Allegiances
+        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.allegiances) {
+            for (const allegianceKey in window.NEOBAND_KEYS.allegiances) {
+                const allegiance = window.NEOBAND_KEYS.allegiances[allegianceKey];
+                const option = document.createElement('option');
+                option.value = `allegiance_${allegianceKey}`; // Unique value for each allegiance
+                option.textContent = `Allegiance: ${allegiance.name}`;
+                selectElement.appendChild(option);
+            }
+        }
+        utils.log('Login user select populated.', 'debug');
+    },
+
+    /**
+     * Handles the login submission.
+     * Validates credentials and redirects the user.
+     */
+    handleLoginSubmit: function() {
+        const userSelect = document.getElementById('login-user-select');
+        const passwordInput = document.getElementById('login-password');
+        const selectedValue = userSelect.value;
+        const password = passwordInput.value;
+
+        if (!selectedValue) {
+            this.showError('Please select a user.');
+            return;
+        }
+        if (!password) {
+            this.showError('Please enter a password.');
+            return;
+        }
+
+        let isValid = false;
+        let redirectPage = 'loginPage'; // Default page
+        let userType = '';
+        let userName = '';
+
+        try {
+            if (selectedValue === 'staff') {
+                userType = 'Staff';
+                userName = window.NEOBAND_KEYS.staff.user.name;
+                // Staff uses neoKey as password
+                if (password === window.NEOBAND_KEYS.staff.user.neoKey) {
+                    isValid = true;
+                    redirectPage = 'registrationPage';
+                }
+            } else if (selectedValue === 'admin') {
+                userType = 'Admin';
+                userName = window.NEOBAND_KEYS.admin.name;
+                // Admin uses its specific password
+                if (password === window.NEOBAND_KEYS.admin.password) {
+                    isValid = true;
+                    redirectPage = 'adminPage';
+                }
+            } else if (selectedValue.startsWith('faction_')) {
+                const factionKey = selectedValue.substring(8);
+                const faction = window.NEOBAND_KEYS.factions[factionKey];
+                userType = 'Faction';
+                userName = faction.name;
+                // Factions use neoKey as password
+                if (faction && password === faction.neoKey) {
+                    isValid = true;
+                    redirectPage = 'factionPage';
+                    // Pre-select this faction on the faction page
+                    core.updateState({ selectedFaction: factionKey }, false); // Don't re-render yet
+                }
+            } else if (selectedValue.startsWith('allegiance_')) {
+                const allegianceKey = selectedValue.substring(11);
+                const allegiance = window.NEOBAND_KEYS.allegiances[allegianceKey];
+                userType = 'Allegiance';
+                userName = allegiance.name;
+                // Allegiances use neoKey as password
+                if (allegiance && password === allegiance.neoKey) {
+                    isValid = true;
+                    redirectPage = 'allegiancesPage';
+                    // Pre-select this allegiance on the allegiance page
+                    core.updateState({ selectedAllegiance: allegianceKey }, false); // Don't re-render yet
+                }
+            }
+        } catch (error) {
+            utils.log(`Error during login validation: ${error}`, 'error');
+            this.showError('An unexpected error occurred during login.');
+            return;
+        }
+
+        if (isValid) {
+            utils.log(`${userType} '${userName}' logged in successfully. Redirecting to ${redirectPage}.`, 'success');
+            // Clear password field after successful login
+            passwordInput.value = ''; 
+            // Update core state about logged-in user (optional, but good practice)
+            core.updateState({ loggedInUserType: userType, loggedInUserName: userName }); // This will trigger render
+            this.showPage(redirectPage); // Navigate to the page
+        } else {
+            utils.log(`Login failed for user selection: ${selectedValue}`, 'warning');
+            this.showError('Invalid user or password.');
+            // Optionally clear password field on failure too
+            // passwordInput.value = ''; 
+        }
     },
 
     /**
@@ -1021,7 +1162,7 @@ const ui = {
                     field3: fieldInputs[2] ? fieldInputs[2].value : ''
                 });
                 const uid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
-                if (uid) operations.syncFaction1DataToServer(uid);
+                // if (uid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(uid); */
            } catch (error) {
                ui.showVisualConfirmation("Scan Error", error.message || "Failed to scan tag.", 'error');
            }
@@ -1115,7 +1256,7 @@ const ui = {
                 field3: fieldInputs[2] ? fieldInputs[2].value : ''
             });
             const uid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
-            if (uid) operations.syncFaction1DataToServer(uid);
+            // if (uid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(uid); */
         } catch (error) { // Catch potential errors from Promise.allSettled itself (unlikely)
             utils.log(`Faction read error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Faction Read Error", error.message || "Failed to read faction data.", 'error');
@@ -1200,7 +1341,7 @@ const ui = {
                  field3: writeFieldInputs[2] ? writeFieldInputs[2].value : ''
              });
              const writeUid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
-             if (writeUid) operations.syncFaction1DataToServer(writeUid);
+             // if (writeUid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(writeUid); */
          } catch (error) {
               utils.log(`Faction write error: ${error.message}`, 'error');
               ui.showVisualConfirmation("Faction Write Error", error.message || "Failed to write faction data.", 'error');
@@ -1406,7 +1547,7 @@ const ui = {
                 field3: writeFieldInputs[2] ? writeFieldInputs[2].value : ''
             });
             const writeUid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
-            if (writeUid) operations.syncFaction1DataToServer(writeUid);
+            // if (writeUid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(writeUid); */
         } catch (error) {
             utils.log(`[Allegiance] Write error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Allegiance Write Error", error.message || "Failed to write allegiance data.", 'error');
@@ -1508,4 +1649,34 @@ const ui = {
         }
     },
 
+    /**
+     * Displays an error message to the user.
+     * Uses a dedicated error display area.
+     * 
+     * @param {string} message - The error message to display.
+     */
+    showError: function(message) {
+        const errorElement = document.getElementById('error-message'); // Assuming you add <div id="error-message" class="error"></div> to index.html
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            // Optionally hide after a delay
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+                errorElement.textContent = '';
+            }, 5000); // Hide after 5 seconds
+        } else {
+            // Fallback to alert if the element doesn't exist
+            console.error("Error display element '#error-message' not found. Alerting instead.");
+            alert(`Error: ${message}`); 
+        }
+        utils.log(`UI Error Displayed: ${message}`, 'error');
+    }
 };
+
+/**
+ * Displays an error message to the user.
+ * Uses a dedicated error display area.
+ * 
+ * @param {string} message - The error message to display.
+ */

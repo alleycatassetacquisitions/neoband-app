@@ -82,16 +82,16 @@ const operations = {
                     scannedTagInfo: { uid },
                     bandStatus: "Detected (Unregistered)",
                     selectedFaction: 'faction1',
-                    enableNfcSync: true
+                    enableNfcSync: false
                 });
 
                 if (typeof ui !== 'undefined' && typeof ui.readUsernameAndUpdateFields === 'function') {
                     try { ui.readUsernameAndUpdateFields(uid); } catch (e) {}
                 }
 
-                // Always run sync for faction1
-                utils.log(`[NFC Sync] Triggering syncFaction1DataToServer for UID: ${uid} (forced for faction1)`, 'info');
-                await operations.syncFaction1DataToServer(uid);
+                // Only run sync if needed (remove forced debug call)
+                // utils.log(`[NFC Sync] Triggering syncFaction1DataToServer for UID: ${uid} (forced for faction1)`, 'info');
+                // await operations.syncFaction1DataToServer(uid);
                 return uid;
             } 
             else {
@@ -255,10 +255,10 @@ const operations = {
 
             utils.log("[Username Write] Converted username text to hex: " + hexData, 'debug');
             // Get staff key and call the modified writeSectorBlock
-            if (!window.NEOBAND_KEYS?.staff?.user?.neokey) {
+            if (!window.NEOBAND_KEYS?.staff?.user?.neoKey) {
                 throw new Error("[writeUsername] Staff key not found in configuration.");
             }
-            const staffKeyHex = window.NEOBAND_KEYS.staff.user.neokey;
+            const staffKeyHex = window.NEOBAND_KEYS.staff.user.neoKey;
             return await this.writeSectorBlock(39, 0, hexData, staffKeyHex);
         } catch (error) {
             utils.log("[Username Write] Username write error: " + error, 'error');
@@ -385,6 +385,8 @@ const operations = {
     /**
      * syncFaction1DataToServer
      *
+     * TODO: NFC sync functionality is currently disabled. Uncomment to re-enable server sync.
+     *
      * Sends the current state (username, allegiance, faction fields, etc.) to the backend server for syncing.
      * The server URL is dynamically determined by getServerBaseUrl(), allowing for flexible network setups.
      *
@@ -399,6 +401,7 @@ const operations = {
      *   - Catches and logs network/CORS errors (e.g., if the server is not running or CORS is not enabled).
      *   - Does not block the UI or throw uncaught errors; all failures are logged for review.
      */
+    /*
     syncFaction1DataToServer: async function (uid) {
         const state = core.currentState;
 
@@ -450,6 +453,7 @@ const operations = {
             utils.log("[NFC Sync] Failed to sync data: " + err.message, "error");
         }
     },
+    */
 
     /**
      * Reads the user's currently assigned allegiance from Sector 39, Block 3
@@ -503,7 +507,7 @@ const operations = {
         const block = FIELD_MAP.user.fields.field4.block;   // Should be 3
         // Use the default staff key (defined in keys.js, often FFFFFFFFFFFF)
         // Assume this key is set as Key B for Sector 39 and allows writing to Block 3.
-        const key = NEOBAND_KEYS.staffKey; 
+        const key = window.NEOBAND_KEYS.staff.user.neoKey; 
         const authMode = this.AUTH_MODE_B; // Use Key B for writing
         const keyIndex = 0; // Key index for reader-stored keys (0 = default Key A/B slot)
 
@@ -576,7 +580,23 @@ const operations = {
                 throw new Error("NEOBAND_KEYS configuration not loaded.");
             }
 
-            const keySettingDelay = 150; // ms delay between sector trailer writes
+            const keySettingDelay = 200; // ms delay between sector trailer writes
+
+            // Helper for validation before writing trailer
+            const validateTrailerWrite = (sector, role, keyA, keyB) => {
+                // Validate sector trailer addressing
+                utils.validateSectorTrailerAddressing(sector, true);
+                // Validate sector trailer block (should always be last block in sector)
+                const trailerBlock = sector < 32 ? 3 : 15;
+                if (!utils.isSectorTrailerBlock(sector, trailerBlock)) {
+                    const msg = `[Provisioning] Block ${trailerBlock} in sector ${sector} is not a sector trailer block.`;
+                    utils.log(msg, 'error');
+                    throw new Error(msg);
+                }
+                // Validate Key A/Key B for this sector/role
+                utils.validateKeysForSectorAndUser(sector, keyA, keyB, role, window.NEOBAND_KEYS);
+                utils.log(`[Provisioning] Validation passed for sector ${sector}, trailer block ${trailerBlock}, role ${role}.`, 'debug');
+            };
 
             // Set Faction Keys
             if (window.NEOBAND_KEYS.factions) {
@@ -584,8 +604,22 @@ const operations = {
                 for (const factionKey in window.NEOBAND_KEYS.factions) {
                     const faction = window.NEOBAND_KEYS.factions[factionKey];
                     if (faction && typeof faction.sector === 'number' && faction.name) {
-                        utils.log(`[Provisioning] Setting key for Sector ${faction.sector} (Role: ${faction.name})`, 'debug');
-                        await NeobandSDK.setUserSectorTrailer(faction.sector, faction.name);
+                        const sector = faction.sector;
+                        const role = faction.name;
+                        // Get keys for validation
+                        const keyA = window.NEOBAND_KEYS.universalReadKeyA;
+                        const keyB = faction.neoKey;
+                        validateTrailerWrite(sector, role, keyA, keyB);
+                        utils.log(`[Provisioning] Setting key for Sector ${sector} (Role: ${role})`, 'debug');
+                        await NeobandSDK.sectorTrailerWrite(
+                            sector,
+                            keyA,
+                            utils.getMifareAccessBits('zeroed'),
+                            '00',
+                            keyB,
+                            operations.AUTH_MODE_B,
+                            0
+                        );
                         sectorsUpdated++;
                         await utils.sleep(keySettingDelay);
                     } else {
@@ -600,8 +634,22 @@ const operations = {
                 for (const allegianceKey in window.NEOBAND_KEYS.allegiances) {
                     const allegiance = window.NEOBAND_KEYS.allegiances[allegianceKey];
                     if (allegiance && typeof allegiance.sector === 'number' && allegiance.name) {
-                        utils.log(`[Provisioning] Setting key for Sector ${allegiance.sector} (Role: ${allegiance.name})`, 'debug');
-                        await NeobandSDK.setUserSectorTrailer(allegiance.sector, allegiance.name);
+                        const sector = allegiance.sector;
+                        const role = allegiance.name;
+                        // Get keys for validation
+                        const keyA = window.NEOBAND_KEYS.universalReadKeyA;
+                        const keyB = allegiance.neoKey;
+                        validateTrailerWrite(sector, role, keyA, keyB);
+                        utils.log(`[Provisioning] Setting key for Sector ${sector} (Role: ${role})`, 'debug');
+                        await NeobandSDK.sectorTrailerWrite(
+                            sector,
+                            keyA,
+                            utils.getMifareAccessBits('zeroed'),
+                            '00',
+                            keyB,
+                            operations.AUTH_MODE_B,
+                            0
+                        );
                         sectorsUpdated++;
                         await utils.sleep(keySettingDelay);
                     } else {
@@ -614,8 +662,20 @@ const operations = {
             if (window.NEOBAND_KEYS.staff && window.NEOBAND_KEYS.staff.user && typeof window.NEOBAND_KEYS.staff.user.sector === 'number') {
                 utils.log("[Provisioning] Setting staff key...", 'debug');
                 const staffSector = window.NEOBAND_KEYS.staff.user.sector;
+                const role = 'staff';
+                const keyA = window.NEOBAND_KEYS.universalReadKeyA;
+                const keyB = window.NEOBAND_KEYS.staff.user.neoKey;
+                validateTrailerWrite(staffSector, role, keyA, keyB);
                 utils.log(`[Provisioning] Setting key for Sector ${staffSector} (Role: staff)`, 'debug');
-                await NeobandSDK.setUserSectorTrailer(staffSector, 'staff');
+                await NeobandSDK.sectorTrailerWrite(
+                    staffSector,
+                    keyA,
+                    utils.getMifareAccessBits('zeroed'),
+                    '00',
+                    keyB,
+                    operations.AUTH_MODE_B,
+                    0
+                );
                 sectorsUpdated++;
                 await utils.sleep(keySettingDelay);
             } else {
@@ -639,12 +699,24 @@ const operations = {
 window.getServerBaseUrl = operations.getServerBaseUrl;
 window.setServerBaseUrl = operations.setServerBaseUrl;
 
+// Add a flag to prevent concurrent provisioning
+let isProvisioning = false;
+
 /**
  * Globally accessible event handler for the "Provision Card" button.
  * Calls the operations.provisionCardWithCustomKeys function and provides UI feedback.
  * Intended to be called directly from button onclick attributes.
  */
 window.handleGlobalProvisionCard = async function() {
+    // Check if provisioning is already in progress
+    if (isProvisioning) {
+        utils.log("[Global Provision Handler] Provisioning already in progress. Please wait.", 'warning');
+        return;
+    }
+
+    // Set the flag to indicate provisioning has started
+    isProvisioning = true;
+
     // Use try-catch to ensure dependencies are available
     try {
         if (typeof utils === 'undefined' || typeof core === 'undefined' || typeof ui === 'undefined' || typeof operations === 'undefined') {
@@ -692,7 +764,31 @@ window.handleGlobalProvisionCard = async function() {
         }
     } finally {
         if (typeof ui !== 'undefined') {
-             ui.hideOperationIndicator();
+            ui.hideOperationIndicator();
         }
+        // Reset the flag when provisioning is complete or an error occurs
+        isProvisioning = false;
     }
 };
+
+// Comment out all invocations of operations.syncFaction1DataToServer(uid) in this file
+// Example:
+// if (uid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(uid); */
+
+// Modified reset handler
+async function handleReset() {
+  try {
+    const result = await NeobandSDK.formatCard();
+    if (result.includes('UFR_OK')) {
+      utils.log('Card formatted successfully', 'success');
+      return true;
+    }
+    throw new Error(`Format failed: ${result}`);
+  } catch (err) {
+    utils.log(`Format error: ${err.message}`, 'error');
+    return false;
+  }
+}
+
+// Example:
+// if (uid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(uid); */

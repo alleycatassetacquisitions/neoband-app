@@ -233,6 +233,8 @@ function initializeAdminInterface() {
           container.appendChild(userSection);
     
           // Add Sync Server button
+          /*
+          // TODO: NFC sync disabled
           const syncButton = document.createElement('button');
           syncButton.textContent = 'Sync Server';
           syncButton.className = 'admin-button';
@@ -244,8 +246,8 @@ function initializeAdminInterface() {
                   utils.log('Error enabling NFC sync: ' + error.message, 'error');
               }
           };
-    
           container.appendChild(syncButton);
+          */
     
           // Add Provision Card button (Admin Page)
           const provisionButton = document.createElement('button');
@@ -266,14 +268,17 @@ function initializeAdminInterface() {
     }
 }
 
+/*
+// TODO: NFC sync disabled
 function enableNfcServerSync() {
     core.updateState({ 
-        enableNfcSync: true, 
+        enableNfcSync: false, 
         selectedFaction: 'faction1',
-        persist: true // Ensure state survives page navigation
+        persist: false // Ensure state survives page navigation
     });
     utils.log("✅ Server sync enabled for Alleycat scans", "success");
 }
+*/
 
 /**
  * Creates an admin section for a specific category (faction, allegiance, user).
@@ -661,7 +666,7 @@ async function writeAdminData(entityKey, category) {
             // Fetch the actual hex key based on the determined role identifier (targetRole)
             let targetKeyHex = null;
             if (targetRole === 'staff') {
-                targetKeyHex = window.NEOBAND_KEYS?.staff?.user?.neokey;
+                targetKeyHex = window.NEOBAND_KEYS?.staff?.user?.neoKey;
             } else if (window.NEOBAND_KEYS?.factions?.[targetRole]?.neoKey) {
                 targetKeyHex = window.NEOBAND_KEYS.factions[targetRole].neoKey;
             } else if (window.NEOBAND_KEYS?.allegiances?.[targetRole]?.neoKey) {

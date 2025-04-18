@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Version 3.0.7] - Sector 0 Write Protection
+
+### Fixed
+- **Sector 0 Write Protection (Critical):**
+  - Modified all writing functions to skip sector 0 entirely, preventing attempts to write to the manufacturer block that caused `UFR_WRITING_ERROR`.
+  - Updated `validateSectorBlock` function to reject all write attempts to sector 0 with a clear error message.
+  - Modified the `formatCard` function to start formatting from sector 1, completely skipping sector 0.
+  - Added explicit checks in all sector trailer writing functions to reject sector 0 operations.
+  - Added explicit checks in all value block writing functions to skip sector 0.
+  - Updated `writeUserSectorBlock` to prevent sector 0 operations.
+  - Added detailed logging and error messages for all skipped sector 0 operations.
+  - **Affected files:** `app/neoband-sdk.js`
+
+## [Version 3.0.6] - Sector Trailer Write Fix
+
+### Fixed
+- **Sector Trailer Write (Critical):**
+  - Fixed a critical bug in sector trailer provisioning where the `SectorTrailerWrite_PK` command was constructed with incorrect parameters, causing 'Incorrect parameters' errors during card formatting and provisioning.
+  - Refactored all sector trailer write logic to use the `sectorTrailerWrite_PK` helper, ensuring correct parameter order and D-Logic compatibility.
+  - Updated `formatCard` and `setUserSectorTrailer` to use the correct command and authentication method (Key B, 0x61) for all sector trailer writes.
+  - Added detailed logging and error handling for all sector trailer operations.
+  - Root cause and solution documented in `Logisec-2025/secotr-trailer-error-fix.md`.
+  - **Affected files:** `app/neoband-sdk.js`, `Logisec-2025/secotr-trailer-error-fix.md`
+
 ## [Version 3.0.5]
 
 ### Added
@@ -390,3 +414,30 @@ Initial project setup and basic functionality implementation.
 ### Notes
 - No changes to Registration or Admin pages.
 - See code comments for required CSS for `.player-data-frame`.
+
+## [Version 3.0.7] - Sector Trailer User Byte Standardization
+
+### Fixed
+- **Sector Trailer User Byte:**
+  - Updated all sector trailer write operations to use '00' as the user byte instead of '69', in accordance with MIFARE and MAD best practices for non-MAD/production cards.
+  - Affected functions: `setUserSectorTrailer`, `formatCard` in `app/neoband-sdk.js`.
+  - Added detailed comments and logging to clarify the user byte choice and ensure future maintainability.
+  - This resolves non-standard card state issues and ensures compatibility with production deployments.
+
+## [1.1.6] - 2024-06-09
+### Fixed
+- Added missing `sectorTrailerWrite` and proper `sectorTrailerWrite_PK` implementations in the neoband-sdk.js file
+- Fixed script loading order in index.html to ensure NeobandSDK is fully initialized before other scripts try to access it
+- Resolved "Uncaught ReferenceError: sectorTrailerWrite is not defined" error in sector trailer operations
+- Fixed "Error during neoband-sdk presence check" issue by ensuring proper SDK initialization sequence
+
+## [Unreleased]
+- Updated `sectorTrailerWrite_PK` in `neoband-sdk.js` to skip sector 0 and reject with an error if called for sector 0, matching the protected sector logic used elsewhere in the SDK. This prevents accidental or unauthorized writes to the protected sector 0 trailer block.
+
+### Added
+- **validateKeyHex Utility Function:**
+  - Added `validateKeyHex` to `utils.js` to validate 12-character hexadecimal NFC key strings.
+  - Resolves uncaught reference errors when calling `utils.validateKeyHex` from `operations.js` and other modules.
+  - Implements detailed error logging and throws descriptive errors for invalid key formats.
+  - Ensures consistent key validation and error handling across all NFC operations.
+  - Affected files: `app/utils.js`, `app/operations.js`

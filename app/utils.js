@@ -13,7 +13,7 @@
 const utils = {
     /**
      * Constants defining the physical limitations of MIFARE Classic 4K tags.
-     * @constant {number} MAX_BLOCK_ADDRESS - Maximum linear block address in MIFARE Classic 4K (255)
+     * @constant {number} MAX_BLOCK_ADDRESS - address in MIFARE Classic 4K (255)
      * @constant {number} MAX_TEXT_LENGTH - Maximum bytes per block (16 bytes)
      */
     MAX_BLOCK_ADDRESS: 255, // MIFARE Classic 4K
@@ -560,5 +560,196 @@ hexToBytes: function(hexStr){
  */
 bytesToHex: function(byteArray){
     return Array.from(byteArray).map(b => ('0'+b.toString(16)).slice(-2)).join('').toUpperCase();
+},
+
+/**
+ * Validates sector/block addressing for MIFARE Classic 4K.
+ * Throws an error if the sector/block is out of range or forbidden.
+ * @param {number} sector - Sector number (0-39)
+ * @param {number} block - Block number within sector (0-3 or 0-15)
+ * @param {boolean} isWriteOperation - If true, applies write restrictions (no sector 0, no trailer)
+ */
+validateSectorBlock: function(sector, block, isWriteOperation = false) {
+    // Validate sector range
+    if (typeof sector !== 'number' || sector < 0 || sector > 39) {
+        const msg = `Invalid sector: ${sector}. Must be 0-39.`;
+        utils.log(msg, 'error');
+        throw new RangeError(msg);
+    }
+    // Validate block range
+    const maxBlock = sector < 32 ? 3 : 15;
+    if (typeof block !== 'number' || block < 0 || block > maxBlock) {
+        const msg = `Invalid block: ${block} for sector ${sector}. Must be 0-${maxBlock}.`;
+        utils.log(msg, 'error');
+        throw new RangeError(msg);
+    }
+    // Write restrictions
+    if (isWriteOperation) {
+        if (sector === 0) {
+            const msg = `Write access denied to sector 0 (manufacturer sector).`;
+            utils.log(msg, 'error');
+            throw new Error(msg);
+        }
+        if (utils.isSectorTrailerBlock(sector, block)) {
+            const msg = `Write access denied to sector trailer: sector ${sector}, block ${block}.`;
+            utils.log(msg, 'error');
+            throw new Error(msg);
+        }
+    }
+    utils.log(`Validated sector/block: sector ${sector}, block ${block}, write=${isWriteOperation}`, 'debug');
+    return true;
+},
+
+/**
+ * Returns true if the given sector/block is a sector trailer block.
+ * @param {number} sector - Sector number (0-39)
+ * @param {number} block - Block number within sector
+ * @returns {boolean}
+ */
+isSectorTrailerBlock: function(sector, block) {
+    const isTrailer = (sector < 32 && block === 3) || (sector >= 32 && block === 15);
+    utils.log(`isSectorTrailerBlock: sector ${sector}, block ${block} → ${isTrailer}`, 'debug');
+    return isTrailer;
+},
+
+/**
+ * Checks if a sector/block is valid for read/write operations.
+ * @param {number} sector - Sector number (0-39)
+ * @param {number} block - Block number within sector
+ * @param {boolean} isWriteOperation - If true, applies write restrictions
+ * @returns {boolean}
+ */
+isValidSectorBlock: function(sector, block, isWriteOperation = false) {
+    try {
+        // Validate sector and block range
+        const maxBlock = sector < 32 ? 3 : 15;
+        if (sector < 0 || sector > 39 || block < 0 || block > maxBlock) {
+            utils.log(`isValidSectorBlock: Invalid sector/block: sector ${sector}, block ${block}`, 'warning');
+            return false;
+        }
+        // Write restrictions
+        if (isWriteOperation) {
+            if (sector === 0) {
+                utils.log(`isValidSectorBlock: Write forbidden to sector 0`, 'warning');
+                return false;
+            }
+            if (utils.isSectorTrailerBlock(sector, block)) {
+                utils.log(`isValidSectorBlock: Write forbidden to sector trailer: sector ${sector}, block ${block}`, 'warning');
+                return false;
+            }
+        }
+        utils.log(`isValidSectorBlock: Valid sector/block: sector ${sector}, block ${block}, write=${isWriteOperation}`, 'debug');
+        return true;
+    } catch (e) {
+        utils.log(`isValidSectorBlock: Exception: ${e.message}`, 'error');
+        return false;
+    }
+},
+
+/**
+ * Validates sector trailer addressing (sector-only, no block).
+ * Throws if sector is out of range or forbidden.
+ * @param {number} sector - Sector number (0-39)
+ * @param {boolean} isWriteOperation - If true, applies write restrictions (no sector 0)
+ */
+validateSectorTrailerAddressing: function(sector, isWriteOperation = false) {
+    if (typeof sector !== 'number' || sector < 0 || sector > 39) {
+        const msg = `Invalid sector for trailer addressing: ${sector}. Must be 0-39.`;
+        utils.log(msg, 'error');
+        throw new RangeError(msg);
+    }
+    if (isWriteOperation && sector === 0) {
+        const msg = `Write access denied to sector 0 trailer (manufacturer sector).`;
+        utils.log(msg, 'error');
+        throw new Error(msg);
+    }
+    utils.log(`Validated sector trailer addressing: sector ${sector}, write=${isWriteOperation}`, 'debug');
+    return true;
+},
+
+/**
+ * Validates block-in-sector addressing (sector + block).
+ * Throws if sector/block is out of range or forbidden.
+ * @param {number} sector - Sector number (0-39)
+ * @param {number} block - Block number within sector (0-3 or 0-15)
+ * @param {boolean} isWriteOperation - If true, applies write restrictions (no sector 0, no trailer)
+ */
+validateBlockInSectorAddressing: function(sector, block, isWriteOperation = false) {
+    // Reuse validateSectorBlock for full validation and logging
+    return utils.validateSectorBlock(sector, block, isWriteOperation);
+},
+
+/**
+ * Validates Key A and Key B for a sector and user/role.
+ * Ensures keys are 12 hex chars, not default, and match expected config for the sector/user.
+ * @param {number} sector - Sector number (0-39)
+ * @param {string} keyA - Key A (12 hex chars)
+ * @param {string} keyB - Key B (12 hex chars)
+ * @param {string} userOrRole - User or role identifier (e.g., 'staff', 'faction1')
+ * @param {object} neobandKeys - NEOBAND_KEYS config object
+ * @returns {boolean}
+ */
+validateKeysForSectorAndUser: function(sector, keyA, keyB, userOrRole, neobandKeys) {
+    // Check key format
+    const hex12 = /^[0-9A-Fa-f]{12}$/;
+    if (!hex12.test(keyA)) {
+        const msg = `Key A for sector ${sector} (${userOrRole}) is invalid: ${keyA}`;
+        utils.log(msg, 'error');
+        throw new Error(msg);
+    }
+    if (!hex12.test(keyB)) {
+        const msg = `Key B for sector ${sector} (${userOrRole}) is invalid: ${keyB}`;
+        utils.log(msg, 'error');
+        throw new Error(msg);
+    }
+    // Check for default keys (optionally warn)
+    if (keyA.toUpperCase() === 'FFFFFFFFFFFF' || keyB.toUpperCase() === 'FFFFFFFFFFFF') {
+        utils.log(`Warning: Using default key (FFFFFFFFFFFF) for sector ${sector}, user/role ${userOrRole}`, 'warning');
+    }
+    // Check against NEOBAND_KEYS config if provided
+    if (neobandKeys) {
+        let expectedKeyA = null, expectedKeyB = null;
+        if (userOrRole === 'staff' && neobandKeys.staff?.user?.sector === sector) {
+            expectedKeyB = neobandKeys.staff.user.neoKey;
+            expectedKeyA = neobandKeys.universalReadKeyA;
+        } else if (neobandKeys.factions && neobandKeys.factions[userOrRole]?.sector === sector) {
+            expectedKeyB = neobandKeys.factions[userOrRole].neoKey;
+            expectedKeyA = neobandKeys.universalReadKeyA;
+        } else if (neobandKeys.allegiances && neobandKeys.allegiances[userOrRole]?.sector === sector) {
+            expectedKeyB = neobandKeys.allegiances[userOrRole].neoKey;
+            expectedKeyA = neobandKeys.universalReadKeyA;
+        }
+        if (expectedKeyA && keyA.toUpperCase() !== expectedKeyA.toUpperCase()) {
+            const msg = `Key A mismatch for sector ${sector}, user/role ${userOrRole}: expected ${expectedKeyA}, got ${keyA}`;
+            utils.log(msg, 'error');
+            throw new Error(msg);
+        }
+        if (expectedKeyB && keyB.toUpperCase() !== expectedKeyB.toUpperCase()) {
+            const msg = `Key B mismatch for sector ${sector}, user/role ${userOrRole}: expected ${expectedKeyB}, got ${keyB}`;
+            utils.log(msg, 'error');
+            throw new Error(msg);
+        }
+        utils.log(`Keys for sector ${sector}, user/role ${userOrRole} validated against NEOBAND_KEYS.`, 'debug');
+    } else {
+        utils.log(`Keys for sector ${sector}, user/role ${userOrRole} validated (no NEOBAND_KEYS check).`, 'debug');
+    }
+    return true;
+},
+
+/**
+ * Validates that a provided key is a 12-character hexadecimal string (MIFARE key format).
+ * Throws an error if the key is invalid. Used for NFC authentication key validation.
+ * @param {string} keyHex - The key to validate (should be 12 hex characters)
+ * @throws {Error} If the key is not a valid 12-character hex string
+ */
+validateKeyHex: function(keyHex) {
+    // Validate that the keyHex is a 12-character hexadecimal string (MIFARE key format)
+    if (!/^[0-9A-Fa-f]{12}$/.test(keyHex)) {
+        // Log the error with detailed information using this.log
+        this.log(`[utils] Invalid key format: must be 12 hex characters. Received: ${keyHex}`, 'error');
+        // Throw an error to halt execution and notify the caller
+        throw new Error(`[utils] Invalid key format: must be 12 hex characters. Received: ${keyHex}`);
+    } 
+    // No return needed; success is implied if no error is thrown.
 },
 };

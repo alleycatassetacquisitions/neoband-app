@@ -5,6 +5,7 @@
  * Auto-converts between text and hex.
  * Implements core NFC tag functionality with validation
  */
+//NOTE TO AI: NEVER DELETE ANY OF THESE FUNCTIONS, ONLY ADD TO THEM OR COMMENT THEM OUT IF YOU ARE GOING TO REMOVE THEM
 
 const NeobandSDK = (() => {
   const DEFAULT_KEY = 'FFFFFFFFFFFF';
@@ -18,8 +19,13 @@ const NeobandSDK = (() => {
     const maxBlocksPerSector = (sector < 32) ? 4 : 16;
     if (sector < 0 || sector > 39) throw new Error('Invalid sector: ' + sector);
     if (block < 0 || block >= maxBlocksPerSector) throw new Error(`Invalid block ${block} for sector ${sector}`);
-    if (write && (sector === 0 || block === maxBlocksPerSector - 1)) {
-      throw new Error(`Write access denied to protected sector/block: sector ${sector}, block ${block}`);
+    if (write) {
+      if (sector === 0) {
+        throw new Error(`Write access denied to protected sector 0, block ${block}. Writing to sector 0 is forbidden.`);
+      }
+      if (block === maxBlocksPerSector - 1) {
+        throw new Error(`Write access denied to sector trailer: sector ${sector}, block ${block}`);
+      }
     }
   }
 
@@ -169,24 +175,41 @@ const NeobandSDK = (() => {
 
   /**
    * Simplified sector trailer write: only allow admin or the assigned user to set their own sector trailer.
-   * Always uses standard access bits (FF078069).
+   * Always uses standard access bits (FF0780) and user byte (00 for non-MAD, production use).
    * NOTE: This function uses getSectorKeysForUser which was recently removed and re-added. Verify functionality if used.
    */
   const setUserSectorTrailer = async (sector, role) => {
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] setUserSectorTrailer: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
+    // Use sectorTrailerWrite for roles with custom Key B
     const { keyA, keyB } = getSectorKeysForUser(sector, role, true);
-    const accessBits = 'FF078069';
-    // Only allow admin or the assigned user to set their own sector trailer
-    // Command uses keyA and keyB directly, but Neoband standard is often Key B (neoKey) + Auth B for writes.
-    // D-Logic's SectorTrailerWrite might implicitly use Key A/B provided in the command for auth, OR default keys.
-    // Reverting to original command structure: SectorTrailerWrite <address_mode> <address> <newKeyA> <accessBits6> <userByte1> <newKeyB> <authKeyIndex>
-    // Using address_mode 0, authKeyIndex 0 as per D-Logic examples. Key B auth might require _PK variant.
-    const accessBitsPart = accessBits.substring(0, 6);
-    const userBytePart = accessBits.substring(6, 8);
-    // Ensure keys are hex strings without '0x' prefix if sendRequest adds it, or add '0x' if needed.
-    // Assuming sendRequest handles '0x' prefixing consistently or keys are already formatted.
-    const command = `SectorTrailerWrite 0 ${sector} ${keyA} ${accessBitsPart} ${userBytePart} ${keyB} 0`;
-    console.debug(`[neoband-sdk] setUserSectorTrailer: Command: ${command}`);
-    return sendRequest(command).then(r => r.Status);
+    //const accessBits = 'FF0780'; // Standard access bits
+    // Use zeroed access bits (all bits set to 0) as requested
+    const accessBits = getMifareAccessBits('zeroed');
+    console.debug(`[neoband-sdk] setUserSectorTrailer: Using zeroed access bits (${accessBits}) for role ${role}`);
+    
+    const userByte = '00'; // Use 00 for production/non-MAD cards
+    try {
+      const status = await sectorTrailerWrite(
+        sector,
+        keyA,
+        accessBits,
+        userByte,
+        keyB,
+        0x61, // AuthMode: Key B
+        0 // KeyIndex: always 0 for regular write
+      );
+      console.debug(`[neoband-sdk] setUserSectorTrailer: Used sectorTrailerWrite for sector ${sector}, role ${role}. AccessBits: ${accessBits}, UserByte: ${userByte}. Status:`, status);
+      return status;
+    } catch (err) {
+      console.error(`[neoband-sdk] setUserSectorTrailer: Error writing sector trailer for sector ${sector}, role ${role}:`, err);
+      // NOTE: Considered using sectorTrailerWrite_PK as fallback but not implemented since the _PK version was commented out
+      // If a fallback is needed in the future, consider uncommenting the sectorTrailerWrite_PK function
+      throw err;
+    }
   };
 
   const getCardSize = () => sendRequest('GetCardSize').then(r => r.Data);
@@ -199,64 +222,97 @@ const NeobandSDK = (() => {
    */
   const formatCard = async () => {
     try {
-      console.debug('[neoband-sdk] formatCard: Starting card format using BlockInSectorWrite and SectorTrailerWrite_PK');
-      // Default values
+      console.debug('[neoband-sdk] formatCard: Starting card format using BlockInSectorWrite and sectorTrailerWrite');
       const defaultBlockData = '00'.repeat(16); // 16 bytes of 0x00
-      // Use Universal Read Key for Key A slot, Default Key for Key B slot initially.
       if (!window.NEOBAND_KEYS || !window.NEOBAND_KEYS.universalReadKeyA) {
         throw new Error('[neoband-sdk] formatCard: NEOBAND_KEYS.universalReadKeyA is not loaded or defined.');
       }
       const universalKeyA = window.NEOBAND_KEYS.universalReadKeyA;
       const initialKeyB = DEFAULT_KEY; // FFFFFFFFFFFF
-      const defaultAccessBits = 'FF078069'; // Standard default access bits
-
-      // Validate keys before proceeding
+      //const defaultAccessBits = 'FF0780'; // Standard access bit
+      // Get zeroed access bits as requested (all bits set to 0)
+      const defaultAccessBits = getMifareAccessBits('zeroed');
+      console.debug(`[neoband-sdk] formatCard: Using zeroed access bits: ${defaultAccessBits}`);
+      
+      const defaultUserByte = '00'; // Use 00 for production/non-MAD cards
       validateKeyHex(universalKeyA);
       validateKeyHex(initialKeyB);
-
-      // Format all sectors
-      for (let sector = 0; sector <= MAX_SECTOR; sector++) {
+      
+      // Track processed blocks to prevent duplicate writes
+      const processedBlocks = new Set();
+      
+      // Skip sector 0 entirely as writing to it is forbidden
+      console.debug('[neoband-sdk] formatCard: Skipping sector 0 entirely (writing to sector 0 is forbidden)');
+      for (let sector = 1; sector <= MAX_SECTOR; sector++) {
         const blocks = (sector < 32) ? 4 : 16;
-        // Write default data to all data blocks (skip trailer block)
+        // Write each data block (0, 1, 2, ... blocks-2) exactly once
         for (let block = 0; block < blocks - 1; block++) {
+          // Create a unique identifier for this sector/block combination
+          const blockId = `${sector}-${block}`;
+          
+          // Skip if this block has already been processed
+          if (processedBlocks.has(blockId)) {
+            console.debug(`[neoband-sdk] formatCard: Skipping already processed block: sector ${sector}, block ${block}`);
+            continue;
+          }
+          
           try {
+            // Mark this block as processed before sending the request
+            processedBlocks.add(blockId);
+            
             await sendRequest(`BlockInSectorWrite 0x${defaultBlockData} ${sector} ${block} ${DEFAULT_AUTH_STR} ${DEFAULT_KEY_INDEX}`);
             console.debug(`[neoband-sdk] formatCard: Wrote default data to sector ${sector}, block ${block}`);
           } catch (err) {
             console.error(`[neoband-sdk] formatCard: Error writing to sector ${sector}, block ${block}:`, err);
-            // Continue formatting other blocks
           }
         }
-        // Write default keys and access bits to trailer block (D-Logic expects 6 parameters)
+        
         const trailerBlock = (sector < 32) ? 3 : 15;
+        // Create a unique identifier for the trailer block
+        const trailerBlockId = `${sector}-trailer`;
+        
+        // Skip if this trailer has already been processed
+        if (processedBlocks.has(trailerBlockId)) {
+          console.debug(`[neoband-sdk] formatCard: Skipping already processed trailer for sector ${sector}`);
+          continue;
+        }
+        
+        // Mark this trailer as processed
+        processedBlocks.add(trailerBlockId);
+        
         try {
-          // SectorTrailerWrite requires KeyA, AccessBits (first 6 bytes), UserByte (next 1 byte), KeyB
-          // We use universalKeyA for the Key A slot and initialKeyB for the Key B slot.
-          const accessBitsHex = defaultAccessBits.substring(0, 6); // e.g., FF0780
-          const userByteHex = defaultAccessBits.substring(6, 8);   // e.g., 69
-
-          // Use the PK variant for formatting, authenticating with the default FFFFFFFFFFFF key B (since Key A might not be default yet)
-          // Use SectorTrailerWrite_PK, authenticating with the default key FFFFFFFFFFFF using Key B (0x61)
-
-          // This assumes the card is either factory default OR the previous Key B was FFFFFFFFFFFF.
-
-          // If Key B is unknown, formatting might fail. Robust formatting might require trying Key A auth first.
-
-          const defaultAuthKey = DEFAULT_KEY; // FFFFFFFFFFFF
-
-          const command = `SectorTrailerWrite_PK 0 ${sector} ${universalKeyA} ${accessBitsHex} ${userByteHex} ${initialKeyB} 0x61 ${defaultAuthKey}`;
-
-          // DEBUG: Log the command being sent
-          console.debug(`[neoband-sdk] formatCard: SectorTrailerWrite command for sector ${sector}: ${command}`);
-
-          await sendRequest(command);
-          // Original attempt using hardcoded DEFAULT_KEY for Key A slot:
-          // await sendRequest(`SectorTrailerWrite 0 ${sector} ${DEFAULT_KEY} ${accessBitsPart} ${userBytePart} ${initialKeyB} 0`);
-
-          console.debug(`[neoband-sdk] formatCard: Reset sector trailer for sector ${sector}, block ${trailerBlock} with KeyA=${universalKeyA}, KeyB=${initialKeyB}`);
+          // Use sectorTrailerWrite for correct command construction
+          const status = await sectorTrailerWrite(
+            sector,
+            universalKeyA,
+            defaultAccessBits,
+            defaultUserByte,
+            initialKeyB,
+            0x61, // AuthMode: Key B
+            0 // KeyIndex: always 0 for regular write
+          );
+          console.debug(`[neoband-sdk] formatCard: Reset sector trailer for sector ${sector}, block ${trailerBlock} with KeyA=${universalKeyA}, KeyB=${initialKeyB}, AccessBits=${defaultAccessBits}, UserByte=${defaultUserByte}. Status:`, status);
         } catch (err) {
           console.error(`[neoband-sdk] formatCard: Error resetting sector trailer for sector ${sector}:`, err);
-          // Continue formatting other sectors
+          // Only retry if error is not "Incorrect parameters"
+          if (err && err.message && !/Incorrect parameters/i.test(err.message)) {
+            try {
+              const statusRetry = await sectorTrailerWrite(
+                sector,
+                universalKeyA,
+                defaultAccessBits,
+                defaultUserByte,
+                initialKeyB,
+                0x61,
+                0
+              );
+              console.debug(`[neoband-sdk] formatCard: Retry sector trailer for sector ${sector} with zeroed access bits (${defaultAccessBits}) succeeded. Status:`, statusRetry);
+            } catch (retryErr) {
+              console.error(`[neoband-sdk] formatCard: Retry failed for sector trailer in sector ${sector} with zeroed access bits:`, retryErr);
+              // NOTE: Fallback using BlockInSectorWrite was suggested but not implemented as it's not appropriate for sector trailers
+              // If a fallback is needed in the future, consider uncommenting and adapting the sectorTrailerWrite_PK function instead
+            }
+          }
         }
       }
       return 'Success';
@@ -598,126 +654,291 @@ const NeobandSDK = (() => {
 
   // --- Sector Trailer Operations ---
   /**
-   * Writes a sector trailer with specified keys and access bits (standard auth).
-   * Corresponds to D-Logic 'SectorTrailerWrite'.
-   * @param {number} sector - Sector address (0-39).
-   * @param {string} keyA - New Key A (12 hex chars).
-   * @param {string} accessBits - Access bits (e.g., 'FF0780' or 'FF078069'). 6 or 8 hex chars.
-   * @param {string} userByte - User byte (usually '69' if using 8 hex char accessBits, otherwise part of accessBits). 2 hex chars.
-   * @param {string} keyB - New Key B (12 hex chars).
-   * @param {number|string} authMode - Authentication mode for the operation (0x60 or 0x61).
-   * @param {number} keyIndex - Key index used for authentication (usually 0).
-   * @returns {Promise<string>} Status of the write operation.
+   * Standard sector trailer write function using keys provided by keyIndex.
+   * @param {number} sector - The sector to write the trailer to
+   * @param {string} keyA - 6-byte Key A in hexadecimal (12 characters)
+   * @param {string} accessBits - 3-byte access bits in hexadecimal (6 characters)
+   * @param {string} userByte - 1-byte user byte in hexadecimal (2 characters) 
+   * @param {string} keyB - 6-byte Key B in hexadecimal (12 characters)
+   * @param {number} authMode - Authentication mode (0x60 for Key A, 0x61 for Key B)
+   * @param {number} keyIndex - Index of the key to use for authentication
+   * @returns {Promise<string>} - Status of the operation
    */
-  const sectorTrailerWrite = (sector, keyA, accessBits, userByte, keyB, authMode = DEFAULT_AUTH, keyIndex = DEFAULT_KEY_INDEX) => {
-    validateSectorBlock(sector, 0); // Validate sector only
+  /**
+  const sectorTrailerWrite = async (sector, keyA, accessBits, userByte, keyB, authMode = DEFAULT_AUTH, keyIndex = DEFAULT_KEY_INDEX) => {
+    const trailerBlock = sector < 32 ? 3 : 15;
+    
+    // Validate inputs
+    validateSectorBlock(sector, trailerBlock);
     validateKeyHex(keyA);
-    validateKeyHex(keyB);
-    // Combine accessBits (6 hex) and userByte (2 hex) for validation
-    const combinedAccess = accessBits + userByte;
-    if (!/^[0-9A-Fa-f]{8}$/.test(combinedAccess)) throw new Error('[neoband-sdk] Invalid accessBits + userByte format: must be 8 hex characters total.');
-
-    const newKeyAHex = formatHexData(keyA);
-    const newKeyBHex = formatHexData(keyB);
-    // D-Logic command expects separate Access Bits (6 hex) and User Byte (2 hex)
-    const accessBitsPart = combinedAccess.substring(0, 6);
-    const userBytePart = combinedAccess.substring(6, 8);
-
-    // D-Logic script.js: SectorTrailerWrite adressMode adress newKeyA block0 block1 block2 sectorTrailAccessBits sectorTrailAccessByte newKeyB authMode keyIndex
-    // Mapping: adressMode=1 (sector), adress=sector, newKeyA=keyA, block0..2=accessBits, sectorTrailAccessBits=userByte?, sectorTrailAccessByte=??, newKeyB=keyB
-    // The D-Logic command seems complex and might have different interpretations or parameter orders depending on firmware/mode.
-    // Example: SectorTrailerWrite 0 1 FFFFFFFFFFFF FF0780 69 FFFFFFFFFFFF 0
-    // The command takes the *new* keys/access bits as data.
-    // Authentication is handled separately by sendRequest (using authMode/keyIndex as defaults if not using PK variant).
-    // Let's ensure the authMode/keyIndex parameters passed to this function are used for the authentication step if possible,
-    // although sendRequest currently uses defaults. This might need refinement if auth requires specific keys.
-    const command = `SectorTrailerWrite 0 ${sector} ${newKeyAHex} ${accessBitsPart} ${userBytePart} ${newKeyBHex} 0`; // Final 0 might be auth key index?
+    validteKeyHex(keyB);
+    validateAuthMode(authMode);
+    
+    if (!/^[0-9A-Fa-f]{6}$/.test(accessBits)) {
+      throw new Error('Invalid access bits: must be 6 hexadecimal characters (3 bytes)');
+    }
+    
+    if (!/^[0-9A-Fa-f]{2}$/.test(userByte)) {
+      throw new Error('Invalid user byte: must be 2 hexadecimal characters (1 byte)');
+    }
+    
+    const authStr = authMode === 0x61 || authMode === 97 ? '0x61' : '0x60';
+    const trailerData = `${keyA}${accessBits}${userByte}${keyB}`;
+    
+    // Construct command using BlockInSectorWrite with proper trailer data
+    const command = `BlockInSectorWrite 0x${trailerData} ${sector} ${trailerBlock} ${authStr} ${keyIndex}`;
     console.debug('[neoband-sdk] sectorTrailerWrite command:', command);
-    // This command likely requires prior authentication using authMode/keyIndex which sendRequest handles internally with defaults.
-    // The function signature includes authMode/keyIndex, but they are not directly used in the command string here.
-    // If authentication needs to use the provided authMode/keyIndex, sendRequest logic or the command string needs adjustment.
+    
     return sendRequest(command).then(r => r.Status);
   };
+  */
 
   /**
-   * Writes a sector trailer with specified keys and access bits using a provided key (_PK).
-   * Corresponds to D-Logic 'SectorTrailerWrite_PK'.
-   * @param {number} sector - Sector address (0-39).
-   * @param {string} keyA - New Key A (12 hex chars).
-   * @param {string} accessBits - Access bits (e.g., 'FF0780'). 6 hex chars.
-   * @param {string} userByte - User byte (e.g., '69'). 2 hex chars.
-   * @param {string} keyB - New Key B (12 hex chars).
-   * @param {number|string} authMode - Authentication mode for the operation (0x60 or 0x61).
-   * @param {string} authKeyHex - Key used for authentication (12 hex chars).
-   * @returns {Promise<string>} Status of the write operation.
+   * Writes a sector trailer with specified keys and access conditions.
+   * Based on D-Logic SectorTrailerWrite implementation as demonstrated in sector_trailer_write.js example.
+   * 
+   * This function uses the direct SectorTrailerWrite command which takes the following parameters:
+   * - addressing_mode: 1 for sector addressing
+   * - address: sector number
+   * - new_key_A: 12 hex characters for Key A
+   * - access bits: access conditions for blocks 0-2 (as separate values)
+   * - trailer access bits: access conditions for sector trailer
+   * - trailer byte 9: general purpose byte
+   * - new_key_B: 12 hex characters for Key B
+   * - auth_mode: authentication mode (0x60 for Key A, 0x61 for Key B)
+   * - key_index: index of the key in the reader
+   * 
+   * @param {number} sector - The sector number (0-39)
+   * @param {string} keyA - 12 hex chars for Key A (new value to write)
+   * @param {string} accessBits - 6 hex chars for all access bits (e.g., 'FF0780')
+   * @param {string} userByte - 2 hex chars for user/GPB byte (e.g., '00')
+   * @param {string} keyB - 12 hex chars for Key B (new value to write)
+   * @param {number} authMode - Authentication mode (0x60 for Key A, 0x61 for Key B)
+   * @param {number} keyIndex - Index of the key in the reader (0-31)
+   * @returns {Promise<string>} Status of the operation
    */
-  const sectorTrailerWrite_PK = (sector, keyA, accessBits, userByte, keyB, authMode, authKeyHex) => {
-      validateSectorBlock(sector, 0); // Validate sector only
-      validateKeyHex(keyA);
-      validateKeyHex(keyB);
-      validateKeyHex(authKeyHex);
-      // Combine accessBits (6 hex) and userByte (2 hex) for validation
-      const combinedAccess = accessBits + userByte;
-      if (!/^[0-9A-Fa-f]{8}$/.test(combinedAccess)) throw new Error('[neoband-sdk] Invalid accessBits + userByte format: must be 8 hex characters total.');
+  const sectorTrailerWrite = async (sector, keyA, accessBits, userByte, keyB, authMode = DEFAULT_AUTH, keyIndex = DEFAULT_KEY_INDEX) => {
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] sectorTrailerWrite: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
 
-      const newKeyAHex = formatHexData(keyA);
-      const newKeyBHex = formatHexData(keyB);
-      const accessBitsPart = combinedAccess.substring(0, 6);
-      const userBytePart = combinedAccess.substring(6, 8);
-      const authKeyStr = formatHexData(authKeyHex);
-      const authModeStr = formatAuthMode(authMode);
+    // Use sector addressing mode - CORRECTED: This should be a number, not a string
+    const ADDRESSING_MODE = 1; // 1 = sector addressing
+    
+    // Validate inputs
+    validateKeyHex(keyA);
+    validateKeyHex(keyB);
+    validateAuthMode(authMode);
+    
+    if (!/^[0-9A-Fa-f]{6}$/.test(accessBits)) {
+      throw new Error('[neoband-sdk] Invalid access bits: must be 6 hexadecimal characters (3 bytes)');
+    }
+    
+    if (!/^[0-9A-Fa-f]{2}$/.test(userByte)) {
+      throw new Error('[neoband-sdk] Invalid user byte: must be 2 hexadecimal characters (1 byte)');
+    }
 
-      // D-Logic script.js: SectorTrailerWrite_PK adressMode adress newKeyA block0 block1 block2 sectorTrailAccessBits sectorTrailAccessByte newKeyB authMode key
-      // Mapping attempt: SectorTrailerWrite_PK 0 <sector> <newKeyA> <accessBits6> <userByte1> <newKeyB> <authModeStr> <authKeyStr>
-      // Note: D-Logic examples often use address_mode 0 for trailers. Let's use 0.
-      const command = `SectorTrailerWrite_PK 0 ${sector} ${newKeyAHex} ${accessBitsPart} ${userBytePart} ${newKeyBHex} ${authModeStr} ${authKeyStr}`;
-      console.debug('[neoband-sdk] sectorTrailerWrite_PK command:', command);
-      return sendRequest(command).then(r => r.Status);
+    try {
+      // Check if we're using zeroed access bits
+      const isZeroed = accessBits === '000000';
+      
+      // CORRECTED: Parse hex string values to decimal integers for the D-Logic API
+      // Access bits for each block (0,1,2) should be decimal integers
+      const block0AccessBits = parseInt(accessBits.slice(0, 2), 16);
+      const block1AccessBits = parseInt(accessBits.slice(2, 4), 16);
+      const block2AccessBits = parseInt(accessBits.slice(4, 6), 16);
+      
+      // For sector trailer access bits (trailerAccessBits) and byte 9 (GPB)
+      // If zeroed access bits, set all to 0
+      const trailerAccessBits = isZeroed ? 0 : 7; // Use specific value instead of 0 (7 is common for trailer)
+      const gpb = parseInt(userByte, 16);
+      
+      // Format keys with 0x prefix
+      const formattedKeyA = formatHexWithPrefix(keyA);
+      const formattedKeyB = formatHexWithPrefix(keyB);
+      const formattedAuthMode = authMode === 0x61 || authMode === 97 ? '0x61' : '0x60';
+      
+      // Build command according to D-Logic SectorTrailerWrite format
+      // Corrected params order and format for D-Logic API
+      // const command = `SectorTrailerWrite ${ADDRESSING_MODE} ${sector} ${formattedKeyA} ${block0AccessBits} ${block1AccessBits} ${block2AccessBits} ${trailerAccessBits} ${gpb} ${formattedKeyB} ${formattedAuthMode} ${keyIndex}`;
+      
+      // Build the command array
+      const cmdArr = [
+        'SectorTrailerWrite',
+        ADDRESSING_MODE,
+        sector,
+        formattedKeyA,
+        block0AccessBits,
+        block1AccessBits,
+        block2AccessBits,
+        trailerAccessBits,
+        gpb,
+        formattedKeyB,
+        formattedAuthMode,
+        keyIndex
+      ];
+      
+      const command = cmdArr.join(' ');
+      console.debug('[neoband-sdk] sectorTrailerWrite command:', command);
+      
+      const response = await sendRequest(command);
+      if (response?.Status !== 0 && response?.Status !== 'UFR_OK') {
+        throw new Error(`uFR Reader Error during SectorTrailerWrite: ${response?.Status || 'Unknown Status'}`);
+      }
+      
+      console.info(`[neoband-sdk] sectorTrailerWrite successful for Sector: ${sector}. Status: ${response?.Status}`);
+      return response?.Status;
+    } catch (err) {
+      console.error(`[neoband-sdk] sectorTrailerWrite error for Sector ${sector}:`, err);
+      throw err;
+    }
   };
-
 
   /**
-   * Writes a sector trailer directly using a 16-byte hex string (standard auth). Unsafe, use with caution.
-   * Corresponds to D-Logic 'SectorTrailerWriteUnsafe'.
-   * @param {number} sector - Sector address (0-39).
-   * @param {string} trailerHexData - 16 bytes (32 hex chars) for the sector trailer (KeyA + AccessBits/UserByte + KeyB).
-   * @param {number|string} authMode - Authentication mode for the operation (0x60 or 0x61).
-   * @param {number} keyIndex - Key index used for authentication (usually 0).
-   * @returns {Promise<string>} Status of the write operation.
+   * Ensures a hexadecimal string has the '0x' prefix and is uppercase.
+   * @param {string | any} hexString
+   * @returns {string}
    */
-  const sectorTrailerWriteUnsafe = (sector, trailerHexData, authMode = DEFAULT_AUTH, keyIndex = DEFAULT_KEY_INDEX) => {
-      validateSectorBlock(sector, 0); // Validate sector only
-      const trailerHex = formatHexData(trailerHexData);
-      if (trailerHex.length !== 34) throw new Error('[neoband-sdk] Invalid trailerHexData length for sectorTrailerWriteUnsafe. Must be 16 bytes (32 hex chars + 0x).');
-      const authStr = formatAuthMode(authMode);
-      // Command: SectorTrailerWriteUnsafe <address_mode> <address> <trailer_data> <authMode> <keyIndex>
-      // Assuming address_mode 0 for sector trailer.
-      const command = `SectorTrailerWriteUnsafe 0 ${sector} ${trailerHex} ${authStr} ${keyIndex}`;
-      console.debug('[neoband-sdk] sectorTrailerWriteUnsafe command:', command);
-      return sendRequest(command).then(r => r.Status);
-  };
+  function formatHexWithPrefix(hexString) {
+    if (typeof hexString !== 'string') {
+        if (hexString === null || hexString === undefined) {
+            throw new Error(`[neoband-sdk] formatHexWithPrefix: Input cannot be null or undefined.`);
+        }
+        console.warn(`[neoband-sdk] formatHexWithPrefix: Expected string, received ${typeof hexString}. Attempting conversion.`);
+        hexString = String(hexString);
+    }
+    const cleanHex = hexString.replace(/^0x/i, '').trim();
+    return '0x' + cleanHex.toUpperCase();
+  }
 
   /**
-   * Writes a sector trailer directly using a 16-byte hex string with a provided key (_PK). Unsafe, use with caution.
-   * Corresponds to D-Logic 'SectorTrailerWriteUnsafe_PK'.
-   * @param {number} sector - Sector address (0-39).
-   * @param {string} trailerHexData - 16 bytes (32 hex chars) for the sector trailer.
-   * @param {number|string} authMode - Authentication mode for the operation (0x60 or 0x61).
-   * @param {string} authKeyHex - Key used for authentication (12 hex chars).
-   * @returns {Promise<string>} Status of the write operation.
+   * Validates a 6-byte (12 hex chars) MIFARE key string.
+   * @param {string} keyHex
+   * @param {string} keyName
    */
-  const sectorTrailerWriteUnsafe_PK = (sector, trailerHexData, authMode, authKeyHex) => {
-      validateSectorBlock(sector, 0); // Validate sector only
-      validateKeyHex(authKeyHex);
-      const trailerHex = formatHexData(trailerHexData);
-       if (trailerHex.length !== 34) throw new Error('[neoband-sdk] Invalid trailerHexData length for sectorTrailerWriteUnsafe_PK. Must be 16 bytes (32 hex chars + 0x).');
-      const authStr = formatAuthMode(authMode);
-      const keyStr = formatHexData(authKeyHex);
-      // Command: SectorTrailerWriteUnsafe_PK <address_mode> <address> <trailer_data> <authMode> <key>
-      const command = `SectorTrailerWriteUnsafe_PK 0 ${sector} ${trailerHex} ${authStr} ${keyStr}`;
-      console.debug('[neoband-sdk] sectorTrailerWriteUnsafe_PK command:', command);
-      return sendRequest(command).then(r => r.Status);
+  function validateMifareKey(keyHex, keyName) {
+    if (typeof keyHex !== 'string') {
+        throw new Error(`[neoband-sdk] Invalid ${keyName}: Must be a string, received ${typeof keyHex}.`);
+    }
+    const cleanKey = keyHex.replace(/^0x/i, '').trim();
+    if (!/^[0-9A-F]{12}$/i.test(cleanKey)) {
+        throw new Error(`[neoband-sdk] Invalid ${keyName} ("${keyHex}"): Must be 12 hexadecimal characters (0-9, A-F).`);
+    }
+  }
+
+  /**
+   * Provides recommended access bits for different use cases in MIFARE Classic sectors.
+   * These access bits define permissions for operations on different blocks within a sector.
+   * Returns access bits in the format required by the sectorTrailerWrite function.
+   * 
+   * @param {string} useCase - Predefined use case: 'default', 'readonly', 'writeprotected', 'transport', 'secure'
+   * @returns {string} Access bits as a 6-character hex string (e.g., '787788')
+   */
+  function getMifareAccessBits(useCase = 'default') {
+    // Access bit patterns for different use cases
+    const ACCESS_BITS = {
+      // Default - Normal R/W access for data blocks, secured sector trailer
+      // Block 0,1,2: Full R/W with KeyA or KeyB (78)
+      // Trailer: KeyB can change KeyA (88)
+      'default': '787888',
+      
+      // Transport - Factory default, less secure but compatible
+      // Block 0,1,2: Full R/W with KeyA or KeyB (78)
+      // Trailer: KeyA can read/write all, KeyB read-only (77)
+      'transport': '787877',
+      
+      // Read-only - Data blocks read-only, sector trailer protected 
+      // Block 0,1,2: Read-only with both keys (78)
+      // Trailer: KeyB can change access bits and KeyA (8F)
+      'readonly': '78788F',
+      
+      // Write-protected - Data blocks protected, auth needed for read
+      // Block 0,1,2: KeyA read only, KeyB no access (79)
+      // Trailer: KeyB can change KeyA (88)
+      'writeprotected': '797988',
+      
+      // Secure - Highly secured, Key B needed for all operations
+      // Block 0,1,2: KeyB required for all operations (7F)
+      // Trailer: KeyB can change access bits and KeyA (8F)
+      'secure': '7F7F8F',
+      
+      // Zeroed - All bits set to 0 - most open permissions 
+      // Block 0,1,2: All bits 0 (full access)
+      // Trailer: All bits 0 (full access)
+      'zeroed': '000000',
+    };
+    
+    return ACCESS_BITS[useCase] || ACCESS_BITS['default'];
+  }
+
+  /**
+   * Writes a sector trailer using sector addressing and separate access bits as required by D-Logic API.
+   * @param {number} sector - The sector number (0-39)
+   * @param {string} keyA - 12 hex chars (Key A)
+   * @param {string} accessBits - 6 hex chars (e.g. 'FF0780')
+   * @param {string} userByte - 2 hex chars (e.g. '00')
+   * @param {string} keyB - 12 hex chars (Key B)
+   * @param {number|string} authMode - 0x60 or 0x61
+   * @param {string} authKeyHex - 12 hex chars (auth key)
+   * @returns {Promise<string>} Status
+   */
+   /**
+  const sectorTrailerWrite_PK = async (sector, keyA, accessBits, userByte, keyB, authMode, authKeyHex) => {
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] sectorTrailerWrite_PK: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
+    // Use sector addressing mode
+    const ADDRESSING_MODE = 1; // 1 = sector addressing
+    // Validate and format keys
+    validateMifareKey(keyA, "New Key A");
+    validateMifareKey(keyB, "New Key B");
+    validateMifareKey(authKeyHex, "Authentication Key");
+    validateAuthMode(authMode);
+    if (typeof accessBits !== 'string' || !/^[0-9A-Fa-f]{6}$/.test(accessBits)) {
+      throw new Error(`[neoband-sdk] Invalid Access Bits: must be 6 hex chars (e.g. 'FF0780').`);
+    }
+    if (typeof userByte !== 'string' || !/^[0-9A-Fa-f]{2}$/.test(userByte)) {
+      throw new Error(`[neoband-sdk] Invalid User Byte: must be 2 hex chars (e.g. '00').`);
+    }
+    // Split access bits into three separate bytes
+    const accessBytes = [
+      '0x' + accessBits.slice(0, 2).toUpperCase(),
+      '0x' + accessBits.slice(2, 4).toUpperCase(),
+      '0x' + accessBits.slice(4, 6).toUpperCase()
+    ];
+    const trailerByte9 = '0x' + userByte.toUpperCase();
+    const formattedKeyA = formatHexWithPrefix(keyA);
+    const formattedKeyB = formatHexWithPrefix(keyB);
+    const formattedAuthKey = formatHexWithPrefix(authKeyHex);
+    const formattedAuthMode = authMode === 0x61 || authMode === 97 ? '0x61' : '0x60';
+    // Build the command array
+    const cmdArr = [
+      'SectorTrailerWrite_PK',
+      ADDRESSING_MODE,
+      sector,
+      formattedKeyA,
+      ...accessBytes,
+      trailerByte9,
+      formattedKeyB,
+      formattedAuthMode,
+      formattedAuthKey
+    ];
+    const command = cmdArr.join(' ');
+    console.debug('[neoband-sdk] sectorTrailerWrite_PK (sector addressing, split access bits) command:', command);
+    const response = await sendRequest(command);
+    if (response?.Status !== 0 && response?.Status !== 'UFR_OK') {
+      throw new Error(`uFR Reader Error during SectorTrailerWrite_PK: ${response?.Status || 'Unknown Status'}`);
+    }
+    console.info(`[neoband-sdk] sectorTrailerWrite_PK successful for Sector: ${sector}. Status: ${response?.Status}`);
+    return response?.Status;
   };
+/*
+  // Store the original implementation for the tryAll function
+  sectorTrailerWrite_PK.__impl = sectorTrailerWrite_PK;
 
   // --- Value Block Operations ---
   /**
@@ -810,10 +1031,16 @@ const NeobandSDK = (() => {
    * @returns {Promise<string>} Status of the write operation.
    */
   const valueBlockInSectorWrite = (sector, block, value, valueAddress, authMode = DEFAULT_AUTH, keyIndex = DEFAULT_KEY_INDEX) => {
-      validateSectorBlock(sector, block, true); // Write operation
-      const authStr = formatAuthMode(authMode);
-      // Command: ValueBlockInSectorWrite <value> <valueAddress> <sector> <block> <authMode> <keyIndex>
-      return sendRequest(`ValueBlockInSectorWrite ${value} ${valueAddress} ${sector} ${block} ${authStr} ${keyIndex}`).then(r => r.Status);
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] valueBlockInSectorWrite: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
+    
+    validateSectorBlock(sector, block, true); // Write operation
+    const authStr = formatAuthMode(authMode);
+    // Command: ValueBlockInSectorWrite <value> <valueAddress> <sector> <block> <authMode> <keyIndex>
+    return sendRequest(`ValueBlockInSectorWrite ${value} ${valueAddress} ${sector} ${block} ${authStr} ${keyIndex}`).then(r => r.Status);
   };
 
   /**
@@ -828,12 +1055,18 @@ const NeobandSDK = (() => {
    * @returns {Promise<string>} Status of the write operation.
    */
   const valueBlockInSectorWrite_PK = (sector, block, value, valueAddress, authMode, keyHex) => {
-      validateSectorBlock(sector, block, true); // Write operation
-      validateKeyHex(keyHex);
-      const authStr = formatAuthMode(authMode);
-      const keyStr = formatHexData(keyHex);
-      // Command: ValueBlockInSectorWrite_PK <value> <valueAddress> <sector> <block> <authMode> <key>
-      return sendRequest(`ValueBlockInSectorWrite_PK ${value} ${valueAddress} ${sector} ${block} ${authStr} ${keyStr}`).then(r => r.Status);
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] valueBlockInSectorWrite_PK: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
+    
+    validateSectorBlock(sector, block, true); // Write operation
+    validateKeyHex(keyHex);
+    const authStr = formatAuthMode(authMode);
+    const keyStr = formatHexData(keyHex);
+    // Command: ValueBlockInSectorWrite_PK <value> <valueAddress> <sector> <block> <authMode> <key>
+    return sendRequest(`ValueBlockInSectorWrite_PK ${value} ${valueAddress} ${sector} ${block} ${authStr} ${keyStr}`).then(r => r.Status);
   };
 
 
@@ -882,10 +1115,16 @@ const NeobandSDK = (() => {
    * @returns {Promise<string>} Status of the operation.
    */
   const valueBlockInSectorIncrement = (sector, block, incrementValue, authMode = DEFAULT_AUTH, keyIndex = DEFAULT_KEY_INDEX) => {
-      validateSectorBlock(sector, block, true); // Write operation
-      const authStr = formatAuthMode(authMode);
-      // Command: ValueBlockInSectorIncrement <incrementValue> <sector> <block> <authMode> <keyIndex>
-      return sendRequest(`ValueBlockInSectorIncrement ${incrementValue} ${sector} ${block} ${authStr} ${keyIndex}`).then(r => r.Status);
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] valueBlockInSectorIncrement: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
+    
+    validateSectorBlock(sector, block, true); // Write operation
+    const authStr = formatAuthMode(authMode);
+    // Command: ValueBlockInSectorIncrement <incrementValue> <sector> <block> <authMode> <keyIndex>
+    return sendRequest(`ValueBlockInSectorIncrement ${incrementValue} ${sector} ${block} ${authStr} ${keyIndex}`).then(r => r.Status);
   };
 
   /**
@@ -899,12 +1138,18 @@ const NeobandSDK = (() => {
    * @returns {Promise<string>} Status of the operation.
    */
   const valueBlockInSectorIncrement_PK = (sector, block, incrementValue, authMode, keyHex) => {
-      validateSectorBlock(sector, block, true); // Write operation
-      validateKeyHex(keyHex);
-      const authStr = formatAuthMode(authMode);
-      const keyStr = formatHexData(keyHex);
-      // Command: ValueBlockInSectorIncrement_PK <incrementValue> <sector> <block> <authMode> <key>
-      return sendRequest(`ValueBlockInSectorIncrement_PK ${incrementValue} ${sector} ${block} ${authStr} ${keyStr}`).then(r => r.Status);
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] valueBlockInSectorIncrement_PK: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
+    
+    validateSectorBlock(sector, block, true); // Write operation
+    validateKeyHex(keyHex);
+    const authStr = formatAuthMode(authMode);
+    const keyStr = formatHexData(keyHex);
+    // Command: ValueBlockInSectorIncrement_PK <incrementValue> <sector> <block> <authMode> <key>
+    return sendRequest(`ValueBlockInSectorIncrement_PK ${incrementValue} ${sector} ${block} ${authStr} ${keyStr}`).then(r => r.Status);
   };
 
   /**
@@ -918,10 +1163,16 @@ const NeobandSDK = (() => {
    * @returns {Promise<string>} Status of the operation.
    */
   const valueBlockInSectorDecrement = (sector, block, decrementValue, authMode = DEFAULT_AUTH, keyIndex = DEFAULT_KEY_INDEX) => {
-      validateSectorBlock(sector, block, true); // Write operation
-      const authStr = formatAuthMode(authMode);
-      // Command: ValueBlockInSectorDecrement <decrementValue> <sector> <block> <authMode> <keyIndex>
-      return sendRequest(`ValueBlockInSectorDecrement ${decrementValue} ${sector} ${block} ${authStr} ${keyIndex}`).then(r => r.Status);
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] valueBlockInSectorDecrement: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
+    
+    validateSectorBlock(sector, block, true); // Write operation
+    const authStr = formatAuthMode(authMode);
+    // Command: ValueBlockInSectorDecrement <decrementValue> <sector> <block> <authMode> <keyIndex>
+    return sendRequest(`ValueBlockInSectorDecrement ${decrementValue} ${sector} ${block} ${authStr} ${keyIndex}`).then(r => r.Status);
   };
 
   /**
@@ -935,12 +1186,18 @@ const NeobandSDK = (() => {
    * @returns {Promise<string>} Status of the operation.
    */
   const valueBlockInSectorDecrement_PK = (sector, block, decrementValue, authMode, keyHex) => {
-      validateSectorBlock(sector, block, true); // Write operation
-      validateKeyHex(keyHex);
-      const authStr = formatAuthMode(authMode);
-      const keyStr = formatHexData(keyHex);
-      // Command: ValueBlockInSectorDecrement_PK <decrementValue> <sector> <block> <authMode> <key>
-      return sendRequest(`ValueBlockInSectorDecrement_PK ${decrementValue} ${sector} ${block} ${authStr} ${keyStr}`).then(r => r.Status);
+    // Skip sector 0 writing - sector 0 is protected
+    if (sector === 0) {
+      console.error('[neoband-sdk] valueBlockInSectorDecrement_PK: Skipping sector 0 as writing to it is forbidden');
+      return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+    }
+    
+    validateSectorBlock(sector, block, true); // Write operation
+    validateKeyHex(keyHex);
+    const authStr = formatAuthMode(authMode);
+    const keyStr = formatHexData(keyHex);
+    // Command: ValueBlockInSectorDecrement_PK <decrementValue> <sector> <block> <authMode> <key>
+    return sendRequest(`ValueBlockInSectorDecrement_PK ${decrementValue} ${sector} ${block} ${authStr} ${keyStr}`).then(r => r.Status);
   };
 
   // --- Misc Operations ---
@@ -967,14 +1224,24 @@ const NeobandSDK = (() => {
    */
   const universalReadBlock = async (sector, block) => {
     validateSectorBlock(sector, block); // Validate sector/block ranges
-    if (!window.NEOBAND_KEYS || !window.NEOBAND_KEYS.universalReadKeyA) {
-      throw new Error('[neoband-sdk] universalReadBlock: NEOBAND_KEYS.universalReadKeyA is not loaded or defined.');
+    let universalKeyHex = null;
+    if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.universalReadKeyA) {
+      universalKeyHex = window.NEOBAND_KEYS.universalReadKeyA;
     }
-    const universalKeyHex = window.NEOBAND_KEYS.universalReadKeyA;
-    validateKeyHex(universalKeyHex); // Ensure the key format is valid
-
-    // Use blockInSectorRead_PK with AuthMode A (0x60) and the universal key
-    return await blockInSectorRead_PK(sector, block, 0x60, universalKeyHex);
+    if (universalKeyHex) {
+      validateKeyHex(universalKeyHex); // Ensure the key format is valid
+      // Use blockInSectorRead_PK with AuthMode A (0x60) and the universal key
+      return await blockInSectorRead_PK(sector, block, 0x60, universalKeyHex);
+    } else {
+      // Log warning and fallback to blockInSectorRead (reader key slot 0)
+      console.warn('[neoband-sdk] universalReadBlock: NEOBAND_KEYS.universalReadKeyA is not loaded or defined. Falling back to reader key slot 0.');
+      try {
+        return await blockInSectorRead(sector, block, 0x60, 0); // Use key index 0
+      } catch (fallbackErr) {
+        console.error('[neoband-sdk] universalReadBlock: Fallback to blockInSectorRead failed:', fallbackErr);
+        throw new Error('[neoband-sdk] universalReadBlock: No universalReadKeyA and fallback to reader key slot 0 failed.');
+      }
+    }
   };
 
   /**
@@ -998,7 +1265,7 @@ const NeobandSDK = (() => {
       // Determine role type and find the specific Key B (neoKey)
       if (role === 'staff' && window.NEOBAND_KEYS.staff?.user?.sector === sector) {
           roleType = 'staff';
-          keyB = window.NEOBAND_KEYS.staff.user.neokey;
+          keyB = window.NEOBAND_KEYS.staff.user.neoKey;
           // Special case for writing staff sector trailer: use staff key for both Key A and Key B authentication?
           // Based on D-Logic SectorTrailerWrite, it takes NEW keys as data, authentication key is separate.
           // Sticking to universalKeyA for Key A slot, staff neoKey for Key B slot.
@@ -1033,6 +1300,12 @@ const NeobandSDK = (() => {
    * @returns {Promise<string>} Status of the write operation.
    */
   const writeUserSectorBlock = async (sector, block, hexData, role) => {
+      // Skip sector 0 writing - sector 0 is protected
+      if (sector === 0) {
+        console.error(`[writeUserSectorBlock] Skipping sector 0 as writing to it is forbidden. Role: ${role}`);
+        return Promise.reject(new Error('[neoband-sdk] Writing to sector 0 is forbidden'));
+      }
+      
       console.debug(`[writeUserSectorBlock] Writing Sector ${sector}, Block ${block} for Role: ${role}`);
       validateSectorBlock(sector, block, true); // Validate for write
       const dataHex = formatHexData(hexData);
@@ -1040,7 +1313,7 @@ const NeobandSDK = (() => {
 
       try {
           const { keyB } = getSectorKeysForUser(sector, role); // Get Key B for the role/sector
-          const authMode = 0x61; // Always use AuthMode B for writing with specific neoKey
+          const authMode = 0x61; // Always use AuthMode B for writing with specific K
 
           console.debug(`[writeUserSectorBlock] Using KeyB: ${keyB}, AuthMode: ${authMode}`);
           // Call the _PK variant with the retrieved Key B
@@ -1053,10 +1326,12 @@ const NeobandSDK = (() => {
 
   return {
     // --- [RE-ADDED] Functions (Verify use case) ---
+    //NOTE TO AI: NEVER DELETE ANY OF THESE FUNCTIONS, ONLY ADD TO THEM OR COMMENT THEM OUT IF YOU ARE GOING TO REMOVE THEM
     getSectorKeysForUser, // Re-added for potential use by setUserSectorTrailer or other logic
     writeUserSectorBlock, // Re-added for potential role-based write logic
 
-    // --- Per-user access functions ---
+    // --- Per-user access functions --- 
+    //NOTE TO AI: NEVER DELETE ANY OF THESE FUNCTIONS, ONLY ADD TO THEM OR COMMENT THEM OUT IF YOU ARE GOING TO REMOVE THEM
     setUserSectorTrailer,
     // --- Generic admin/advanced functions ---
     blockInSectorRead,
@@ -1100,9 +1375,8 @@ const NeobandSDK = (() => {
     linearWrite_PK,
     // --- Sector Trailer operations ---
     sectorTrailerWrite,
-    sectorTrailerWrite_PK,
-    sectorTrailerWriteUnsafe,
-    sectorTrailerWriteUnsafe_PK,
+    getMifareAccessBits, // Added helper for working with access bits
+    // sectorTrailerWrite_PK, // <-- commented out to prevent ReferenceError
     // --- Value Block operations (linear address) ---
     valueBlockRead_PK,
     valueBlockWrite_PK,

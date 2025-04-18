@@ -34,15 +34,16 @@
       This is a requirement of the D-Logic app shell.
       
       Load sequence:
-      1. map.js - Defines the MIFARE memory map structure (FIELD_MAP)
-      2. utils.js - Utility functions for hex conversion, logging, etc.
-      3. ui.js - UI manipulation and event handling
-      4. core.js - Application state management and initialization
+      1. keys.js - Defines the encryption keys for NFC operations
+      2. neoband-sdk.js - Core SDK for NFC communication
+      3. map.js - Defines the MIFARE memory map structure (FIELD_MAP)
+      4. utils.js - Utility functions for hex conversion, logging, etc.
       5. operations.js - NFC communication and card operations
-      6. admin.js - Administrative interface functionality
+      6. core.js - Application state management and initialization
+      7. ui.js - UI manipulation and event handling
+      8. admin.js - Administrative interface functionality
     -->
     <script src="app/keys.js"></script>
-    <script src="app/credentialManager.js"></script>
     <script src="app/neoband-sdk.js"></script>
     <script src="app/map.js"></script>        <!-- Load map.js FIRST to make FIELD_MAP available to other modules -->
     <script src="app/utils.js"></script>      <!-- Utility functions used by all other modules -->
@@ -89,33 +90,24 @@
          <div id="loginPage" class="page active">
                     
            <h2>Neoband App Login</h2>
-
+           <div id="error-message" class="error"></div> <!-- Removed inline styles -->
+           <!-- Added for login errors -->
             <div class="form-group">
-                    <label for="staff-login-btn">Staff Login:</label>
-                    <button id="staff-login-btn" class="btn">Staff Login</button>
-                    <button id="admin-login-btn" class="btn">Admin Login</button>
-            </div>
-            <div class="form-group">
-                        <label for="groupSelect">Select Faction/Allegiance:</label>
-                        <select id="groupSelect">
-                            <option value="">-- Select --</option>
-                            <!-- We'll populate these options dynamically, or hardcode them -->
+                <label for="login-user-select">Select User:</label>
+                <select id="login-user-select" class="input">
+                    <option value="">-- Select User --</option>
+                    <!-- Options will be populated by ui.js -->
                 </select>
             </div>
 
             <div class="form-group">
-                        <label for="group-login-user">Username:</label>
-                        <input id="group-login-user" type="text" placeholder="Username (optional)">
-            </div>
-                
-            <div class="form-group">
-                        <label for="group-login-pass">Password:</label>
-                        <input id="group-login-pass" type="password" placeholder="Password (optional)">
+                <label for="login-password">Password:</label>
+                <input id="login-password" type="password" class="input" placeholder="Enter Password">
             </div>
 
-          <div class="button-group">
-                        <button id="group-login-btn" class="btn">Faction/Allegiance Login</button>
-          </div>    
+            <div class="button-group">
+                <button id="login-submit-btn" class="btn">Login</button>
+            </div>
         </div>
     
 
@@ -159,7 +151,7 @@
                 <button id="reg-read-btn" class="btn btn-secondary">Read</button>
                 <button id="reg-write-btn" class="btn">Write</button>
                 <button id="reg-reset-btn" class="btn btn-danger">Reset</button>
-                <button id="reg-provision-btn" class="btn btn-warning" onclick="handleGlobalProvisionCard()">Provision Card</button>
+                <button id="reg-provision-btn" class="btn btn-warning">Provision Card</button>
             </div>
         </div>
 

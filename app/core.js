@@ -227,11 +227,11 @@ const core = {
         }
 
         // --- Initialize server sync at app start ---
-        if (typeof operations !== 'undefined' && typeof operations.syncFaction1DataToServer === 'function') {
-            utils.log('[Startup] Initializing server sync at app start (no tag present, placeholder UID)...', 'info');
-            // Use null or empty string as UID since no tag is present yet
-            operations.syncFaction1DataToServer('');
-        }
+        // if (typeof operations !== 'undefined' && typeof operations.syncFaction1DataToServer === 'function') {
+        //     utils.log('[Startup] Initializing server sync at app start (no tag present, placeholder UID)...', 'info');
+        //     // Use null or empty string as UID since no tag is present yet
+        //     operations.syncFaction1DataToServer(''); // TODO: NFC sync disabled
+        // }
     },
 
     /**

@@ -735,13 +735,14 @@ validateKeysForSectorAndUser: function(sector, keyA, keyB, userOrRole, neobandKe
     }
     return true;
 },
-
 /**
  * Validates that a provided key is a 12-character hexadecimal string (MIFARE key format).
  * Throws an error if the key is invalid. Used for NFC authentication key validation.
  * @param {string} keyHex - The key to validate (should be 12 hex characters)
  * @throws {Error} If the key is not a valid 12-character hex string
  */
+
+/**
 validateKeyHex: function(keyHex) {
     // Validate that the keyHex is a 12-character hexadecimal string (MIFARE key format)
     if (!/^[0-9A-Fa-f]{12}$/.test(keyHex)) {
@@ -749,7 +750,8 @@ validateKeyHex: function(keyHex) {
         this.log(`[utils] Invalid key format: must be 12 hex characters. Received: ${keyHex}`, 'error');
         // Throw an error to halt execution and notify the caller
         throw new Error(`[utils] Invalid key format: must be 12 hex characters. Received: ${keyHex}`);
-    } 
+    },
     // No return needed; success is implied if no error is thrown.
-},
-};
+  }
+ */
+ }

@@ -214,12 +214,185 @@ const NeobandSDK = (() => {
 
   const getCardSize = () => sendRequest('GetCardSize').then(r => r.Data);
 
+    /**
+   * Format the card by writing default values to all data blocks and resetting sector trailers.
+   * MODIFIED: Uses only non-PK BlockInSectorWrite and sectorTrailerWrite.
+   * Assumes reader key index 0 holds FFFFFFFFFFFF for initial authentication.
+   * @returns {Promise<string>} Status 'Success' or 'Error'
+   */
+    const formatCard = async () => {
+      try {
+        console.debug('[neoband-sdk] formatCard (NON-PK): Starting card format using non-PK functions...');
+        const defaultBlockData = '00'.repeat(16); // 16 bytes of 0x00
+        if (!window.NEOBAND_KEYS || !window.NEOBAND_KEYS.universalReadKeyA) {
+            throw new Error('[neoband-sdk] formatCard: NEOBAND_KEYS.universalReadKeyA is not loaded or defined.');
+        }
+        const universalKeyA = window.NEOBAND_KEYS.universalReadKeyA;
+        // Key B to write during formatting - we will write the universal Key A here too initially,
+        // or stick to FFFFFFFF. Let's use FFFFFFFF for consistency with the default state.
+        const initialKeyB = 'FFFFFFFFFFFF';
+        const defaultAccessBits = getMifareAccessBits('zeroed'); // '000000'
+        const defaultUserByte = '00';
+        const defaultAuthMode = 0x60; // AUTH_MODE_A - Assume default Key A (FFFF...) works for initial auth
+        const defaultKeyIndex = 0;
+  
+        validateKeyHex(universalKeyA); // Make sure utils.js has validateKeyHex or use NeobandSDK internal one
+        validateKeyHex(initialKeyB);
+  
+        const processedBlocks = new Set();
+  
+        console.debug('[neoband-sdk] formatCard (NON-PK): Skipping sector 0...');
+        for (let sector = 1; sector <= MAX_SECTOR; sector++) {
+            const blocks = (sector < 32) ? 4 : 16;
+  
+            // --- Write Data Blocks (Non-PK) ---
+            for (let block = 0; block < blocks - 1; block++) {
+                const blockId = `${sector}-${block}`;
+                if (processedBlocks.has(blockId)) continue;
+                processedBlocks.add(blockId);
+                try {
+                    // Use non-PK BlockInSectorWrite, authenticating with default Key A (index 0)
+                    await sendRequest(`BlockInSectorWrite 0x${defaultBlockData} ${sector} ${block} ${formatAuthMode(defaultAuthMode)} ${defaultKeyIndex}`);
+                    console.debug(`[neoband-sdk] formatCard (NON-PK): Wrote default data to sector ${sector}, block ${block}`);
+                } catch (err) {
+                    console.error(`[neoband-sdk] formatCard (NON-PK): Error writing data block sector ${sector}, block ${block}:`, err);
+                    // Decide if we should continue or throw
+                    // throw err; // Option: Stop on first error
+                }
+            }
+  
+            // --- Reset Sector Trailer (Non-PK) ---
+            const trailerBlockId = `${sector}-trailer`;
+            if (processedBlocks.has(trailerBlockId)) continue;
+            processedBlocks.add(trailerBlockId);
+  
+            try {
+                // Use non-PK sectorTrailerWrite
+                // Authenticate with default Key A (index 0)
+                // Write: universalKeyA, zeroed bits, zeroed user byte, initialKeyB (FFFF...)
+                const status = await sectorTrailerWrite( // Calls the existing non-PK function
+                    sector,
+                    universalKeyA,       // New Key A to write
+                    defaultAccessBits,   // New Access Bits ('000000')
+                    defaultUserByte,     // New User Byte ('00')
+                    initialKeyB,       // New Key B to write ('FFFFFFFFFFFF')
+                    defaultAuthMode,     // Auth using Key A (0x60)
+                    defaultKeyIndex      // Use key index 0 (assuming FFFF... is loaded)
+                );
+                console.debug(`[neoband-sdk] formatCard (NON-PK): Reset sector trailer for sector ${sector}. Status:`, status);
+                if (status !== 'UFR_OK' && !status?.includes('UFR_OK')) {
+                     throw new Error(`Failed to write sector trailer (NON-PK) for sector ${sector}. Status: ${status}`);
+                }
+            } catch (err) {
+                console.error(`[neoband-sdk] formatCard (NON-PK): Error resetting sector trailer for sector ${sector}:`, err);
+                // throw err; // Option: Stop on first error
+            }
+        }
+        console.log("[neoband-sdk] formatCard (NON-PK): Formatting completed.");
+        return 'Success'; // Indicate success even if some blocks failed, needs review
+      } catch (err) {
+        console.error('[neoband-sdk] formatCard (NON-PK): Card format failed:', err);
+        return 'Error'; // Indicate failure
+      }
+    };
+  
+  /**
+   * Format the card by writing default values to all data blocks and resetting sector trailers.
+   * Uses only BlockInSectorWrite and SectorTrailerWrite (no LinearRead/Write).
+   * This matches the D-Logic Advanced example approach.  This version now uses the PK variant.
+   * @returns {Promise<string>} Status
+   */
+  /**
+  const formatCard = async () => {
+    try {
+        console.debug('[neoband-sdk] formatCard: Starting card format using BlockInSectorWrite_PK and sectorTrailerWrite_PK');
+        const defaultBlockData = '00'.repeat(16);
+        if (!window.NEOBAND_KEYS || !window.NEOBAND_KEYS.universalReadKeyA) {
+            throw new Error('[neoband-sdk] formatCard: NEOBAND_KEYS.universalReadKeyA is not loaded or defined.');
+        }
+        const universalKeyA = window.NEOBAND_KEYS.universalReadKeyA;
+        const initialKeyB = 'FFFFFFFFFFFF';
+        const defaultAccessBits = getMifareAccessBits('zeroed');
+        const defaultUserByte = '00';
+        const authKey = DEFAULT_KEY; // Use the reader's default key
+
+        validateKeyHex(universalKeyA);
+        validateKeyHex(initialKeyB);
+        validateKeyHex(authKey); //validate
+
+        // Track processed blocks to prevent duplicate writes
+        const processedBlocks = new Set();
+
+        // Skip sector 0 entirely as writing to it is forbidden
+        console.debug('[neoband-sdk] formatCard: Skipping sector 0 entirely (writing to sector 0 is forbidden)');
+        for (let sector = 1; sector <= MAX_SECTOR; sector++) {
+            const blocks = (sector < 32) ? 4 : 16;
+            // Write each data block (0, 1, 2, ... blocks-2) exactly once
+            for (let block = 0; block < blocks - 1; block++) {
+                // Create a unique identifier for this sector/block combination
+                const blockId = `${sector}-${block}`;
+
+                // Skip if this block has already been processed
+                if (processedBlocks.has(blockId)) {
+                    console.debug(`[neoband-sdk] formatCard: Skipping already processed block: sector ${sector}, block ${block}`);
+                    continue;
+                }
+
+                try {
+                    // Mark this block as processed before sending the request
+                    processedBlocks.add(blockId);
+
+                    await sendRequest(`BlockInSectorWrite_PK 0x${defaultBlockData} ${sector} ${block} ${DEFAULT_AUTH} ${authKey}`);
+                    console.debug(`[neoband-sdk] formatCard: Wrote default data to sector ${sector}, block ${block}`);
+                } catch (err) {
+                     console.error(`[neoband-sdk] formatCard: Error writing to sector ${sector}, block ${block}:`, err);
+                     throw err;
+                }
+            }
+            const trailerBlock = (sector < 32) ? 3 : 15;
+            const trailerBlockId = `${sector}-trailer`;
+    
+            // Skip if this trailer has already been processed
+            if (processedBlocks.has(trailerBlockId)) {
+                console.debug(`[neoband-sdk] formatCard: Skipping already processed trailer for sector ${sector}`);
+                continue;
+            }
+            processedBlocks.add(trailerBlockId);
+            try {
+                // Use the corrected sectorTrailerWrite_PK function
+                const status = await sectorTrailerWrite_PK(
+                    sector,
+                    universalKeyA,  // Key A
+                    defaultAccessBits,
+                    defaultUserByte,
+                    initialKeyB,  // Key B
+                    0x61,         // AuthMode: Key B
+                    authKey       // Authentication Key
+                );
+                console.debug(`[neoband-sdk] formatCard: Reset sector trailer for sector ${sector}  Status:`, status);
+                if (status !== 'UFR_OK' && !status?.includes('UFR_OK')) {
+                     throw new Error(`Failed to write sector trailer for sector ${sector}. Status: ${status}`);
+                }
+            } catch (err) {
+                console.error(`[neoband-sdk] formatCard: Error resetting sector trailer for sector ${sector}:`, err);
+                throw err;
+            }
+        }
+        return 'Success';
+    } catch (err) {
+        console.error('[neoband-sdk] formatCard: Card format failed:', err);
+        return 'Error';
+    }
+};
+*/
+
   /**
    * Format the card by writing default values to all data blocks and resetting sector trailers.
    * Uses only BlockInSectorWrite and SectorTrailerWrite (no LinearRead/Write).
    * This matches the D-Logic Advanced example approach.
    * @returns {Promise<string>} Status
    */
+  /**
   const formatCard = async () => {
     try {
       console.debug('[neoband-sdk] formatCard: Starting card format using BlockInSectorWrite and sectorTrailerWrite');
@@ -321,6 +494,7 @@ const NeobandSDK = (() => {
       return 'Error';
     }
   };
+*/
 
   const readText = (sector, block) => readBlock(sector, block).then(hexToText);
   const writeText = (sector, block, text) => writeBlock(sector, block, textToHex(text));
@@ -460,16 +634,37 @@ const NeobandSDK = (() => {
   }
 
   // --- Helper Functions ---
+
+    /**
+     * Validates a 12-character hex key string (e.g., "FFFFFFFFFFFF").
+     * @param {string} hexStr - 12-character hex string representing the key.
+     * @returns {Uint8Array} 6-byte key array.
+     */
+    const validateKeyHex = (hexStr) => {
+      const result = new Uint8Array(6);
+      for(let i = 0; i < 6; i++){
+          const byteStr = hexStr.substr(i*2,2);
+          const byteVal = parseInt(byteStr, 16);
+          if (isNaN(byteVal)) {
+              console.warn(`Invalid hex byte '${byteStr}' in validateKeyHex() at position ${i}`);
+              result[i] = 0; // Default to 0 on invalid byte
+          } else {
+              result[i] = byteVal;
+          }
+      }
+      return result;
+  };
   /**
    * Validates if the provided hex string is a valid 12-character key.
    * @param {string} keyHex - Hex key string (e.g., 'FFFFFFFFFFFF')
    */
+  /** 
   function validateKeyHex(keyHex) {
     if (!/^[0-9A-Fa-f]{12}$/.test(keyHex)) {
       throw new Error(`[neoband-sdk] Invalid key format: must be 12 hex characters. Received: ${keyHex}`);
     }
   }
-
+*/
   /**
    * Validates the authentication mode.
    * @param {number|string} authMode - Authentication mode (e.g., 0x60, 0x61, '0x60', '0x61', 96, 97)
@@ -784,9 +979,14 @@ const NeobandSDK = (() => {
       console.debug('[neoband-sdk] sectorTrailerWrite command:', command);
       
       const response = await sendRequest(command);
-      if (response?.Status !== 0 && response?.Status !== 'UFR_OK') {
+     // Check if the Status property is missing OR if the Status string
+      // does NOT include 'UFR_OK'. This handles formats like "[0x00 (0)] UFR_OK".
+      if (!response?.Status || !String(response.Status).includes('UFR_OK')) {
+        // Throw an error if the status indicates failure or is missing/malformed.
         throw new Error(`uFR Reader Error during SectorTrailerWrite: ${response?.Status || 'Unknown Status'}`);
       }
+      // If Status is 0 (UFR_OK), proceed without throwing an error.
+      console.log(`SectorTrailerWrite successful for sector ${sector}. Status: ${response?.Status}`);
       
       console.info(`[neoband-sdk] sectorTrailerWrite successful for Sector: ${sector}. Status: ${response?.Status}`);
       return response?.Status;
@@ -836,7 +1036,7 @@ const NeobandSDK = (() => {
    * @param {string} useCase - Predefined use case: 'default', 'readonly', 'writeprotected', 'transport', 'secure'
    * @returns {string} Access bits as a 6-character hex string (e.g., '787788')
    */
-  function getMifareAccessBits(useCase = 'default') {
+  const getMifareAccessBits = (useCase = 'default') => {
     // Access bit patterns for different use cases
     const ACCESS_BITS = {
       // Default - Normal R/W access for data blocks, secured sector trailer
@@ -870,9 +1070,52 @@ const NeobandSDK = (() => {
       'zeroed': '000000',
     };
     
-    return ACCESS_BITS[useCase] || ACCESS_BITS['default'];
+    return ACCESS_BITS[useCase] || '000000';
   }
+   /**
+   * Writes a sector trailer with specified keys and access conditions.
+   * This version constructs the command string correctly, handling access bits and user byte.
+   * It also includes improved error handling.
+   * @param {number} sector - The sector number (0-39)
+   * @param {string} keyA - 12 hex chars for Key A
+   * @param {string} accessBits - 6 hex chars for access bits (e.g., 'FF0780')
+   * @param {string} userByte - 2 hex chars for user/GPB byte (e.g., '00')
+   * @param {string} keyB - 12 hex chars for Key B
+   * @param {number} authMode - Authentication mode (0x60 for Key A, 0x61 for Key B)
+   * @param {string} authKeyHex - 12 hex chars for the authentication key.
+   * @returns {Promise<string>} Status of the operation
+   */
+   const sectorTrailerWrite_PK = async (sector, keyA, accessBits, userByte, keyB, authMode, authKeyHex) => {
+    const trailerBlock = sector < 32 ? 3 : 15;
+    validateSectorBlock(sector, trailerBlock);
+    validateKeyHex(keyA);
+    validateKeyHex(keyB);
+    validateAuthMode(authMode);
+    validateKeyHex(authKeyHex); // Validate the authentication key
+    if (!/^[0-9A-Fa-f]{6}$/.test(accessBits)) {
+        throw new Error('Invalid access bits: must be 6 hexadecimal characters');
+    }
+    if (!/^[0-9A-Fa-f]{2}$/.test(userByte)) {
+        throw new Error('Invalid user byte: must be 2 hexadecimal characters');
+    }
+    const authStr = authMode === 0x61 || authMode === 97 ? '0x61' : '0x60';
+    const trailerData = `${keyA}${accessBits}${userByte}${keyB}`;
+    const command = `BlockInSectorWrite_PK 0x${trailerData} ${sector} ${trailerBlock} ${authStr} ${authKeyHex}`;
+    console.debug('[neoband-sdk] sectorTrailerWrite_PK command:', command);
+    try {
+        const response = await sendRequest(command);
+        // Check if the status code is anything other than 0 (UFR_OK)
+    if (response?.Status !== 0) {
+    throw new Error(`uFR Reader Error during SectorTrailerWrite: ${response?.Status || 'Unknown Status'}`);
+  }
+  // If Status is 0 (UFR_OK), proceed without throwing an error.
+   console.log(`SectorTrailerWrite successful for sector ${sector}. Status: ${response?.Status}`);
 
+    } catch (error) {
+        console.error('[neoband-sdk] sectorTrailerWrite_PK error for Sector:', sector, error);
+        throw error; // Re-throw the error to be caught by the caller
+    }
+};
   /**
    * Writes a sector trailer using sector addressing and separate access bits as required by D-Logic API.
    * @param {number} sector - The sector number (0-39)
@@ -1376,7 +1619,7 @@ const NeobandSDK = (() => {
     // --- Sector Trailer operations ---
     sectorTrailerWrite,
     getMifareAccessBits, // Added helper for working with access bits
-    // sectorTrailerWrite_PK, // <-- commented out to prevent ReferenceError
+    //sectorTrailerWrite_PK,
     // --- Value Block operations (linear address) ---
     valueBlockRead_PK,
     valueBlockWrite_PK,

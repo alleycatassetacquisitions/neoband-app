@@ -199,7 +199,7 @@ const operations = {
             // Ensure data is padded to 16 bytes (32 hex chars)
             hexData = hexData.padEnd(32, 'F');
             // Call SDK PK function directly with the provided key and Key B auth mode
-            const status = await NeobandSDK.blockInSectorWrite_PK(sector, block, hexData, operations.AUTH_MODE_B, keyHex);
+            await NeobandSDK.sectorTrailerWrite(sector, keyA, accessBits, userByte, keyB, authMode, keyIndex);
             // Check status (optional, SDK might throw on error)
             const success = status && status.includes('UFR_OK');
             if (!success) {
@@ -526,7 +526,7 @@ const operations = {
             utils.log(`[writeUserAllegiance] Writing hex data: ${hexData} to Sector ${sector}, Block ${block}`, 'debug');
 
             // Use the existing writeSectorBlock via NeobandSDK, specifying Key B auth
-            const successStatus = await NeobandSDK.blockInSectorWrite_PK(sector, block, hexData, authMode, key);
+            await NeobandSDK.sectorTrailerWrite(sector, keyA, accessBits, userByte, keyB, authMode, keyIndex);
             // Check status based on expected SDK response format
             const success = successStatus && successStatus.includes('UFR_OK');
 
@@ -614,7 +614,7 @@ const operations = {
                         await NeobandSDK.sectorTrailerWrite(
                             sector,
                             keyA,
-                            utils.getMifareAccessBits('zeroed'),
+                            NeobandSDK.getMifareAccessBits('zeroed'),
                             '00',
                             keyB,
                             operations.AUTH_MODE_B,
@@ -644,7 +644,7 @@ const operations = {
                         await NeobandSDK.sectorTrailerWrite(
                             sector,
                             keyA,
-                            utils.getMifareAccessBits('zeroed'),
+                            NeobandSDK.getMifareAccessBits('zeroed'),
                             '00',
                             keyB,
                             operations.AUTH_MODE_B,
@@ -670,7 +670,7 @@ const operations = {
                 await NeobandSDK.sectorTrailerWrite(
                     staffSector,
                     keyA,
-                    utils.getMifareAccessBits('zeroed'),
+                    NeobandSDK.getMifareAccessBits('zeroed'),
                     '00',
                     keyB,
                     operations.AUTH_MODE_B,

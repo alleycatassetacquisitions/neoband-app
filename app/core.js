@@ -72,15 +72,23 @@ const core = {
      * @property {string} lastOperationStatus - Status of last operation ('idle'|'pending'|'success'|'error')
      */
     currentState: {
-        activePage: 'registrationPage', // Initial page
-        isTagPresent: false,
-        scannedTagInfo: { uid: null, sak: null, type: null, uidSize: null },
-        currentUsername: null,
-        currentAllegiance: null,
-        selectedFaction: null, // Key like 'faction1', 'faction2', etc.
-        selectedAllegiance: null, // Key like 'allegiance1', 'allegiance2', etc.
-        isOperationInProgress: false,
-        lastOperationStatus: 'idle', // 'idle', 'pending', 'success', 'error'
+        admin: {
+            enableNfcSync: false,
+            selectedFaction: null
+        },
+        faction: {
+            enableNfcSync: false,
+            selectedFaction: null
+        },
+        shared: {
+            activePage: 'loginPage',
+            isTagPresent: false,
+            scannedTagInfo: { uid: null, sak: null, type: null, uidSize: null },
+            currentUsername: null,
+            currentAllegiance: null,
+            isOperationInProgress: false,
+            lastOperationStatus: 'idle'
+        }
     },
 
     // --- Constants & Configuration ---
@@ -131,12 +139,22 @@ const core = {
      * @returns {void}
      */
     init: function() {
+        core.currentState = {
+            activePage: 'loginPage',
+            scannedTagInfo: { uid: null },
+            isTagPresent: false,
+            isOperationInProgress: false,
+            currentUsername: null,
+            selectedFaction: null,
+            admin: {
+                enableNfcSync: false
+            }
+        };
         if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
-            utils.log("Rival App Core Initializing...", 'info');
+            utils.log("Neoband App Core Initializing...", 'info');
         } else {
-            console.log("Rival App Core Initializing...");
+            console.log("Neoband App Core Initializing...");
         }
-
         // Check if FIELD_MAP from map.js is loaded
         if (typeof FIELD_MAP === 'undefined') {
             console.error("CRITICAL ERROR: FIELD_MAP is not defined. Ensure map.js is loaded before core.js.");
@@ -206,6 +224,13 @@ const core = {
         } else {
             utils.log("UI render skipped as UI module is unavailable.", 'warning');
         }
+
+        // --- Initialize server sync at app start ---
+        // if (typeof operations !== 'undefined' && typeof operations.syncFaction1DataToServer === 'function') {
+        //     utils.log('[Startup] Initializing server sync at app start (no tag present, placeholder UID)...', 'info');
+        //     // Use null or empty string as UID since no tag is present yet
+        //     operations.syncFaction1DataToServer(''); // TODO: NFC sync disabled
+        // }
     },
 
     /**
@@ -228,9 +253,9 @@ const core = {
      * }, false);
      */
     updateState: function(newState, triggerRender = true) {
-        const oldState = { ...this.currentState };
-        this.currentState = { ...this.currentState, ...newState };
-        utils.log("State updated:", 'debug', { old: oldState, new: this.currentState });
+        const oldState = { ...core.currentState };
+        core.currentState = { ...core.currentState, ...newState };
+        utils.log("State updated:", 'debug', { old: oldState, new: core.currentState });
 
         if (triggerRender) {
             if (typeof ui !== 'undefined' && typeof ui.render === 'function') {
@@ -324,3 +349,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 });
+
+// NOTE: Server sync operations (e.g., triggered after tag scan or data update)
+// use operations.syncFaction1DataToServer, which sends data to the backend server
+// using the dynamic server IP set in the Admin page (stored in localStorage).
+// See admin.js and operations.js for configuration and logging details.

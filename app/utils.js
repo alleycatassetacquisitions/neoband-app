@@ -13,7 +13,7 @@
 const utils = {
     /**
      * Constants defining the physical limitations of MIFARE Classic 4K tags.
-     * @constant {number} MAX_BLOCK_ADDRESS - Maximum linear block address in MIFARE Classic 4K (255)
+     * @constant {number} MAX_BLOCK_ADDRESS - address in MIFARE Classic 4K (255)
      * @constant {number} MAX_TEXT_LENGTH - Maximum bytes per block (16 bytes)
      */
     MAX_BLOCK_ADDRESS: 255, // MIFARE Classic 4K
@@ -561,4 +561,584 @@ hexToBytes: function(hexStr){
 bytesToHex: function(byteArray){
     return Array.from(byteArray).map(b => ('0'+b.toString(16)).slice(-2)).join('').toUpperCase();
 },
-};
+
+/**
+ * Validates sector/block addressing for MIFARE Classic 4K.
+ * Throws an error if the sector/block is out of range or forbidden.
+ * @param {number} sector - Sector number (0-39)
+ * @param {number} block - Block number within sector (0-3 or 0-15)
+ * @param {boolean} isWriteOperation - If true, applies write restrictions (no sector 0, no trailer)
+ */
+validateSectorBlock: function(sector, block, isWriteOperation = false) {
+    // Validate sector range
+    if (typeof sector !== 'number' || sector < 0 || sector > 39) {
+        const msg = `Invalid sector: ${sector}. Must be 0-39.`;
+        utils.log(msg, 'error');
+        throw new RangeError(msg);
+    }
+    // Validate block range
+    const maxBlock = sector < 32 ? 3 : 15;
+    if (typeof block !== 'number' || block < 0 || block > maxBlock) {
+        const msg = `Invalid block: ${block} for sector ${sector}. Must be 0-${maxBlock}.`;
+        utils.log(msg, 'error');
+        throw new RangeError(msg);
+    }
+    // Write restrictions
+    if (isWriteOperation) {
+        if (sector === 0) {
+            const msg = `Write access denied to sector 0 (manufacturer sector).`;
+            utils.log(msg, 'error');
+            throw new Error(msg);
+        }
+        if (utils.isSectorTrailerBlock(sector, block)) {
+            const msg = `Write access denied to sector trailer: sector ${sector}, block ${block}.`;
+            utils.log(msg, 'error');
+            throw new Error(msg);
+        }
+    }
+    utils.log(`Validated sector/block: sector ${sector}, block ${block}, write=${isWriteOperation}`, 'debug');
+    return true;
+},
+
+/**
+ * Returns true if the given sector/block is a sector trailer block.
+ * @param {number} sector - Sector number (0-39)
+ * @param {number} block - Block number within sector
+ * @returns {boolean}
+ */
+isSectorTrailerBlock: function(sector, block) {
+    const isTrailer = (sector < 32 && block === 3) || (sector >= 32 && block === 15);
+    utils.log(`isSectorTrailerBlock: sector ${sector}, block ${block} → ${isTrailer}`, 'debug');
+    return isTrailer;
+},
+
+/**
+ * Checks if a sector/block is valid for read/write operations.
+ * @param {number} sector - Sector number (0-39)
+ * @param {number} block - Block number within sector
+ * @param {boolean} isWriteOperation - If true, applies write restrictions
+ * @returns {boolean}
+ */
+isValidSectorBlock: function(sector, block, isWriteOperation = false) {
+    try {
+        // Validate sector and block range
+        const maxBlock = sector < 32 ? 3 : 15;
+        if (sector < 0 || sector > 39 || block < 0 || block > maxBlock) {
+            utils.log(`isValidSectorBlock: Invalid sector/block: sector ${sector}, block ${block}`, 'warning');
+            return false;
+        }
+        // Write restrictions
+        if (isWriteOperation) {
+            if (sector === 0) {
+                utils.log(`isValidSectorBlock: Write forbidden to sector 0`, 'warning');
+                return false;
+            }
+            if (utils.isSectorTrailerBlock(sector, block)) {
+                utils.log(`isValidSectorBlock: Write forbidden to sector trailer: sector ${sector}, block ${block}`, 'warning');
+                return false;
+            }
+        }
+        utils.log(`isValidSectorBlock: Valid sector/block: sector ${sector}, block ${block}, write=${isWriteOperation}`, 'debug');
+        return true;
+    } catch (e) {
+        utils.log(`isValidSectorBlock: Exception: ${e.message}`, 'error');
+        return false;
+    }
+},
+
+/**
+ * Validates sector trailer addressing (sector-only, no block).
+ * Throws if sector is out of range or forbidden.
+ * @param {number} sector - Sector number (0-39)
+ * @param {boolean} isWriteOperation - If true, applies write restrictions (no sector 0)
+ */
+validateSectorTrailerAddressing: function(sector, isWriteOperation = false) {
+    if (typeof sector !== 'number' || sector < 0 || sector > 39) {
+        const msg = `Invalid sector for trailer addressing: ${sector}. Must be 0-39.`;
+        utils.log(msg, 'error');
+        throw new RangeError(msg);
+    }
+    if (isWriteOperation && sector === 0) {
+        const msg = `Write access denied to sector 0 trailer (manufacturer sector).`;
+        utils.log(msg, 'error');
+        throw new Error(msg);
+    }
+    utils.log(`Validated sector trailer addressing: sector ${sector}, write=${isWriteOperation}`, 'debug');
+    return true;
+},
+
+/**
+ * Validates block-in-sector addressing (sector + block).
+ * Throws if sector/block is out of range or forbidden.
+ * @param {number} sector - Sector number (0-39)
+ * @param {number} block - Block number within sector (0-3 or 0-15)
+ * @param {boolean} isWriteOperation - If true, applies write restrictions (no sector 0, no trailer)
+ */
+validateBlockInSectorAddressing: function(sector, block, isWriteOperation = false) {
+    // Reuse validateSectorBlock for full validation and logging
+    return utils.validateSectorBlock(sector, block, isWriteOperation);
+},
+
+/**
+ * Validates Key A and Key B for a sector and user/role.
+ * Ensures keys are 12 hex chars, not default, and match expected config for the sector/user.
+ * @param {number} sector - Sector number (0-39)
+ * @param {string} keyA - Key A (12 hex chars)
+ * @param {string} keyB - Key B (12 hex chars)
+ * @param {string} userOrRole - User or role identifier (e.g., 'staff', 'faction1')
+ * @param {object} neobandKeys - NEOBAND_KEYS config object
+ * @returns {boolean}
+ */
+validateKeysForSectorAndUser: function(sector, keyA, keyB, userOrRole, neobandKeys) {
+    // Check key format
+    const hex12 = /^[0-9A-Fa-f]{12}$/;
+    if (!hex12.test(keyA)) {
+        const msg = `Key A for sector ${sector} (${userOrRole}) is invalid: ${keyA}`;
+        utils.log(msg, 'error');
+        throw new Error(msg);
+    }
+    if (!hex12.test(keyB)) {
+        const msg = `Key B for sector ${sector} (${userOrRole}) is invalid: ${keyB}`;
+        utils.log(msg, 'error');
+        throw new Error(msg);
+    }
+    // Check for default keys (optionally warn)
+    if (keyA.toUpperCase() === 'FFFFFFFFFFFF' || keyB.toUpperCase() === 'FFFFFFFFFFFF') {
+        utils.log(`Warning: Using default key (FFFFFFFFFFFF) for sector ${sector}, user/role ${userOrRole}`, 'warning');
+    }
+    // Check against NEOBAND_KEYS config if provided
+    if (neobandKeys) {
+        let expectedKeyA = null, expectedKeyB = null;
+        if (userOrRole === 'staff' && neobandKeys.staff?.user?.sector === sector) {
+            expectedKeyB = neobandKeys.staff.user.neoKey;
+            expectedKeyA = neobandKeys.universalReadKeyA;
+        } else if (neobandKeys.factions && neobandKeys.factions[userOrRole]?.sector === sector) {
+            expectedKeyB = neobandKeys.factions[userOrRole].neoKey;
+            expectedKeyA = neobandKeys.universalReadKeyA;
+        } else if (neobandKeys.allegiances && neobandKeys.allegiances[userOrRole]?.sector === sector) {
+            expectedKeyB = neobandKeys.allegiances[userOrRole].neoKey;
+            expectedKeyA = neobandKeys.universalReadKeyA;
+        }
+        if (expectedKeyA && keyA.toUpperCase() !== expectedKeyA.toUpperCase()) {
+            const msg = `Key A mismatch for sector ${sector}, user/role ${userOrRole}: expected ${expectedKeyA}, got ${keyA}`;
+            utils.log(msg, 'error');
+            throw new Error(msg);
+        }
+        if (expectedKeyB && keyB.toUpperCase() !== expectedKeyB.toUpperCase()) {
+            const msg = `Key B mismatch for sector ${sector}, user/role ${userOrRole}: expected ${expectedKeyB}, got ${keyB}`;
+            utils.log(msg, 'error');
+            throw new Error(msg);
+        }
+        utils.log(`Keys for sector ${sector}, user/role ${userOrRole} validated against NEOBAND_KEYS.`, 'debug');
+    } else {
+        utils.log(`Keys for sector ${sector}, user/role ${userOrRole} validated (no NEOBAND_KEYS check).`, 'debug');
+    }
+    return true;
+},
+/**
+ * Validates that a provided key is a 12-character hexadecimal string (MIFARE key format).
+ * Throws an error if the key is invalid. Used for NFC authentication key validation.
+ * @param {string} keyHex - The key to validate (should be 12 hex characters)
+ * @throws {Error} If the key is not a valid 12-character hex string
+ */
+
+/**
+validateKeyHex: function(keyHex) {
+    // Validate that the keyHex is a 12-character hexadecimal string (MIFARE key format)
+    if (!/^[0-9A-Fa-f]{12}$/.test(keyHex)) {
+        // Log the error with detailed information using this.log
+        this.log(`[utils] Invalid key format: must be 12 hex characters. Received: ${keyHex}`, 'error');
+        // Throw an error to halt execution and notify the caller
+        throw new Error(`[utils] Invalid key format: must be 12 hex characters. Received: ${keyHex}`);
+    },
+    // No return needed; success is implied if no error is thrown.
+  }
+ */
+}
+
+// --- Persistence Functions (Moved from ui-persistence.js) ---
+
+/**
+ * Saves the current values of input fields, their labels, and the section title INPUT 
+ * within the Faction details container to localStorage.
+ * @async
+ * @function saveFactionUISettings
+ * @description Iterates through input elements and labels in #faction-fields-container, 
+ *              saves their id/value/textContent pairs, and saves the title INPUT value using its ID.
+ * Logs the save operation. Handles potential errors during saving.
+ */
+async function saveFactionUISettings() {
+    utils.log('Attempting to save Faction UI settings (inputs, labels, title)...', 'info');
+    try {
+        const fieldsContainer = document.getElementById('faction-fields-container');
+        // Target the INPUT inside the H3 for the title
+        const titleInputElement = document.getElementById('faction-name-display')?.querySelector('input.faction-title-input'); 
+
+        if (!fieldsContainer) {
+            utils.log('Faction fields container not found. Cannot save settings.', 'warn');
+            return; 
+        }
+
+        const inputs = fieldsContainer.querySelectorAll('input, select, textarea');
+        let settings = {};
+
+        // Load existing settings first to merge
+        try {
+            const existingSettings = localStorage.getItem('factionUISettings');
+            if (existingSettings) {
+                settings = JSON.parse(existingSettings);
+            }
+        } catch (e) {
+            utils.log(`Error parsing existing faction settings: ${e}. Starting fresh.`, 'warn');
+            settings = {};
+        }
+
+        // Save title INPUT value using its ID as the key
+        if (titleInputElement && titleInputElement.id) {
+            settings[titleInputElement.id] = titleInputElement.value; // Use ID as key, store value
+            utils.log(`Saving Faction title input (${titleInputElement.id}): ${settings[titleInputElement.id]}`, 'debug');
+        } else {
+             utils.log('Faction title input element or its ID not found for saving.', 'warn');
+        }
+
+        // Save input values and their corresponding label INPUT text
+        inputs.forEach(input => {
+            if (input.id) {
+                 // Find the corresponding label and the title input within it
+                 const label = fieldsContainer.querySelector(`label[for="${input.id}"]`);
+                 const labelTitleInput = label?.querySelector('input.field-title-input');
+                
+                 // Ensure we are not processing the main title input again
+                 if (titleInputElement && input.id === titleInputElement.id) {
+                     return; // Skip main title input, already handled
+                 } 
+                 // Ensure we are not processing a label's title input directly in this loop
+                 else if (labelTitleInput && input.id === labelTitleInput.id) {
+                      // This case should ideally not happen if querySelectorAll excludes nested inputs correctly,
+                      // but check just in case.
+                      return; // Skip label title inputs here, handle below
+                 }
+                 // Process regular value inputs
+                 else {
+                    settings[input.id] = input.value;
+                    utils.log(`Saving Faction value input ${input.id}: ${input.value}`, 'debug');
+                 }
+
+                // Find and save label's title INPUT text
+                if (labelTitleInput) {
+                    const labelKey = `label-${input.id}`; // Key for the label's content
+                    settings[labelKey] = labelTitleInput.value; // Save the *value* of the input inside the label
+                     utils.log(`Saving Faction label input content ${labelKey}: ${labelTitleInput.value}`, 'debug');
+                } else {
+                    // This might be expected if an input has no associated label title input
+                    // utils.log(`Label title input for Faction value input ${input.id} not found.`, 'debug'); 
+                }
+            }
+        });
+
+        localStorage.setItem('factionUISettings', JSON.stringify(settings));
+        utils.log('Faction UI settings saved successfully.', 'success');
+        
+        // Optional visual confirmation
+        // ...
+
+    } catch (error) {
+        utils.log(`Error saving Faction UI settings: ${error}`, 'error');
+        console.error(error);
+        // Optional visual error confirmation
+        // ...
+    }
+}
+
+/**
+ * Loads Faction UI settings (inputs, labels, title) from localStorage and applies them.
+ * Should be called *after* the faction fields have been dynamically generated by ui.js.
+ * @async
+ * @function loadFactionUISettings
+ * @description Retrieves settings from localStorage, parses them, and updates inputs, labels, and title in #faction-fields-container.
+ * Logs the load operation. Handles potential errors.
+ */
+async function loadFactionUISettings() {
+    utils.log('Attempting to load Faction UI settings (inputs, labels, title)...', 'info');
+    let settings = {}; // Define settings in the outer scope
+    try {
+        const savedSettings = localStorage.getItem('factionUISettings');
+        if (!savedSettings) {
+            utils.log('No saved Faction UI settings found.', 'info');
+            return;
+        }
+        settings = JSON.parse(savedSettings); // Assign parsed settings
+
+    } catch (parseError) {
+        utils.log(`Error parsing saved Faction UI settings from localStorage: ${parseError}`, 'error');
+        // Optionally clear corrupted settings
+        // localStorage.removeItem('factionUISettings'); 
+        return; // Stop if parsing fails
+    }
+
+    try { // Add try-catch around DOM manipulation
+        const fieldsContainer = document.getElementById('faction-fields-container');
+        const titleElement = document.getElementById('faction-name-display')?.querySelector('input.faction-title-input'); // Target the INPUT inside the H3
+
+        if (!fieldsContainer) {
+            utils.log('Faction fields container not found during load. Cannot apply settings.', 'debug');
+            return; 
+        }
+
+        // Load Title
+        // Use the placeholder ID for the input element: `faction-${factionKey}-name-display`
+        const titleInputId = titleElement?.id; // Get the ID if titleElement exists
+        if (titleElement && titleInputId && settings[titleInputId] !== undefined) {
+             titleElement.value = settings[titleInputId]; // Set input VALUE
+             utils.log(`Loaded Faction title input (${titleInputId}): ${settings[titleInputId]}`, 'debug');
+        } else if (!titleElement) {
+             utils.log('Faction title input element not found during load.', 'warn');
+        }
+
+        // Load input values and label text
+        for (const key in settings) {
+             // Skip the title key as it's handled above (using its specific input ID)
+             if (titleInputId && key === titleInputId) continue; 
+
+            if (key.startsWith('label-')) {
+                // Load label text into the title INPUT within the label
+                const inputId = key.substring(6); 
+                const labelElement = fieldsContainer.querySelector(`label[for="${inputId}"]`);
+                const titleInputElement = labelElement?.querySelector('input.field-title-input'); // Target the INPUT inside the label
+                if (titleInputElement) {
+                    titleInputElement.value = settings[key]; // Set input VALUE
+                    utils.log(`Loaded Faction label input for ${inputId}: ${settings[key]}`, 'debug');
+                } else {
+                    utils.log(`Label title input element for key ${key} (input ID: ${inputId}) not found during load.`, 'warn');
+                }
+            } else {
+                // Load input value
+                const inputElement = fieldsContainer.querySelector(`#${CSS.escape(key)}`);
+                if (inputElement) {
+                     // Ensure we don't accidentally overwrite the title/label inputs again
+                    if (!inputElement.classList.contains('faction-title-input') && !inputElement.classList.contains('field-title-input')) {
+                        inputElement.value = settings[key];
+                        utils.log(`Loaded Faction value input ${key}: ${settings[key]}`, 'debug');
+                    }
+                } else {
+                     utils.log(`Value input element with ID ${key} not found in Faction container during load.`, 'warn');
+                }
+            }
+        }
+
+        utils.log('Faction UI settings applied successfully.', 'info');
+
+    } catch (domError) {
+        utils.log(`Error applying Faction UI settings to DOM: ${domError}`, 'error');
+        console.error(domError);
+    }
+}
+
+/**
+ * Saves the current values of input fields, their labels, and the section title INPUT
+ * within the Allegiance details container to localStorage.
+ * @async
+ * @function saveAllegianceUISettings
+ * @description Iterates through input elements and labels in #allegiance-fields-container, 
+ *              saves their id/value/textContent pairs, and saves the title INPUT value using its ID.
+ * Logs the save operation. Handles potential errors during saving.
+ */
+async function saveAllegianceUISettings() {
+    utils.log('Attempting to save Allegiance UI settings (inputs, labels, title)...', 'info');
+    try {
+        const fieldsContainer = document.getElementById('allegiance-fields-container');
+        // Target the INPUT inside the H3 for the title
+        const titleInputElement = document.getElementById('allegiance-name-display')?.querySelector('input.allegiance-title-input'); 
+
+        if (!fieldsContainer) {
+            utils.log('Allegiance fields container not found. Cannot save settings.', 'warn');
+            return; 
+        }
+
+        const inputs = fieldsContainer.querySelectorAll('input, select, textarea');
+        let settings = {};
+
+         // Load existing settings first to merge
+        try {
+            const existingSettings = localStorage.getItem('allegianceUISettings');
+            if (existingSettings) {
+                settings = JSON.parse(existingSettings);
+            }
+        } catch (e) {
+            utils.log(`Error parsing existing allegiance settings: ${e}. Starting fresh.`, 'warn');
+            settings = {}; 
+        }
+
+        // Save title INPUT value using its ID as the key
+        if (titleInputElement && titleInputElement.id) {
+            settings[titleInputElement.id] = titleInputElement.value; // Use ID as key, store value
+            utils.log(`Saving Allegiance title input (${titleInputElement.id}): ${settings[titleInputElement.id]}`, 'debug');
+        } else {
+            utils.log('Allegiance title input element or its ID not found for saving.', 'warn');
+        }
+
+        // Save input values and their corresponding label INPUT text
+        inputs.forEach(input => {
+            if (input.id) {
+                // Find the corresponding label and the title input within it
+                const label = fieldsContainer.querySelector(`label[for="${input.id}"]`);
+                const labelTitleInput = label?.querySelector('input.field-title-input');
+
+                // Ensure we are not processing the main title input again
+                if (titleInputElement && input.id === titleInputElement.id) {
+                    return; // Skip main title input, already handled
+                }
+                // Ensure we are not processing a label's title input directly in this loop
+                else if (labelTitleInput && input.id === labelTitleInput.id) {
+                     return; // Skip label title inputs here, handle below
+                }
+                // Process regular value inputs
+                else {
+                    settings[input.id] = input.value;
+                    utils.log(`Saving Allegiance value input ${input.id}: ${input.value}`, 'debug');
+                }
+
+                // Find and save label's title INPUT text
+                if (labelTitleInput) {
+                    const labelKey = `label-${input.id}`; // Key for the label's content
+                    settings[labelKey] = labelTitleInput.value; // Save the *value* of the input inside the label
+                    utils.log(`Saving Allegiance label input content ${labelKey}: ${labelTitleInput.value}`, 'debug');
+                } else {
+                    // utils.log(`Label title input for Allegiance value input ${input.id} not found.`, 'debug'); 
+                }
+            }
+        });
+
+        localStorage.setItem('allegianceUISettings', JSON.stringify(settings));
+        utils.log('Allegiance UI settings saved successfully.', 'success');
+
+        // Optional visual confirmation
+        // ...
+
+    } catch (error) {
+        utils.log(`Error saving Allegiance UI settings: ${error}`, 'error');
+        console.error(error);
+        // Optional visual error confirmation
+        // ...
+    }
+}
+
+/**
+ * Loads Allegiance UI settings (inputs, labels, title) from localStorage and applies them.
+ * Should be called *after* the allegiance fields have been dynamically generated by ui.js.
+ * @async
+ * @function loadAllegianceUISettings
+ * @description Retrieves settings from localStorage, parses them, and updates inputs, labels, and title in #allegiance-fields-container.
+ * Logs the load operation. Handles potential errors.
+ */
+async function loadAllegianceUISettings() {
+    utils.log('Attempting to load Allegiance UI settings (inputs, labels, title)...', 'info');
+    let settings = {}; // Define settings in the outer scope
+    try {
+        const savedSettings = localStorage.getItem('allegianceUISettings');
+        if (!savedSettings) {
+            utils.log('No saved Allegiance UI settings found.', 'info');
+            return;
+        }
+        settings = JSON.parse(savedSettings); // Assign parsed settings
+
+    } catch (parseError) {
+        utils.log(`Error parsing saved Allegiance UI settings from localStorage: ${parseError}`, 'error');
+        // Optionally clear corrupted settings
+        // localStorage.removeItem('allegianceUISettings');
+        return; // Stop if parsing fails
+    }
+
+    try { // Add try-catch around DOM manipulation
+        const fieldsContainer = document.getElementById('allegiance-fields-container');
+        const titleElement = document.getElementById('allegiance-name-display')?.querySelector('input.allegiance-title-input'); // Target the INPUT inside the H3
+
+        if (!fieldsContainer) {
+            utils.log('Allegiance fields container not found during load. Cannot apply settings.', 'debug');
+            return; 
+        }
+
+        // Load Title
+        // Use the placeholder ID for the input element: `allegiance-${allegianceKey}-name-display`
+        const titleInputId = titleElement?.id;
+        if (titleElement && titleInputId && settings[titleInputId] !== undefined) {
+            titleElement.value = settings[titleInputId]; // Set input VALUE
+            utils.log(`Loaded Allegiance title input (${titleInputId}): ${settings[titleInputId]}`, 'debug');
+        } else if (!titleElement) {
+            utils.log('Allegiance title input element not found during load.', 'warn');
+        }
+
+        // Load input values and label text
+        for (const key in settings) {
+            // Skip the title key
+            if (titleInputId && key === titleInputId) continue;
+
+            if (key.startsWith('label-')) {
+                // Load label text into the title INPUT within the label
+                const inputId = key.substring(6); 
+                const labelElement = fieldsContainer.querySelector(`label[for="${inputId}"]`);
+                const titleInputElement = labelElement?.querySelector('input.field-title-input'); // Target the INPUT inside the label
+                if (titleInputElement) {
+                    titleInputElement.value = settings[key]; // Set input VALUE
+                    utils.log(`Loaded Allegiance label input for ${inputId}: ${settings[key]}`, 'debug');
+                } else {
+                    utils.log(`Label title input element for key ${key} (input ID: ${inputId}) not found during load.`, 'warn');
+                }
+            } else {
+                // Load input value
+                const inputElement = fieldsContainer.querySelector(`#${CSS.escape(key)}`);
+                if (inputElement) {
+                     // Ensure we don't accidentally overwrite the title/label inputs again
+                     if (!inputElement.classList.contains('allegiance-title-input') && !inputElement.classList.contains('field-title-input')) {
+                        inputElement.value = settings[key];
+                        utils.log(`Loaded Allegiance value input ${key}: ${settings[key]}`, 'debug');
+                     }
+                } else {
+                    utils.log(`Value input element with ID ${key} not found in Allegiance container during load.`, 'warn');
+                }
+            }
+        }
+
+        utils.log('Allegiance UI settings applied successfully.', 'info');
+
+    } catch (domError) {
+        utils.log(`Error applying Allegiance UI settings to DOM: ${domError}`, 'error');
+        console.error(domError);
+    }
+}
+
+// --- Initialization for Persistence (Moved from ui-persistence.js) ---
+document.addEventListener('DOMContentLoaded', () => {
+    utils.log('UI Persistence (in utils.js) initializing event listeners...', 'info');
+
+    // NOTE: Load functions (loadFactionUISettings, loadAllegianceUISettings) are now called
+    // from ui.js *after* the relevant fields/titles are dynamically generated,
+    // ensuring elements exist before settings are applied.
+    // We *do not* call them here on initial DOMContentLoaded anymore.
+
+    // Attach event listeners to the save buttons
+    const saveFactionBtn = document.getElementById('faction-save-btn');
+    const saveAllegianceBtn = document.getElementById('allegiance-save-ui-btn');
+
+    if (saveFactionBtn) {
+        saveFactionBtn.addEventListener('click', saveFactionUISettings);
+        utils.log('Attached save listener to Faction save button.', 'debug');
+        // Enable the button unconditionally
+        saveFactionBtn.disabled = false; 
+        utils.log('Faction save button enabled.', 'debug');
+    } else {
+        utils.log('Faction save button (#faction-save-btn) not found.', 'warn');
+    }
+
+    if (saveAllegianceBtn) {
+        saveAllegianceBtn.addEventListener('click', saveAllegianceUISettings);
+        utils.log('Attached save listener to Allegiance save button.', 'debug');
+        // Enable the button unconditionally
+        saveAllegianceBtn.disabled = false;
+        utils.log('Allegiance save button enabled.', 'debug');
+    } else {
+        utils.log('Allegiance save button (#allegiance-save-ui-btn) not found.', 'warn');
+    }
+    
+    utils.log('UI Persistence (in utils.js) listener initialization complete.', 'info');
+});

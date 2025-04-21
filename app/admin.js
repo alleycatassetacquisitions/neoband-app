@@ -35,10 +35,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /**
  * Initializes the admin interface by building the UI components.
- * Creates a dynamic admin interface based on the FIELD_MAP structure,
- * organizing content by category (factions, allegiances, user data).
- * 
- * @returns {void}
+ *
+ * This function dynamically generates the Admin page UI, including:
+ *   - The Settings section for server IP configuration (see below)
+ *   - Faction, Allegiance, and User Data admin controls
+ *   - Sync Server button for manual sync enablement
+ *
+ * The Settings section allows the user to enter and save the backend server IP address.
+ * This value is stored in localStorage and used by all sync/API operations (see operations.js).
+ *
+ * The UI loads the current server IP from localStorage on page load, and updates it when the user clicks Save.
+ * All changes are logged for traceability. User feedback is provided for success/error.
  */
 function initializeAdminInterface() {
     const adminPage = document.getElementById('adminPage');
@@ -160,26 +167,118 @@ function initializeAdminInterface() {
     styleSheet.innerText = adminStyles;
     document.head.appendChild(styleSheet);
 
+    // === SETTINGS SECTION: Server IP ===
+    // This section allows the user to configure the backend server IP address used for all sync/API operations.
+    // The value is stored in localStorage and accessed via operations.getServerBaseUrl/setServerBaseUrl.
+    // The input is pre-filled with the current value, and updates are saved on button click.
+    // This enables the app to work on any network or device without code changes.
+    const settingsSection = document.createElement('div');
+    settingsSection.className = 'admin-section';
+    settingsSection.style.marginBottom = '30px';
+    settingsSection.innerHTML = `
+        <h3>Settings</h3>
+        <div class="form-group">
+            <label for="server-ip-input">Server IP</label>
+            <input type="text" id="server-ip-input" class="input" placeholder="e.g. http://192.168.0.100:3000" style="width: 320px; max-width: 100%;" />
+        </div>
+        <button id="save-server-ip-btn" class="btn" style="margin-top: 10px;">Save</button>
+        <span id="server-ip-status" style="margin-left: 15px; color: var(--cyan);"></span>
+    `;
+    container.appendChild(settingsSection);
+
+    // Set initial value from localStorage (via operations.js)
+    setTimeout(() => {
+        const serverIpInput = document.getElementById('server-ip-input');
+        if (serverIpInput && typeof window.getServerBaseUrl === 'function') {
+            serverIpInput.value = window.getServerBaseUrl();
+        }
+    }, 0);
+
+    // Save button event: updates localStorage and logs the change
+    setTimeout(() => {
+        const saveBtn = document.getElementById('save-server-ip-btn');
+        const serverIpInput = document.getElementById('server-ip-input');
+        const statusSpan = document.getElementById('server-ip-status');
+        if (saveBtn && serverIpInput) {
+            saveBtn.onclick = function() {
+                const url = serverIpInput.value.trim();
+                if (!url) {
+                    statusSpan.textContent = 'Please enter a valid server URL.';
+                    statusSpan.style.color = 'var(--error-color)';
+                    return;
+                }
+                if (typeof window.setServerBaseUrl === 'function') {
+                    window.setServerBaseUrl(url);
+                    statusSpan.textContent = 'Saved!';
+                    statusSpan.style.color = 'var(--cyan)';
+                } else {
+                    statusSpan.textContent = 'Error: Unable to save.';
+                    statusSpan.style.color = 'var(--error-color)';
+                }
+            };
+        }
+    }, 0);
+
     // --- Create UI sections ---
     try {
           // Use plural keys for category parameter to ensure FIELD_MAP[category] is defined
           const factionsSection = createAdminSection("FACTION CONTROL", FIELD_MAP.factions, 'factions');
           container.appendChild(factionsSection);
-
+    
           const allegiancesSection = createAdminSection("ALLEGIANCE CONTROL", FIELD_MAP.allegiances, 'allegiances');
           container.appendChild(allegiancesSection);
-  
+    
           // Create section for user data (limited view)
           const userSection = createAdminSection("USER DATA (Sector 39)", FIELD_MAP.user, 'user', true);
           container.appendChild(userSection);
-  
+    
+          // Add Sync Server button
+          /*
+          // TODO: NFC sync disabled
+          const syncButton = document.createElement('button');
+          syncButton.textContent = 'Sync Server';
+          syncButton.className = 'admin-button';
+          syncButton.style.marginTop = '20px';
+          syncButton.onclick = () => {
+              try {
+                  enableNfcServerSync();
+              } catch (error) {
+                  utils.log('Error enabling NFC sync: ' + error.message, 'error');
+              }
+          };
+          container.appendChild(syncButton);
+          */
+    
+          // Add Provision Card button (Admin Page)
+          const provisionButton = document.createElement('button');
+          provisionButton.id = 'admin-provision-card-btn'; // Unique ID for admin button
+          provisionButton.textContent = 'Provision Card (Format + Set Keys)';
+          provisionButton.className = 'btn btn-warning'; // Use warning style for potentially destructive action
+          provisionButton.style.marginTop = '20px';
+          provisionButton.style.marginLeft = '10px'; // Add some space from sync button
+          // Call the global handler function directly
+          provisionButton.onclick = window.handleGlobalProvisionCard; 
+          container.appendChild(provisionButton);
+    
           console.log("Admin Interface Initialized Successfully.");
-
+    
     } catch (error) {
         console.error("Error initializing admin sections:", error);
         container.innerHTML = `<p style="color: var(--error-color);">Error building admin interface. Check console for details.</p>`;
     }
 }
+
+/*
+// TODO: NFC sync disabled
+function enableNfcServerSync() {
+    core.updateState({ 
+        enableNfcSync: false, 
+        selectedFaction: 'faction1',
+        persist: false // Ensure state survives page navigation
+    });
+    utils.log("✅ Server sync enabled for Alleycat scans", "success");
+}
+*/
 
 /**
  * Creates an admin section for a specific category (faction, allegiance, user).
@@ -468,12 +567,11 @@ async function readAdminData(entityKey, category) {
             const block = parseInt(input.dataset.block);
             const key = input.dataset.key; // Key should be hex string
 
-            // Assume operations.readBlock exists and handles the uFR logic
-            // It needs sector, block (relative to sector), authMode, and key
-            // Using Key A (0x60) and the specific key from map.js by default
+            // Always use admin role for admin reads (default key is handled in operations.js)
             let data = null;
             if (typeof operations !== 'undefined' && typeof operations.readSectorBlock === 'function') {
-                data = await operations.readSectorBlock(sector, block, 0x60, key);
+                // Corrected: Reads are universal, no role needed.
+                data = await operations.readSectorBlock(sector, block);
             } else {
                 console.warn('operations.readSectorBlock is not available.');
             }
@@ -549,22 +647,45 @@ async function writeAdminData(entityKey, category) {
             const hexData = utils.textToHex(dataToWrite).padEnd(32, '0');
             utils.log(`Converted admin input text to hex: ${hexData}`, 'debug');
 
-            // Assume operations.writeBlock exists and handles the uFR logic
-            // It needs sector, block (relative), data (hex), authMode, key
-            let success = false;
-            if (typeof operations !== 'undefined' && typeof operations.writeSectorBlock === 'function') {
-                success = await operations.writeSectorBlock(sector, block, hexData, 0x60, key);
+            // Corrected: Determine target role based on sector and pass that role for writing.
+            let targetRole = null;
+            if (sector === 39) {
+                targetRole = 'staff'; // User data sector uses staff key
             } else {
-                console.warn('operations.writeSectorBlock is not available.');
+                // Find faction/allegiance associated with this sector
+                const findRole = (map) => Object.entries(map || {}).find(([, data]) => data.sector === sector)?.[0];
+                targetRole = findRole(FIELD_MAP.factions) || findRole(FIELD_MAP.allegiances);
             }
 
-            if (success) {
-                utils.log(`Write Success (Sector ${sector}, Block ${block}): ${dataToWrite}`); // Use utils namespace
-            } else {
-                utils.log(`Write Failed (Sector ${sector}, Block ${block})`, 'error'); // Use utils namespace
-                // Optionally stop writing on first failure
-                throw new Error(`Failed to write to Sector ${sector}, Block ${block}.`);
+            if (!targetRole) {
+                throw new Error(`Could not determine target role for writing to Sector ${sector}`);
             }
+
+            utils.log(`Admin writing to Sector ${sector} using target role: ${targetRole}`, 'debug');
+
+            // Fetch the actual hex key based on the determined role identifier (targetRole)
+            let targetKeyHex = null;
+            if (targetRole === 'staff') {
+                targetKeyHex = window.NEOBAND_KEYS?.staff?.user?.neoKey;
+            } else if (window.NEOBAND_KEYS?.factions?.[targetRole]?.neoKey) {
+                targetKeyHex = window.NEOBAND_KEYS.factions[targetRole].neoKey;
+            } else if (window.NEOBAND_KEYS?.allegiances?.[targetRole]?.neoKey) {
+                targetKeyHex = window.NEOBAND_KEYS.allegiances[targetRole].neoKey;
+            }
+
+            if (!targetKeyHex) {
+                utils.log(`[writeAdminData] Could not determine target role/key for sector ${sector}.`, 'error');
+                throw new Error(`Cannot write to sector ${sector}: Unable to determine the associated faction, allegiance, or if it's the staff sector.`);
+            }
+
+            utils.log(`[writeAdminData] Determined target role: ${targetRole} for sector ${sector}. Attempting write...`, 'info');
+
+            utils.log(`[writeAdminData] Using key ${targetKeyHex} for target role ${targetRole} on sector ${sector}.`, 'debug');
+
+            // Pass the fetched keyHex to the modified writeSectorBlock
+            await operations.writeSectorBlock(sector, block, hexData, targetKeyHex);
+
+            utils.log(`[writeAdminData] Wrote ${hexData} to Sector ${sector}, Block ${block} successfully.`, 'success');
         }
         if (typeof ui !== 'undefined' && typeof ui.showVisualConfirmation === 'function') {
             ui.showVisualConfirmation("Write Complete", "Sector data written successfully.");

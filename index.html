@@ -27,20 +27,28 @@
     -->
     <link rel="stylesheet" type="text/css" href="app/style.css">
 
+    <!-- Allegeince logos-->
+    <link rel="preload" as="image" href="app/NEO_ENDLINE_Color_Logo-200.png">
+    <link rel="preload" as="image" href="app/NEO_HELIX_Color_Logo-200.png">
+    <link rel="preload" as="image" href="app/NEO_Resistance_Logo-200.png">
+
     <!-- 
       Script loading order is critical for proper functionality
       IMPORTANT: All scripts must be referenced with "app/" prefix for uFR Zero device compatibility
       despite actually being located in the root directory (not in an app/ folder).
       This is a requirement of the D-Logic app shell.
       
-      Load sequence:
-      1. map.js - Defines the MIFARE memory map structure (FIELD_MAP)
-      2. utils.js - Utility functions for hex conversion, logging, etc.
-      3. ui.js - UI manipulation and event handling
-      4. core.js - Application state management and initialization
+      Load sequence:allegiance-logo
+      1. keys.js - Defines the encryption keys for NFC operations
+      2. neoband-sdk.js - Core SDK for NFC communication
+      3. map.js - Defines the MIFARE memory map structure (FIELD_MAP)
+      4. utils.js - Utility functions for hex conversion, logging, etc.
       5. operations.js - NFC communication and card operations
-      6. admin.js - Administrative interface functionality
+      6. core.js - Application state management and initialization
+      7. ui.js - UI manipulation and event handling
+      8. admin.js - Administrative interface functionality
     -->
+    <script src="app/keys.js"></script>
     <script src="app/neoband-sdk.js"></script>
     <script src="app/map.js"></script>        <!-- Load map.js FIRST to make FIELD_MAP available to other modules -->
     <script src="app/utils.js"></script>      <!-- Utility functions used by all other modules -->
@@ -70,7 +78,8 @@
         <h1>Neoband App</h1>
         <nav class="nav-menu">
             <ul>
-                <li><a href="#" id="nav-reg" class="active-nav">Registration</a></li>
+                <li><a href="#" id="nav-login" class="active-nav">Login</a></li> 
+                <li><a href="#" id="nav-reg">Registration</a></li>
                 <li><a href="#" id="nav-faction">Factions</a></li>
                 <li><a href="#" id="nav-allegiance">Allegiances</a></li>
                 <li><a href="#" id="nav-admin">Admin</a></li>
@@ -79,6 +88,34 @@
     </header>
 
     <main>
+        <!-- 
+          Login Page
+          This section handles user login 
+        -->
+         <div id="loginPage" class="page active">
+                    
+           <h2>Neoband App Login</h2>
+           <div id="error-message" class="error"></div> <!-- Removed inline styles -->
+           <!-- Added for login errors -->
+            <div class="form-group">
+                <label for="login-user-select">Select User:</label>
+                <select id="login-user-select" class="input">
+                    <option value="">-- Select User --</option>
+                    <!-- Options will be populated by ui.js -->
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="login-password">Password:</label>
+                <input id="login-password" type="password" class="input" placeholder="Enter Password">
+            </div>
+
+            <div class="button-group">
+                <button id="login-submit-btn" class="btn">Login</button>
+            </div>
+        </div>
+    
+
         <!-- 
           Registration Page
           This section handles user registration and basic tag operations:
@@ -91,8 +128,8 @@
           DO NOT remove, change, or downgrade any existing functionality on this page.
           All current features are required and working as intended.
         -->
-        <div id="registrationPage" class="page active">
-            <h2>Neoband Registration</h2>
+        <div id="registrationPage" class="page">
+          <h2>Neoband Registration</h2>
 
             <div class="form-group">
                 <label for="reg-username">New Username (Max 16 Chars):</label>
@@ -109,6 +146,16 @@
                  <input id="reg-current-username" class="input" type="text" readonly="" placeholder="(Not Read)">
              </div>
 
+            <!--Added Missing Allegiance Selection Dropdown
+             <div class="form-group">
+                <label for="reg-allegiance-select">Assign Allegiance:</label>
+                <select id="reg-allegiance-select" class="input">
+                    <option value="">-- Select Allegiance --</option>
+                    
+                </select>
+             </div> 
+            -->
+
             <div class="form-group">
                 <label for="reg-status">Band Status:</label>
                 <input id="reg-status" class="status-display" type="text" readonly="" value="Unknown" title="Band Status">
@@ -116,9 +163,10 @@
 
             <div class="button-group">
                 <button id="reg-scan-btn" class="btn">Scan Tag</button>
-                <button id="reg-read-btn" class="btn btn-secondary" disabled="">Read Tag</button>
-                <button id="reg-write-btn" class="btn" disabled="">Register / Update</button>
-                <button id="reg-reset-btn" class="btn btn-danger" disabled="">!!! Clear User Data !!!</button>
+                <button id="reg-provision-btn" class="btn btn-warning">Provision Neoband</button>
+                <button id="reg-write-btn" class="btn">Register Neoband</button>                
+                <button id="reg-read-btn" class="btn btn-secondary">Read</button>
+                <button id="reg-reset-btn" class="btn btn-danger">Do Not Touch</button>
             </div>
         </div>
 
@@ -137,11 +185,20 @@
         <div id="factionPage" class="page">
             <h2>Faction Data Management</h2>
 
-            <div class="form-group">
-                 <label>Current User:</label>
-                 <input id="faction-current-username" class="input" type="text" readonly="" placeholder="Scan Tag...">
-             </div>
+            <!-- Player Data Section -->
+            <section id="faction-player-data" class="player-data-frame">
+                <h3>Player Data</h3>
+                <div class="form-group">
+                    <label>Current User:</label>
+                    <input id="faction-current-username" class="input" type="text" readonly placeholder="Scan Tag...">
+                </div>
+                <div class="form-group">
+                    <label>Current Allegiance:</label>
+                    <input id="faction-current-allegiance" class="input" type="text" readonly placeholder="(Not Read)">
+                </div>
+            </section>
 
+            <!-- Everything else under Player Data -->
             <div class="form-group">
                 <label for="faction-select">Select Faction:</label>
                 <select id="faction-select" class="input">
@@ -160,8 +217,9 @@
 
             <div class="button-group">
                  <button id="faction-scan-btn" class="btn">Scan Tag</button>
-                 <button id="faction-read-btn" class="btn btn-secondary" disabled="">Read Faction Data</button>
-                 <button id="faction-write-btn" class="btn" disabled="">Write Faction Data</button>
+                 <button id="faction-read-btn" class="btn btn-secondary" disabled>Read Faction Data</button>
+                 <button id="faction-write-btn" class="btn" disabled>Write Faction Data</button>
+                 <button id="faction-save-btn" class="btn btn-secondary" disabled>Save UI Edits</button>
             </div>
         </div>
 
@@ -180,11 +238,42 @@
         <div id="allegiancesPage" class="page">
             <h2>Allegiance Data Management</h2>
 
-            <div class="form-group">
-                <label>Current User:</label>
-                <input id="allegiance-current-username" class="input" type="text" readonly="" placeholder="Scan Tag...">
-            </div>
+            <!-- Player Data Section -->
+            <section id="allegiance-player-data" class="player-data-frame">
+                <h3>Player Data</h3>
+                <!-- START: Restructure Player Data Content -->
+                <div class="player-data-content">
+                    <div class="player-data-fields">
+                        <div class="form-group">
+                            <label>Current User:</label>
+                            <input id="allegiance-current-username" class="input" type="text" readonly placeholder="Scan Tag...">
+                        </div>
+                        <div class="form-group">
+                            <label for="allegiance-set-current-select">Select Allegiance:</label>
+                            <select id="allegiance-set-current-select" class="input">
+                                <option value="">-- Choose Allegiance --</option>
+                                <!-- Options dynamically populated by ui.js -->
+                            </select>
+                        </div>
+                        <!--
+                        <div class="button-group">
+                            <button id="allegiance-save-current-btn" class="btn btn-secondary" disabled>Save Allegiance</button> //Initially disabled
+                        </div>
+                            -->
+                    </div>
+                    <div class="player-data-logo">
+                        <!-- Logo moved here -->
+                         <img id="allegiance-logo" src="" alt="Allegiance Logo" class="logo-hidden" title="Click to save this allegiance">
+                        <label class="allegiance-logo-label">Click to Bind:</label>
+                        
+                        <!-- Note: Associated CSS for #allegiance-logo, .logo-hidden should still apply -->
+                         <!-- Ensure style.css has rules for .player-data-logo if needed -->
+                    </div>
+                </div>
+                 <!-- END: Restructure Player Data Content -->
+            </section>
 
+            <!-- Everything else under Player Data -->
             <div class="form-group">
                 <label for="allegiance-select">Select Allegiance:</label>
                 <select id="allegiance-select" class="input">
@@ -203,8 +292,9 @@
 
             <div class="button-group">
                  <button id="allegiance-scan-btn" class="btn">Scan Tag</button>
-                 <button id="allegiance-read-btn" class="btn btn-secondary" disabled="">Read Allegiance Data</button>
-                 <button id="allegiance-write-btn" class="btn" disabled="">Write Allegiance Data</button>
+                 <button id="allegiance-read-btn" class="btn btn-secondary" disabled>Read Allegiance Data</button>
+                 <button id="allegiance-write-btn" class="btn" disabled>Write Allegiance Data</button>
+                 <button id="allegiance-save-ui-btn" class="btn btn-secondary">Save UI Edits</button>
             </div>
         </div>
 

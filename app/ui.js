@@ -82,7 +82,11 @@ const ui = {
     init: function() {
         utils.log("UI Initializing...", 'info');
 
+        //Login Page Elements & Listeners
+        document.getElementById('login-submit-btn')?.addEventListener('click', this.handleLoginSubmit.bind(this)); // Use bind(this) to maintain context
+
         // Navigation Link Listeners
+        document.getElementById('nav-login')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('loginPage'); });
         document.getElementById('nav-reg')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('registrationPage'); });
         document.getElementById('nav-faction')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('factionPage'); });
         document.getElementById('nav-allegiance')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('allegiancesPage'); });
@@ -93,6 +97,7 @@ const ui = {
         document.getElementById('reg-read-btn')?.addEventListener('click', this.handleRegRead);
         document.getElementById('reg-write-btn')?.addEventListener('click', this.handleRegWrite);
         document.getElementById('reg-reset-btn')?.addEventListener('click', this.handleRegReset);
+        document.getElementById('reg-provision-btn')?.addEventListener('click', window.handleGlobalProvisionCard);
 
         // Faction Page Button & Select Listeners
         document.getElementById('faction-select')?.addEventListener('change', this.handleFactionSelectChange);
@@ -105,6 +110,8 @@ const ui = {
         document.getElementById('allegiance-scan-btn')?.addEventListener('click', this.handleAllegianceScan);
         document.getElementById('allegiance-read-btn')?.addEventListener('click', this.handleAllegianceRead);
         document.getElementById('allegiance-write-btn')?.addEventListener('click', this.handleAllegianceWrite);
+        // New listener for the save current allegiance button
+        document.getElementById('allegiance-save-current-btn')?.addEventListener('click', this.handleAllegianceSaveCurrent.bind(this)); // Added
 
         // Log Toggle Button Listener
         document.getElementById('log-toggle')?.addEventListener('click', this.toggleLogDisplay);
@@ -112,14 +119,41 @@ const ui = {
         // Visual Confirmation Button Listener
         document.getElementById('confirmButton')?.addEventListener('click', this.hideVisualConfirmation);
 
+        // *** ADD/MODIFY LISTENERS specific to logo interaction ***
+        
+        // Listener for the Set Current Allegiance Dropdown (Updates Logo)
+        const setCurrentSelect = document.getElementById('allegiance-set-current-select');
+        if (setCurrentSelect) {
+            setCurrentSelect.addEventListener('change', this.handleAllegianceSetCurrentSelectChange.bind(this));
+             utils.log('[UI Init] Added change listener to set current allegiance dropdown.', 'debug');
+        } else {
+             utils.log('[UI Init] Set current allegiance dropdown not found during init.', 'warning');
+        }
+
+        // --- DEFER LOGO-RELATED INIT --- 
+        setTimeout(() => {
+            utils.log('[UI Init Deferred] Attaching logo listeners and setting initial state...', 'debug');
+            // Listener for the Allegiance Logo Click (Saves Allegiance)
+            const logoImg = document.getElementById('allegiance-logo');
+            if (logoImg) {
+                logoImg.addEventListener('click', this.handleAllegianceLogoClick.bind(this));
+                utils.log('[UI Init Deferred] Added click listener to allegiance logo.', 'debug');
+                // Ensure logo is hidden initially
+                this.updateAllegianceLogo(null); // Hide logo by default
+            } else {
+                utils.log('[UI Init Deferred] Allegiance logo element not found.', 'error'); // Log as error if still not found
+            }
+        }, 0); // Defer execution slightly
+        // --- END DEFER LOGO-RELATED INIT --- 
 
         // Populate dynamic dropdowns
+        this.populateLoginUserSelect();
         this.populateFactionSelect();
         this.populateAllegianceSelect();
-        this.populateAllegianceAssignSelect(); // Populate registration allegiance dropdown
+        this.populateAllegianceAssignSelect();
+        this.populateAllegianceSetCurrentSelect();
 
-
-        utils.log("UI Initialized.", 'success');
+        utils.log("UI Initialized (listeners attached, dropdowns populated).", 'success');
         this.showPage(core.currentState.activePage); // Show initial page
         this.render(); // Initial render based on default state
     },
@@ -144,7 +178,7 @@ const ui = {
 
         // --- Update common elements ---
         // Update Band ID / Username fields across relevant pages if tag is present
-        const currentUid = state.scannedTagInfo.uid || "N/A";
+        const currentUid = state.scannedTagInfo?.uid || "N/A"; // Safe null check
         const currentUsername = state.currentUsername || "(Not Read)";
         const currentAllegiance = state.currentAllegiance || "(Not Read)";
         const displayUsername = state.currentUsername ? state.currentUsername : (currentUid !== "N/A" ? `${currentUid} (Unreg)` : "Scan Tag...");
@@ -154,6 +188,10 @@ const ui = {
         ui.updateInputValue('reg-current-allegiance', currentAllegiance);
         ui.updateInputValue('faction-current-username', displayUsername);
         ui.updateInputValue('allegiance-current-username', displayUsername);
+        // --- New: Update Player Data Allegiance fields on Faction/Allegiance pages ---
+        ui.updateInputValue('faction-current-allegiance', currentAllegiance);
+        ui.updateInputValue('allegiance-current-allegiance', currentAllegiance);
+        utils.log(`Player Data: Set currentAllegiance to '${currentAllegiance}' on Faction/Allegiance pages.`, 'debug');
 
         // Update registration status display
         let regStatus = "Unknown";
@@ -182,12 +220,156 @@ const ui = {
         // Allegiance buttons
         const isAllegianceSelected = !!state.selectedAllegiance;
         ui.setButtonDisabled('allegiance-scan-btn', isOpRunning);
-        ui.setButtonDisabled('allegiance-read-btn', isOpRunning);
-        ui.setButtonDisabled('allegiance-write-btn', isOpRunning);
+        ui.setButtonDisabled('allegiance-read-btn', isOpRunning || !isAllegianceSelected);
+        ui.setButtonDisabled('allegiance-write-btn', isOpRunning || !isAllegianceSelected);
+        // New: Enable/disable the Save Allegiance button
+        ui.setButtonDisabled('allegiance-save-current-btn', isOpRunning || !isTagScanned);
 
         // --- Update active page ---
-        this.showPage(state.activePage);
+        this.showPage(state.activePage || 'loginPage'); // Default to login page
         utils.log(`UI Render complete for page: ${state.activePage}`, 'debug');
+    },
+
+    /**
+     * Populates the login user select dropdown.
+     */
+    populateLoginUserSelect: function() {
+        const selectElement = document.getElementById('login-user-select');
+        if (!selectElement) {
+            utils.log('Login user select element not found.', 'error');
+            return;
+        }
+
+        // Clear existing options except the placeholder
+        while (selectElement.options.length > 1) {
+            selectElement.remove(1);
+        }
+
+        // Add Staff
+        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.staff && window.NEOBAND_KEYS.staff.user) {
+            const staffOption = document.createElement('option');
+            staffOption.value = 'staff';
+            staffOption.textContent = 'Staff (' + window.NEOBAND_KEYS.staff.user.name + ')';
+            selectElement.appendChild(staffOption);
+        }
+
+        // Add Admin
+        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.admin) {
+            const adminOption = document.createElement('option');
+            adminOption.value = 'admin';
+            adminOption.textContent = 'Admin (' + window.NEOBAND_KEYS.admin.name + ')';
+            selectElement.appendChild(adminOption);
+        }
+
+        // Add Factions
+        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.factions) {
+            for (const factionKey in window.NEOBAND_KEYS.factions) {
+                const faction = window.NEOBAND_KEYS.factions[factionKey];
+                const option = document.createElement('option');
+                option.value = `faction_${factionKey}`; // Unique value for each faction
+                option.textContent = `Faction: ${faction.name}`;
+                selectElement.appendChild(option);
+            }
+        }
+
+        // Add Allegiances
+        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.allegiances) {
+            for (const allegianceKey in window.NEOBAND_KEYS.allegiances) {
+                const allegiance = window.NEOBAND_KEYS.allegiances[allegianceKey];
+                const option = document.createElement('option');
+                option.value = `allegiance_${allegianceKey}`; // Unique value for each allegiance
+                option.textContent = `Allegiance: ${allegiance.name}`;
+                selectElement.appendChild(option);
+            }
+        }
+        utils.log('Login user select populated.', 'debug');
+    },
+
+    /**
+     * Handles the login submission.
+     * Validates credentials and redirects the user.
+     */
+    handleLoginSubmit: function() {
+        const userSelect = document.getElementById('login-user-select');
+        const passwordInput = document.getElementById('login-password');
+        const selectedValue = userSelect.value;
+        const password = passwordInput.value;
+
+        if (!selectedValue) {
+            this.showError('Please select a user.');
+            return;
+        }
+        if (!password) {
+            this.showError('Please enter a password.');
+            return;
+        }
+
+        let isValid = false;
+        let redirectPage = 'loginPage'; // Default page
+        let userType = '';
+        let userName = '';
+
+        try {
+            if (selectedValue === 'staff') {
+                userType = 'Staff';
+                userName = window.NEOBAND_KEYS.staff.user.name;
+                // Staff uses neoKey as password
+                if (password === window.NEOBAND_KEYS.staff.user.neoKey) {
+                    isValid = true;
+                    redirectPage = 'registrationPage';
+                }
+            } else if (selectedValue === 'admin') {
+                userType = 'Admin';
+                userName = window.NEOBAND_KEYS.admin.name;
+                // Admin uses its specific password
+                if (password === window.NEOBAND_KEYS.admin.password) {
+                    isValid = true;
+                    redirectPage = 'adminPage';
+                }
+            } else if (selectedValue.startsWith('faction_')) {
+                const factionKey = selectedValue.substring(8);
+                const faction = window.NEOBAND_KEYS.factions[factionKey];
+                userType = 'Faction';
+                userName = faction.name;
+                // Factions use neoKey as password
+                if (faction && password === faction.neoKey) {
+                    isValid = true;
+                    redirectPage = 'factionPage';
+                    // Pre-select this faction on the faction page
+                    core.updateState({ selectedFaction: factionKey }, false); // Don't re-render yet
+                }
+            } else if (selectedValue.startsWith('allegiance_')) {
+                const allegianceKey = selectedValue.substring(11);
+                const allegiance = window.NEOBAND_KEYS.allegiances[allegianceKey];
+                userType = 'Allegiance';
+                userName = allegiance.name;
+                // Allegiances use neoKey as password
+                if (allegiance && password === allegiance.neoKey) {
+                    isValid = true;
+                    redirectPage = 'allegiancesPage';
+                    // Pre-select this allegiance on the allegiance page
+                    core.updateState({ selectedAllegiance: allegianceKey }, false); // Don't re-render yet
+                }
+            }
+        } catch (error) {
+            utils.log(`Error during login validation: ${error}`, 'error');
+            this.showError('An unexpected error occurred during login.');
+            return;
+        }
+
+        if (isValid) {
+            utils.log(`${userType} '${userName}' logged in successfully. Redirecting to ${redirectPage}.`, 'success');
+            // Clear password field after successful login
+            passwordInput.value = ''; 
+            // Update core state about logged-in user (optional, but good practice)
+            core.updateState({ loggedInUserType: userType, loggedInUserName: userName }); // This will trigger render
+            this.showPage(redirectPage); // Navigate to the page
+        } else {
+            utils.log(`Login failed for user selection: ${selectedValue}`, 'warning');
+            this.showError('Invalid user or password.');
+            // Optionally clear password field on failure too
+            // passwordInput.value = ''; 
+        }
     },
 
     /**
@@ -204,7 +386,7 @@ const ui = {
      * @param {string} pageId - The ID of the page to display.
      * @returns {void}
      */
-    showPage: function(pageId) {
+    showPage: function(pageId = 'loginPage') { // Default parameter
         utils.log(`Navigating to page: ${pageId}`, 'debug');
         core.updateState({ activePage: pageId }, false); // Update state without triggering re-render yet
 
@@ -217,8 +399,8 @@ const ui = {
         } else {
             console.error(`Page with ID ${pageId} not found!`);
             // Show default page as fallback
-            document.getElementById('registrationPage')?.classList.add('active');
-            core.updateState({ activePage: 'registrationPage' }, false);
+            document.getElementById('loginPage')?.classList.add('active');
+            core.updateState({ activePage: 'loginPage' }, false);
         }
 
         // Update navigation menu highlighting
@@ -227,6 +409,12 @@ const ui = {
         if (activeNavLink) {
             activeNavLink.classList.add('active-nav');
         }
+        // To avoid accidental syncing when users return to the Faction page later
+        if (pageId !== 'adminPage' && core.currentState.admin?.enableNfcSync) {
+            utils.log('Leaving Admin Page — Sync flag auto-disabled', 'debug');
+            core.updateState({ enableNfcSync: false });
+        }
+        
     },
 
     // --- UI Element Updaters ---
@@ -354,6 +542,7 @@ const ui = {
             return;
         }
 
+        // Use per-field sector/block addressing for each allegiance field (MIFARE Classic compliance)
         try {
             let readCount = 0;
             for (const [fieldKey, fieldConfig] of Object.entries(allegianceData.fields)) {
@@ -365,26 +554,32 @@ const ui = {
                     const textData = await operations.readAllegianceField(
                         fieldConfig.sector,
                         fieldConfig.block,
-                        fieldConfig.key,
                         `Allegiance Field ${fieldKey}`
                     );
-                    // Only update UI if data is not empty
-                    if (textData) {
-                        ui.updateInputValue(inputId, textData);
-                    }
-                    readCount++;
-                } catch (error) {
-                    utils.log(`Error reading field ${fieldKey}: ${error}`, 'error');
+                    // Log SDK call result
+                    utils.log(`[Allegiance] SDK readAllegianceField result for ${fieldKey}: "${textData}"`, 'debug');
+                    // Update the UI with the text data
+                    ui.updateInputValue(inputId, textData);
+                    utils.log(`[Allegiance] UI updated: set ${inputId} = "${textData}"`, 'debug');
+                    if (textData) readCount++;
+                } catch (fieldError) {
+                    utils.log(`[Allegiance] Failed to read field ${fieldKey} (Block ${fieldConfig.block}): ${fieldError.message}`, 'error');
+                    // Do NOT clear the field on error; preserve previous value.
+                    // Display an error message to the user.
+                    ui.showVisualConfirmation(
+                        `Allegiance Field Read Error`,
+                        `Failed to read ${fieldConfig.title}: ${fieldError.message}`,
+                        "error"
+                    );
+                    utils.log(`[Allegiance] UI error displayed for field ${fieldKey}: ${fieldError.message}`, 'debug');
                 }
             }
-            if (readCount > 0) {
-                ui.showVisualConfirmation("Read Successful", "Allegiance data read completed.", 'success');
-            } else {
-                ui.showVisualConfirmation("Read Error", "Failed to read allegiance data.", 'error');
-            }
+            ui.showVisualConfirmation("Allegiance Read Complete", `Read ${readCount} fields for ${allegianceData.name}.`, 'success');
+            // --- Update Player Data Allegiance field ---
+            await ui.readAndUpdateCurrentAllegiance();
         } catch (error) {
-            utils.log(`[Allegiance] Read failed: ${error}`, 'error');
-            ui.showVisualConfirmation("Read Error", "An error occurred during data read.", 'error');
+            utils.log(`[Allegiance] Read error: ${error.message}`, 'error');
+            ui.showVisualConfirmation("Allegiance Read Error", error.message || "Failed to read allegiance data.", 'error');
         }
     },
 
@@ -422,15 +617,49 @@ const ui = {
     * Populates the allegiance assignment dropdown on the registration page.
     */
     populateAllegianceAssignSelect: function() {
-        const select = document.getElementById('reg-allegiance-select');
-        if (!select) return;
+        this.populateAllegianceSelectByName('reg-allegiance-select');
+    },
+
+    /**
+    * Populates an allegiance select dropdown using allegiance names for value/text.
+    * Used for both Registration page assignment and Allegiance page current setting.
+    * @param {string} selectId - The ID of the select element to populate.
+    */
+    populateAllegianceSelectByName: function(selectId) {
+        const select = document.getElementById(selectId);
+        if (!select) {
+            utils.log(`[populateAllegianceSelectByName] Select element with ID '${selectId}' not found.`, 'warning');
+            return;
+        }
         select.innerHTML = '<option value="">-- Select Allegiance --</option>'; // Reset
+        // Add a "None" option for clearing allegiance
+        const noneOption = document.createElement('option');
+        noneOption.value = ""; // Empty value represents clearing
+        noneOption.textContent = "(None)";
+        select.appendChild(noneOption);
+
+        if (typeof FIELD_MAP === 'undefined' || !FIELD_MAP.allegiances) {
+            utils.log("[populateAllegianceSelectByName] FIELD_MAP or FIELD_MAP.allegiances not defined.", 'error');
+            return;
+        }
         Object.entries(FIELD_MAP.allegiances).forEach(([key, allegiance]) => {
-            const option = document.createElement('option');
-            option.value = allegiance.name; // Use the name for writing to the tag
-            option.textContent = allegiance.name;
-            select.appendChild(option);
+            if (allegiance && allegiance.name) { // Check if allegiance and name exist
+                const option = document.createElement('option');
+                option.value = allegiance.name; // Use the name for writing to the tag
+                option.textContent = allegiance.name;
+                select.appendChild(option);
+            } else {
+                utils.log(`[populateAllegianceSelectByName] Skipping invalid allegiance entry: key=${key}`, 'warning');
+            }
         });
+        utils.log(`[populateAllegianceSelectByName] Populated select element '${selectId}'.`, 'debug');
+    },
+
+    /**
+    * Populates the 'Set Current Allegiance' dropdown on the Allegiance page.
+    */
+    populateAllegianceSetCurrentSelect: function() {
+        this.populateAllegianceSelectByName('allegiance-set-current-select');
     },
 
      /**
@@ -440,10 +669,14 @@ const ui = {
     displayFactionFields: function(factionKey) {
         const container = document.getElementById('faction-fields-container');
         const factionData = FIELD_MAP.factions[factionKey];
-        let nameDisplayElement = null;
+        let nameDisplayElement = document.getElementById('faction-name-display');
         const detailsDiv = document.getElementById('faction-details');
 
-        nameDisplayElement = document.getElementById('faction-name-display');
+        // --- Start: Ensure Clean Slate ---
+        if (nameDisplayElement) nameDisplayElement.innerHTML = ''; // Clear title display
+        if (container) container.innerHTML = ''; // Clear fields container
+        // --- End: Ensure Clean Slate ---
+
         if (!container || !factionData || !detailsDiv || !nameDisplayElement) {
             utils.log(`Could not display fields for faction key: ${factionKey} - missing container, data, detailsDiv, or nameDisplayElement`, 'error');
             if (detailsDiv) {
@@ -454,53 +687,45 @@ const ui = {
         }
 
         // Create editable faction name heading
-        nameDisplayElement = document.getElementById('faction-name-display');
-        nameDisplayElement.innerHTML = ''; // Clear existing content
-        
-        // Create editable input for faction name
+        // nameDisplayElement.innerHTML = ''; // Moved to top
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'input faction-title-input';
-        nameInput.value = factionData.name;
-        nameInput.id = `faction-${factionKey}-name-input`;
-        nameInput.dataset.originalValue = factionData.name; // Store original value for reference
+        nameInput.placeholder = factionData.name; 
+        nameInput.id = `faction-${factionKey}-name-display`; 
+        nameInput.dataset.originalValue = factionData.name;
         nameDisplayElement.appendChild(nameInput);
         
-        container.innerHTML = ''; // Clear previous fields
+        // container.innerHTML = ''; // Moved to top
 
         Object.entries(factionData.fields).forEach(([fieldKey, fieldConfig]) => {
              const groupDiv = document.createElement('div');
-             groupDiv.className = 'faction-field-group form-group'; // Reuse form-group style
+             groupDiv.className = 'faction-field-group form-group';
 
-             // Create editable label with input
              const labelDiv = document.createElement('div');
              labelDiv.className = 'field-label-container';
              
-             // Create editable input for field title
              const titleInput = document.createElement('input');
              titleInput.type = 'text';
              titleInput.className = 'input field-title-input';
-             titleInput.value = fieldConfig.title;
-             titleInput.dataset.originalValue = fieldConfig.title; // Store original value
+             titleInput.placeholder = fieldConfig.title; 
+             titleInput.dataset.originalValue = fieldConfig.title; 
              
-             // Use a unique ID based on faction and field key for the value input
              const inputId = `faction-${factionKey}-${fieldKey}-input`;
              
-             // Create the value input (for the actual data)
              const valueInput = document.createElement('input');
              valueInput.type = 'text';
-             valueInput.className = 'input faction-data-input'; // Add class for easy selection
+             valueInput.className = 'input faction-data-input'; 
              valueInput.id = inputId;
              valueInput.placeholder = fieldConfig.placeholder;
-             // Store block number and key for writing operations
-             valueInput.dataset.sector = factionData.sector; // Store sector
-             valueInput.dataset.block = fieldConfig.block; // Use 'block' from FIELD_MAP
-             valueInput.dataset.key = fieldConfig.key; // Use 'key' from FIELD_MAP
-             valueInput.dataset.fieldKey = fieldKey; // Store the original field key
+             valueInput.dataset.sector = factionData.sector; 
+             valueInput.dataset.block = fieldConfig.block; 
+             valueInput.dataset.key = fieldConfig.key; 
+             valueInput.dataset.fieldKey = fieldKey;
 
-             // Add a label element to maintain accessibility
              const label = document.createElement('label');
              label.htmlFor = inputId;
+             label.id = `label-${inputId}`;
              label.appendChild(titleInput);
              
              groupDiv.appendChild(label);
@@ -508,6 +733,15 @@ const ui = {
              container.appendChild(groupDiv);
         });
          detailsDiv.style.display = 'block'; // Show the details section
+         
+         // --- Load persisted UI settings AFTER fields are generated (with delay) ---
+         // Delay slightly to ensure DOM is ready after generation
+         setTimeout(() => {
+             utils.log(`Calling loadFactionUISettings for ${factionKey} after delay...`, 'debug');
+             loadFactionUISettings(); // Load saved titles, labels, and values
+         }, 0); // 0ms timeout defers execution until after current stack clears
+         // --- End Load persisted UI settings ---
+
          this.render(); // Update button states etc.
          utils.log(`Displayed fields for faction: ${factionData.name}`, 'debug');
     },
@@ -520,69 +754,60 @@ const ui = {
         const container = document.getElementById('allegiance-fields-container');
         const allegianceData = FIELD_MAP.allegiances[allegianceKey];
         const detailsDiv = document.getElementById('allegiance-details');
+        let nameDisplayElement = document.getElementById('allegiance-name-display');
 
-         if (!container || !allegianceData || !detailsDiv) {
+        // --- Start: Ensure Clean Slate ---
+        if (nameDisplayElement) nameDisplayElement.innerHTML = ''; // Clear title display
+        if (container) container.innerHTML = ''; // Clear fields container
+        // --- End: Ensure Clean Slate ---
+
+         if (!container || !allegianceData || !detailsDiv || !nameDisplayElement) {
             utils.log(`Could not display fields for allegiance key: ${allegianceKey}`, 'error');
             detailsDiv.style.display = 'none';
             return;
         }
 
         // Create editable allegiance name heading
-        const nameDisplayElement = document.getElementById('allegiance-name-display');
-        if (!nameDisplayElement) {
-            utils.log(`Could not display allegiance fields: missing name display element`, 'error');
-            if (detailsDiv) {
-                detailsDiv.style.display = 'none';
-            }
-            return;
-        }
-        nameDisplayElement.innerHTML = ''; // Clear existing content
-        
-        // Create editable input for allegiance name
+        // nameDisplayElement.innerHTML = ''; // Moved to top
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'input allegiance-title-input';
-        nameInput.value = allegianceData.name;
-        nameInput.id = `allegiance-${allegianceKey}-name-input`;
-        nameInput.dataset.originalValue = allegianceData.name; // Store original value for reference
+        nameInput.placeholder = allegianceData.name; 
+        nameInput.id = `allegiance-${allegianceKey}-name-display`;
+        nameInput.dataset.originalValue = allegianceData.name; 
         nameDisplayElement.appendChild(nameInput);
         
-        container.innerHTML = ''; // Clear previous fields
+        // container.innerHTML = ''; // Moved to top
 
          // Generate fields
         Object.entries(allegianceData.fields).forEach(([fieldKey, fieldConfig]) => {
              const groupDiv = document.createElement('div');
              groupDiv.className = 'allegiance-field-group form-group';
 
-             // Create editable label with input
              const labelDiv = document.createElement('div');
              labelDiv.className = 'field-label-container';
              
-             // Create editable input for field title
              const titleInput = document.createElement('input');
              titleInput.type = 'text';
              titleInput.className = 'input field-title-input';
-             titleInput.value = fieldConfig.title;
-             titleInput.dataset.originalValue = fieldConfig.title; // Store original value
+             titleInput.placeholder = fieldConfig.title;
+             titleInput.dataset.originalValue = fieldConfig.title;
              
-             // Use a unique ID based on allegiance and field key
              const inputId = `allegiance-${allegianceKey}-${fieldKey}-input`;
              
-             // Create the value input (for the actual data)
              const valueInput = document.createElement('input');
              valueInput.type = 'text';
              valueInput.className = 'input allegiance-data-input';
              valueInput.id = inputId;
              valueInput.placeholder = fieldConfig.placeholder;
-             // Store block number and key for writing operations
-             valueInput.dataset.sector = allegianceData.sector; // Store sector
-             valueInput.dataset.block = fieldConfig.block; // Use 'block' from FIELD_MAP
-             valueInput.dataset.key = fieldConfig.key;     // Use 'key' from FIELD_MAP
+             valueInput.dataset.sector = allegianceData.sector; 
+             valueInput.dataset.block = fieldConfig.block; 
+             valueInput.dataset.key = fieldConfig.key;     
              valueInput.dataset.fieldKey = fieldKey;
 
-             // Add a label element to maintain accessibility
              const label = document.createElement('label');
              label.htmlFor = inputId;
+             label.id = `label-${inputId}`;
              label.appendChild(titleInput);
              
              groupDiv.appendChild(label);
@@ -590,6 +815,15 @@ const ui = {
              container.appendChild(groupDiv);
         });
          detailsDiv.style.display = 'block'; // Show the details section
+
+         // --- Load persisted UI settings AFTER fields are generated (with delay) ---
+         // Delay slightly to ensure DOM is ready after generation
+         setTimeout(() => {
+             utils.log(`Calling loadAllegianceUISettings for ${allegianceKey} after delay...`, 'debug');
+             loadAllegianceUISettings(); // Load saved titles, labels, and values
+         }, 0); // 0ms timeout defers execution until after current stack clears
+         // --- End Load persisted UI settings ---
+
          this.render(); // Update button states etc.
          utils.log(`Displayed fields for allegiance: ${allegianceData.name}`, 'debug');
     },
@@ -887,73 +1121,107 @@ const ui = {
         // Scroll log to bottom
         logDisplay.scrollTop = logDisplay.scrollHeight;
      },
+     /**
+      * Handles the factory reset operation for a scanned tag.
+      * Confirms with the user, then attempts to reset the entire tag (Sectors 1-39)
+      * to factory defaults (Keys: FFFFFFFFFFFF, Access: FF078069) using the
+      * operations.resetTagToFactoryDefaults function.
+      * Updates UI and provides feedback based on the operation result.
+      */
      handleRegReset: async function() {
-        // Show log display and initialize
-        const logDisplay = document.getElementById("logDisplay");
-        if (logDisplay) {
-            logDisplay.style.display = "block";
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Starting factory reset operation...</div>`;
-        } else {
-            console.error("Log display element not found when starting factory reset.");
-        }
-        utils.log("Starting factory reset operation...", 'info');
-        
-        try {
-            if (!document.getElementById("reg-band-id").value.trim()) {
-                logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ No tag detected. Please scan a tag first.</div>`;
-                utils.log("No tag detected. Please scan a tag first.", 'error');
-                ui.showVisualConfirmation("No Tag Detected", "Please scan a band first", "error");
-             return;
+         // Show log display and initialize
+         const logDisplay = document.getElementById("logDisplay");
+         if (logDisplay) {
+             logDisplay.style.display = "block";
+             logDisplay.innerHTML = ''; // Clear previous logs for this operation
+             logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Starting FULL Tag Factory Reset operation...</div>`;
+         } else {
+             console.error("Log display element not found when starting factory reset.");
          }
-
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Confirming factory reset operation with user...</div>`;
-            utils.log("Confirming factory reset operation with user...", 'info');
-            
-            if (!confirm("Are you sure you want to perform a factory reset on this band? This will erase ALL data including username, faction data, and allegiances.")) {
-                logDisplay.innerHTML += `<div style='color:#FFA500;'>Factory reset operation cancelled by user</div>`;
-                utils.log("Factory reset operation cancelled by user", 'warning');
-               return;
-           }
-
-            // Proceed with reset
-            ui.showOperationIndicator("Resetting Tag...");
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Beginning factory reset...</div>`;
-            utils.log("Beginning factory reset...", 'info');
-
-            // Clear all user data blocks
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing username block...</div>`;
-            await operations.writeBlock(39, 0, "", NFC_KEY, 'Username Clear'); // Sector 39, Block 0 (Username)
-            
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing status block...</div>`;
-            await operations.writeBlock(39, 2, "", NFC_KEY, 'Status Clear'); // Sector 39, Block 2 (Status)
-            
-            logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Clearing allegiance block...</div>`;
-            await operations.writeBlock(39, 3, "", NFC_KEY, 'Allegiance Clear'); // Sector 39, Block 3 (Allegiance)
-
-            // Update UI
-            ui.updateInputValue('reg-status', "Unregistered");
-            ui.updateInputValue('reg-username', "");
-            ui.updateInputValue('reg-current-username', "");
-            ui.updateSelectValue('reg-allegiance-select', "");
-            
-            // Update core state
-            core.updateState({ currentUsername: null });
-
-            // Show success
-            logDisplay.innerHTML += `<div style='color:#00FF00;'>✓ Factory reset completed successfully</div>`;
-            utils.log("Factory reset completed successfully", 'success');
-            ui.showVisualConfirmation("Reset Complete", "Tag has been reset to factory defaults", "success");
-
-         } catch (error) {
-            logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ Factory reset error: ${error}</div>`;
-            utils.log(`Factory reset error: ${error}`, 'error');
-            ui.showVisualConfirmation("Reset Error", error.toString(), "error");
-        } finally {
-            ui.hideOperationIndicator();
-            
-            // Scroll log to bottom
-            logDisplay.scrollTop = logDisplay.scrollHeight;
-        }
+         utils.log("Starting FULL Tag Factory Reset operation...", 'info');
+ 
+         try {
+             // Check if tag is present
+             if (!document.getElementById("reg-band-id").value.trim()) {
+                 const noTagMsg = 'No tag detected. Please scan a tag first.';
+                 if(logDisplay) logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ ${noTagMsg}</div>`;
+                 utils.log(noTagMsg, 'error');
+                 ui.showVisualConfirmation("No Tag Detected", noTagMsg, "error");
+                 return;
+             }
+ 
+             // Confirm with user before proceeding
+             const confirmMsg = "Are you sure you want to perform a FULL factory reset on this band?\n\n" +
+                              "This will attempt to ERASE ALL SECTORS (1-39) back to factory defaults " +
+                              "(Keys: FFFFFFFFFFFF, Access: FF078069). \n\n" +
+                              "THIS CANNOT BE UNDONE.";
+ 
+             if(logDisplay) logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Confirming FULL factory reset with user...</div>`;
+             utils.log("Confirming factory reset operation with user...", 'info');
+             
+             if (!confirm(confirmMsg)) {
+                 const cancelMsg = "Factory reset operation cancelled by user.";
+                 if(logDisplay) logDisplay.innerHTML += `<div style='color:#FFA500;'>${cancelMsg}</div>`;
+                 utils.log(cancelMsg, 'warning');
+                 return;
+             }
+ 
+             ui.showOperationIndicator("Resetting Tag...");
+             if(logDisplay) logDisplay.innerHTML += `<div style='color:#FFFFFF;'>Beginning FULL factory reset... (This may take a while)</div>`;
+             utils.log("Beginning FULL factory reset...", 'info');
+ 
+             // Call the new operations function for factory reset
+             const result = await operations.factoryResetCard(); // <-- Use the new standalone function
+ 
+             if(logDisplay) logDisplay.innerHTML += `<div style='color:${result.success ? "#00FF00" : "#FF0000"};'>${result.message}</div>`;
+ 
+             if (result.success) {
+                 // --- Update UI to reflect reset --- 
+                 // (Similar to old reset, but more general)
+                 ui.updateInputValue('reg-username', ""); // Clear the input field
+                 ui.updateInputValue('reg-current-username', "(Reset - Scan/Read Again)"); // Update current display
+                 ui.updateSelectValue('reg-allegiance-select', ""); // Clear allegiance dropdown
+                 ui.updateInputValue('reg-status', "Reset (Unregistered)"); // Update status display
+ 
+                 // Also clear fields on other pages that show username/allegiance
+                 ui.updateInputValue('faction-current-username', "(Reset - Scan/Read Again)");
+                 ui.updateInputValue('faction-current-allegiance', "(Reset - Scan/Read Again)");
+                 ui.updateInputValue('allegiance-current-username', "(Reset - Scan/Read Again)");
+                 // Clear the allegiance dropdown and logo on the allegiance page
+                 ui.updateSelectValue('allegiance-set-current-select', "");
+                 ui.updateAllegianceLogo(null);
+ 
+                 // --- Update core state ---
+                 core.updateState({
+                     currentUsername: null,
+                     currentAllegiance: null,
+                     bandStatus: "Reset (Unregistered)"
+                 }); // Let updateState trigger render
+ 
+                 // Show success
+                 utils.log("Full Factory Reset completed successfully.", 'success');
+                 ui.showVisualConfirmation("Reset Complete", result.message, "success");
+             } else {
+                  // Show failure/partial success message
+                 utils.log("Full Factory Reset completed with errors.", 'warning');
+                 ui.showVisualConfirmation("Reset Finished (with errors)", result.message, "warning");
+                  // Update status display to show error
+                  ui.updateInputValue('reg-status', "Reset Error");
+             }
+         } catch (error) { // Catch errors from the UI handler itself (e.g., confirmation, element access)
+             const errorMsg = `Factory Reset UI error: ${error.message || error}`;
+             if(logDisplay) logDisplay.innerHTML += `<div style='color:#FF0000;'>✗ ${errorMsg}</div>`;
+             utils.log(errorMsg, 'error');
+             console.error("Reset UI Error Details:", error); // Log full error object to console
+             // Update status display to show error
+             ui.updateInputValue('reg-status', "Reset Error");
+             // Show visual error confirmation
+             ui.showVisualConfirmation("Reset Error", errorMsg, "error");
+         } finally {
+             // Always hide the operation indicator
+             // Delay hiding slightly to allow user to see final message in indicator if needed
+             setTimeout(() => ui.hideOperationIndicator(), 500);
+         }
      },
 
     // Faction Page
@@ -977,12 +1245,34 @@ const ui = {
      handleFactionScan: async function() {
           utils.clearLog();
           utils.log("Faction: Scan initiated.", 'info');
+          // Retrieve selectedFactionKey from the core state
+          const selectedFactionKey = core.currentState.selectedFaction;
+          // Check if a faction is actually selected before proceeding
+          if (!selectedFactionKey) {
+              ui.showVisualConfirmation("Scan Error", "Please select a faction before scanning.", 'warning');
+              return; // Stop execution if no faction is selected
+          }
            try {
                 await operations.scanTag();
 
                 // After a successful scan, the scanTag function already tries to read username 
                 // through readUsernameAndUpdateFields, so we don't need to do it again here
                 ui.render();
+                // --- Update Player Data Allegiance field ---
+                await ui.readAndUpdateCurrentAllegiance();
+
+                // --- Update state with latest field values and sync ---
+                // Only update for the first three fields (field1, field2, field3)
+                const fieldInputs = ['field1', 'field2', 'field3'].map(
+                    key => document.getElementById(`faction-${selectedFactionKey}-${key}-input`)
+                );
+                core.updateState({
+                    field1: fieldInputs[0] ? fieldInputs[0].value : '',
+                    field2: fieldInputs[1] ? fieldInputs[1].value : '',
+                    field3: fieldInputs[2] ? fieldInputs[2].value : ''
+                });
+                const uid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
+                // if (uid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(uid); */
            } catch (error) {
                ui.showVisualConfirmation("Scan Error", error.message || "Failed to scan tag.", 'error');
            }
@@ -1038,7 +1328,6 @@ const ui = {
                     let blockText = await operations.readFactionField(
                         factionSector,
                         fieldConfig.block,
-                        fieldConfig.key,
                         `Faction Field ${fieldKey}`
                     );
 
@@ -1063,6 +1352,21 @@ const ui = {
                 }
             }
             ui.showVisualConfirmation("Faction Read Complete", `Read ${readCount} fields for ${factionData.name}.`, 'success');
+            // --- Update Player Data Allegiance field ---
+            await ui.readAndUpdateCurrentAllegiance();
+
+            // --- Update state with latest field values and sync ---
+            // Only update for the first three fields (field1, field2, field3)
+            const fieldInputs = ['field1', 'field2', 'field3'].map(
+                key => document.getElementById(`faction-${factionKey}-${key}-input`)
+            );
+            core.updateState({
+                field1: fieldInputs[0] ? fieldInputs[0].value : '',
+                field2: fieldInputs[1] ? fieldInputs[1].value : '',
+                field3: fieldInputs[2] ? fieldInputs[2].value : ''
+            });
+            const uid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
+            // if (uid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(uid); */
         } catch (error) { // Catch potential errors from Promise.allSettled itself (unlikely)
             utils.log(`Faction read error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Faction Read Error", error.message || "Failed to read faction data.", 'error');
@@ -1122,7 +1426,7 @@ const ui = {
                               factionSector, 
                               fieldConfig.block, 
                               textData, 
-                              fieldConfig.key, 
+                              factionKey, // Pass the selected faction key as the role
                               `Faction Field ${fieldKey}`
                           );
                           utils.log(`Wrote Faction Field ${fieldKey} (Block ${fieldConfig.block}): "${textData}"`, 'info');
@@ -1135,6 +1439,19 @@ const ui = {
                   }
              }
              ui.showVisualConfirmation("Faction Write Complete", `Wrote ${writeCount} fields for ${factionData.name}.`, 'success');
+
+             // --- Update state with latest field values and sync ---
+             // Only update for the first three fields (field1, field2, field3)
+             const writeFieldInputs = ['field1', 'field2', 'field3'].map(
+                 key => document.getElementById(`faction-${factionKey}-${key}-input`)
+             );
+             core.updateState({
+                 field1: writeFieldInputs[0] ? writeFieldInputs[0].value : '',
+                 field2: writeFieldInputs[1] ? writeFieldInputs[1].value : '',
+                 field3: writeFieldInputs[2] ? writeFieldInputs[2].value : ''
+             });
+             const writeUid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
+             // if (writeUid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(writeUid); */
          } catch (error) {
               utils.log(`Faction write error: ${error.message}`, 'error');
               ui.showVisualConfirmation("Faction Write Error", error.message || "Failed to write faction data.", 'error');
@@ -1167,6 +1484,8 @@ const ui = {
                 // After a successful scan, the scanTag function already tries to read username 
                 // through readUsernameAndUpdateFields, so we don't need to do it again here
                  ui.render();
+                // --- Update Player Data Allegiance field ---
+                await ui.readAndUpdateCurrentAllegiance();
            } catch (error) {
                ui.showVisualConfirmation("Scan Error", error.message || "Failed to scan tag.", 'error');
            }
@@ -1215,7 +1534,6 @@ const ui = {
                     const textData = await operations.readAllegianceField(
                         fieldConfig.sector,
                         fieldConfig.block,
-                        fieldConfig.key,
                         `Allegiance Field ${fieldKey}`
                     );
                     // Log SDK call result
@@ -1237,7 +1555,8 @@ const ui = {
                 }
             }
             ui.showVisualConfirmation("Allegiance Read Complete", `Read ${readCount} fields for ${allegianceData.name}.`, 'success');
-            utils.log(`[Allegiance] Read complete: ${readCount} fields read for ${allegianceData.name}`, 'info');
+            // --- Update Player Data Allegiance field ---
+            await ui.readAndUpdateCurrentAllegiance();
         } catch (error) {
             utils.log(`[Allegiance] Read error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Allegiance Read Error", error.message || "Failed to read allegiance data.", 'error');
@@ -1305,7 +1624,7 @@ const ui = {
                             allegianceSector,
                             fieldConfig.block,
                             textData,
-                            fieldConfig.key,
+                            allegianceKey, // Pass the selected allegiance key as the role
                             `Allegiance Field ${fieldKey}`
                         );
                         utils.log(`[Allegiance] SDK writeAllegianceField success for ${fieldKey}`, 'debug');
@@ -1326,7 +1645,19 @@ const ui = {
                 }
             }
             ui.showVisualConfirmation("Allegiance Write Complete", `Wrote ${writeCount} fields for ${allegianceData.name}.`, 'success');
-            utils.log(`[Allegiance] Write complete: ${writeCount} fields written for ${allegianceData.name}`, 'info');
+
+            // --- Update state with latest field values and sync ---
+            // Only update for the first three fields (field1, field2, field3)
+            const writeFieldInputs = ['field1', 'field2', 'field3'].map(
+                key => document.getElementById(`allegiance-${allegianceKey}-${key}-input`)
+            );
+            core.updateState({
+                field1: writeFieldInputs[0] ? writeFieldInputs[0].value : '',
+                field2: writeFieldInputs[1] ? writeFieldInputs[1].value : '',
+                field3: writeFieldInputs[2] ? writeFieldInputs[2].value : ''
+            });
+            const writeUid = core.currentState.scannedTagInfo && core.currentState.scannedTagInfo.uid;
+            // if (writeUid) /* TODO: NFC sync disabled */ /* operations.syncFaction1DataToServer(writeUid); */
         } catch (error) {
             utils.log(`[Allegiance] Write error: ${error.message}`, 'error');
             ui.showVisualConfirmation("Allegiance Write Error", error.message || "Failed to write allegiance data.", 'error');
@@ -1406,4 +1737,267 @@ const ui = {
         logDisplay.scrollTop = logDisplay.scrollHeight;
     },
 
-};
+    /**
+     * Reads the current allegiance from sector 39, block 3 and updates the Player Data fields on Faction and Allegiance pages.
+     * Uses operations.readCurrentAllegiance and updates both the UI and core state.
+     * Logs all steps and errors.
+     */
+    readAndUpdateCurrentAllegiance: async function() {
+        try {
+            utils.log('[UI] Reading current allegiance for Player Data section...', 'info');
+            const allegiance = await operations.readCurrentAllegiance(); // Returns name or "(None)"
+            
+            // Update core state first
+            core.updateState({ currentAllegiance: allegiance === "(None)" ? null : allegiance });
+
+            // --- Conditional UI Update based on active page ---
+            const currentPage = core.currentState.activePage;
+
+            if (currentPage === 'allegiancesPage') {
+                // Update the NEW dropdown on the Allegiance page
+                ui.updateSelectValue('allegiance-set-current-select', allegiance === "(None)" ? "" : allegiance);
+                utils.log(`[UI - Allegiance Page] Updated 'Set Current Allegiance' dropdown to: '${allegiance}'`, 'debug');
+            } else {
+                // Update the read-only input on other pages (like Faction page)
+                ui.updateInputValue('faction-current-allegiance', allegiance);
+                 utils.log(`[UI - Other Page (${currentPage})] Updated read-only allegiance field to: '${allegiance}'`, 'debug');
+                // We might need to add similar inputs to other pages if they display current allegiance.
+            }
+            // Original line commented out as it targeted the old input on allegiance page:
+            // ui.updateInputValue('allegiance-current-allegiance', allegiance); 
+
+            utils.log(`[UI] Finished updating Player Data allegiance fields to: '${allegiance}'`, 'success');
+        } catch (error) {
+            utils.log(`[UI] Error reading/updating current allegiance: ${error}`, 'error');
+            // Update relevant fields to show error state
+            const currentPage = core.currentState.activePage;
+            if (currentPage === 'allegiancesPage') {
+                 // Optionally clear or disable the dropdown on error?
+                 // For now, just log. The select value remains unchanged.
+                 utils.log('[UI - Allegiance Page] Error reading allegiance, dropdown state preserved.', 'warning');
+            } else {
+                 ui.updateInputValue('faction-current-allegiance', '(Read Error)');
+            }
+            // ui.updateInputValue('allegiance-current-allegiance', '(Read Error)'); // Old input commented out
+        }
+    },
+
+    /**
+     * Displays an error message to the user.
+     * Uses a dedicated error display area.
+     * 
+     * @param {string} message - The error message to display.
+     */
+    showError: function(message) {
+        const errorElement = document.getElementById('error-message'); // Assuming you add <div id="error-message" class="error"></div> to index.html
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            // Optionally hide after a delay
+            setTimeout(() => {
+                errorElement.style.display = 'none';
+                errorElement.textContent = '';
+            }, 5000); // Hide after 5 seconds
+        } else {
+            // Fallback to alert if the element doesn't exist
+            console.error("Error display element '#error-message' not found. Alerting instead.");
+            alert(`Error: ${message}`); 
+        }
+        utils.log(`UI Error Displayed: ${message}`, 'error');
+    },
+
+    /**
+     * Handles the click event for the 'Save Allegiance' button on the Allegiance page.
+     * Writes the selected allegiance from the 'allegiance-set-current-select' dropdown
+     * to Sector 39, Block 3 using the staff key.
+     */
+    handleAllegianceSaveCurrent: async function() {
+        utils.log('[UI] Save Current Allegiance button clicked.', 'info');
+        const selectElement = document.getElementById('allegiance-set-current-select');
+        
+        if (!selectElement) {
+            utils.log('[UI] Save Current Allegiance failed: Select element not found.', 'error');
+            ui.showVisualConfirmation("Save Error", "UI component missing. Refresh might help.", 'error');
+            return;
+        }
+        
+        const selectedAllegianceName = selectElement.value;
+        // No need to check for empty value here, as writing an empty string signifies clearing the allegiance.
+        // utils.log(`[UI] Selected allegiance to save: '${selectedAllegianceName}'`, 'debug');
+
+        if (!core.currentState.isTagPresent) {
+            utils.log('[UI] Save Current Allegiance failed: No tag present.', 'warning');
+            ui.showVisualConfirmation("Save Error", "Scan a tag first.", 'error');
+            return;
+        }
+
+        try {
+            ui.showOperationIndicator('Saving Allegiance...');
+            const success = await operations.writeUserAllegiance(selectedAllegianceName);
+            
+            if (success) {
+                utils.log(`[UI] Successfully saved allegiance '${selectedAllegianceName}' to Sector 39, Block 3.`, 'success');
+                ui.showVisualConfirmation("Allegiance Saved", `Current allegiance set to: ${selectedAllegianceName || '(None)'}`, 'success');
+                // Update core state to reflect the change immediately
+                core.updateState({ currentAllegiance: selectedAllegianceName || null }); 
+                // No need to call readAndUpdateCurrentAllegiance again, we know the value written.
+            } else {
+                // writeUserAllegiance should throw on failure, so this might not be reached
+                // but kept for robustness.
+                utils.log('[UI] operations.writeUserAllegiance reported failure but did not throw.', 'warning');
+                ui.showVisualConfirmation("Save Failed", "Could not save allegiance. See logs.", 'error');
+            }
+        } catch (error) {
+            utils.log(`[UI] Error saving current allegiance: ${error.message}`, 'error');
+            ui.showVisualConfirmation("Save Error", `Failed to save allegiance: ${error.message}`, 'error');
+        } finally {
+            ui.hideOperationIndicator();
+        }
+    },
+
+    /**
+     * Updates the allegiance logo display based on the allegiance name.
+     * MODIFIED: Toggles 'logo-hidden' class instead of inline style.
+     * @param {string|null} allegianceName - The name of the allegiance (e.g., "Endline") or null/empty.
+     */
+    updateAllegianceLogo: function(allegianceName) {
+        const logoImg = document.getElementById('allegiance-logo'); // Assume an <img id="allegiance-logo"> exists in index.html
+        if (!logoImg) {
+             utils.log('[UI] Allegiance logo element (#allegiance-logo) not found.', 'warning');
+             return;
+        }
+
+        let logoSrc = ''; // Default to empty
+
+        // Use allegianceName directly (as set in populateAllegianceSelectByName)
+        switch (allegianceName) {
+            case "Endline":
+                logoSrc = 'app/NEO_ENDLINE_Color_Logo-200.png';
+                break;
+            case "Helix":
+                logoSrc = 'app/NEO_HELIX_Color_Logo-200.png';
+                break;
+            case "The Resistance":
+                logoSrc = 'app/NEO_Resistance_Logo-200.png';
+                break;
+            default:
+                logoSrc = ''; // Hide for "(None)" or other values
+        }
+
+        logoImg.src = logoSrc;
+
+        // *** MODIFIED: Toggle class instead of style.display ***
+        if (logoSrc) {
+            logoImg.classList.remove('logo-hidden');
+        } else {
+            logoImg.classList.add('logo-hidden');
+        }
+
+        // Store the allegiance name in a data attribute for the click handler
+        logoImg.dataset.allegianceName = allegianceName || "";
+
+        utils.log(`[UI] Updated allegiance logo. Name: '${allegianceName}', Src: '${logoSrc}', Hidden: ${!logoSrc}`, 'debug');
+    },
+
+    /**
+     * Handles changes to the 'Set Current Allegiance' dropdown in the Player Data section.
+     * MODIFIED: Updates the allegiance logo based on the selection.
+     */
+     handleAllegianceSetCurrentSelectChange: function(event) {
+        const selectedAllegianceName = event.target.value; // This is "Endline", "Helix", etc. or ""
+
+        utils.log(`[UI] 'Set Current Allegiance' dropdown changed to: '${selectedAllegianceName}'`, 'debug');
+
+        // Update the logo display to match the dropdown selection
+        ui.updateAllegianceLogo(selectedAllegianceName);
+
+        // Note: This change *doesn't* save to the tag automatically.
+        // Saving happens via the logo click or the 'Save Allegiance' button.
+    },
+
+     /**
+      * Reads the current allegiance from sector 39, block 3 and updates the Player Data fields.
+      * MODIFIED: Also updates the allegiance logo display.
+      */
+     readAndUpdateCurrentAllegiance: async function() {
+         try {
+             utils.log('[UI] Reading current allegiance for Player Data section...', 'info');
+             const allegiance = await operations.readCurrentAllegiance(); // Returns name or "(None)"
+
+             // Update core state first
+             core.updateState({ currentAllegiance: allegiance === "(None)" ? null : allegiance });
+
+             const currentPage = core.currentState.activePage;
+             const allegianceValue = allegiance === "(None)" ? "" : allegiance; // Value for select/logo
+
+             if (currentPage === 'allegiancesPage') {
+                 ui.updateSelectValue('allegiance-set-current-select', allegianceValue);
+                 // *** Update logo based on read allegiance ***
+                 ui.updateAllegianceLogo(allegianceValue);
+                 utils.log(`[UI - Allegiance Page] Updated 'Set Current Allegiance' dropdown and Logo to: '${allegiance}'`, 'debug');
+             } else {
+                 ui.updateInputValue('faction-current-allegiance', allegiance);
+                  utils.log(`[UI - Other Page (${currentPage})] Updated read-only allegiance field to: '${allegiance}'`, 'debug');
+             }
+
+             utils.log(`[UI] Finished updating Player Data allegiance fields/logo to: '${allegiance}'`, 'success');
+         } catch (error) {
+             utils.log(`[UI] Error reading/updating current allegiance: ${error}`, 'error');
+             const currentPage = core.currentState.activePage;
+             if (currentPage === 'allegiancesPage') {
+                  utils.log('[UI - Allegiance Page] Error reading allegiance, dropdown/logo state preserved.', 'warning');
+                  // *** Update logo based on error ***
+                   ui.updateAllegianceLogo(null); // Hide logo on error
+             } else {
+                  ui.updateInputValue('faction-current-allegiance', '(Read Error)');
+             }
+         }
+     },
+
+     /**
+      * Handles the click event for the allegiance logo.
+      * Saves the allegiance associated with the currently displayed logo to the tag.
+      */
+     handleAllegianceLogoClick: async function() {
+         const logoImg = document.getElementById('allegiance-logo');
+         // Check if logo is hidden (meaning no allegiance is selected/displayed)
+         if (!logoImg || logoImg.classList.contains('logo-hidden') || !logoImg.dataset.allegianceName) {
+              utils.log('[UI] Logo click failed: Logo is hidden or allegiance name data attribute missing.', 'warning');
+              ui.showVisualConfirmation("Save Error", "No allegiance selected to save.", 'error');
+              return;
+         }
+
+         const allegianceToSave = logoImg.dataset.allegianceName;
+         utils.log(`[UI] Allegiance logo clicked. Attempting to save: '${allegianceToSave}'`, 'info');
+
+
+         if (!core.currentState.isTagPresent) {
+             utils.log('[UI] Logo click save failed: No tag present.', 'warning');
+             ui.showVisualConfirmation("Save Error", "Scan a tag first.", 'error');
+             return;
+         }
+
+         try {
+             ui.showOperationIndicator(`Saving ${allegianceToSave}...`);
+             const success = await operations.writeUserAllegiance(allegianceToSave);
+
+             if (success) {
+                 utils.log(`[UI] Successfully saved allegiance '${allegianceToSave}' via logo click.`, 'success');
+                 ui.showVisualConfirmation("Allegiance Saved", `Current allegiance set to: ${allegianceToSave || '(None)'}`, 'success');
+                 // Update core state
+                 core.updateState({ currentAllegiance: allegianceToSave || null });
+                 // Update the dropdown to match the saved value
+                 ui.updateSelectValue('allegiance-set-current-select', allegianceToSave);
+             } else {
+                  utils.log('[UI] Logo click save failed: operations.writeUserAllegiance reported failure.', 'warning');
+                  ui.showVisualConfirmation("Save Failed", "Could not save allegiance via logo. See logs.", 'error');
+             }
+         } catch (error) {
+             utils.log(`[UI] Error saving allegiance via logo click: ${error.message}`, 'error');
+             ui.showVisualConfirmation("Save Error", `Failed to save allegiance: ${error.message}`, 'error');
+         } finally {
+             ui.hideOperationIndicator();
+         }
+     },
+
+}; // End of ui object

@@ -519,3 +519,59 @@ select {
     color: red;
     margin-bottom: 10px;
 }
+/* Neoband App 25/app/style.css */
+
+/* Add styles for the Player Data section layout */
+#allegiance-player-data .player-data-content {
+    display: flex; /* Use flexbox for side-by-side layout */
+    align-items: center; /* Align items to the top */
+    gap: 20px; /* Space between fields and logo */
+}
+
+#allegiance-player-data .player-data-fields {
+    /*flex-grow: 1; /* Allow fields section to take available space */
+    width: 65%; /* Example: Give fields 65% of the width */
+}
+
+#allegiance-player-data .player-data-logo {
+    flex-shrink: 0; /* Prevent logo container from shrinking */
+    padding-top: 20px; /* Example: Align logo vertically */
+    width: 35%; /* Example: Give logo 35% of the width */
+    min-width: 220px; /* Ensure space for the logo even when hidden */
+    text-align: center; /* Center the logo if needed */
+    display: flex; /* Use flexbox for vertical alignment */
+    flex-direction: column; /* Stack items vertically */
+    align-items: center; /* Center items horizontally */
+    justify-content: center; /* Center items vertically (optional) */
+}
+
+/* *** ADD STYLES FOR THE LOGO IMAGE *** */
+#allegiance-logo {
+    display: block; /* Or block, depending on desired layout */
+    cursor: pointer;
+    width: 250px; /* Or max-width: 100px; */
+    height: 250px;
+    margin: 0 auto 10px auto; /* Or adjust as needed */
+    /*vertical-align: middle;
+    /* Remove margin-left and vertical-align */
+    /* object-fit: cover; /* Optional: uncomment if needed *//* Add transition for smoother hide/show if desired */
+    /* transition: opacity 0.3s ease-in-out; */
+}
+
+/* *** ADD CLASS TO HIDE THE LOGO *** */
+#allegiance-logo.logo-hidden {
+    display: block; /* Make label a block element */
+    margin-top: 5px; /* Add some space above the label */
+    font-size: 0.9em; /* Optional: adjust label font size */
+    color: var(--light-grey); /* Optional: adjust color */
+    text-align: center; /* Ensure text is centered */display: none;
+    /* Or use opacity/visibility for transitions */
+    /* opacity: 0; */
+    /* visibility: hidden; */
+}
+
+/* Optional: Style for when the logo has no source (fallback) */
+#allegiance-logo[src=""],
+#allegiance-logo:not([src]) {
+    display: none; /* Hide if src is empty or not set */
+}

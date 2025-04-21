@@ -1567,6 +1567,33 @@ const NeobandSDK = (() => {
       }
   };
 
+  /**
+   * Load a key into the reader's memory at the specified key slot.
+   * @param {string} keyHex - 12-character hex key string (e.g., 'FFFFFFFFFFFF')
+   * @param {number} keyIndex - Key slot index (usually 0)
+   * @returns {Promise<string>} Status of the key loading operation
+   */
+  const loadKey = (keyHex, keyIndex = 0) => {
+    // Validate the key format
+    if (typeof keyHex !== 'string' || !/^[0-9A-Fa-f]{12}$/i.test(keyHex)) {
+      throw new Error(`[neoband-sdk] loadKey: Invalid key format. Must be 12 hex characters, received: ${keyHex}`);
+    }
+    
+    // Format the key with 0x prefix if not already present
+    const formattedKey = keyHex.startsWith('0x') ? keyHex : '0x' + keyHex;
+    
+    // Send the LoadKey command to the reader
+    console.debug(`[neoband-sdk] Loading key ${formattedKey} into reader slot ${keyIndex}...`);
+    return sendRequest(`LoadKey ${formattedKey} ${keyIndex}`).then(response => {
+      if (response?.Status && String(response.Status).includes('UFR_OK')) {
+        console.debug(`[neoband-sdk] Key loaded successfully into slot ${keyIndex}`);
+        return response.Status;
+      } else {
+        throw new Error(`[neoband-sdk] Error loading key: ${response?.Status || 'Unknown error'}`);
+      }
+    });
+  };
+
   return {
     // --- [RE-ADDED] Functions (Verify use case) ---
     //NOTE TO AI: NEVER DELETE ANY OF THESE FUNCTIONS, ONLY ADD TO THEM OR COMMENT THEM OUT IF YOU ARE GOING TO REMOVE THEM
@@ -1619,7 +1646,7 @@ const NeobandSDK = (() => {
     // --- Sector Trailer operations ---
     sectorTrailerWrite,
     getMifareAccessBits, // Added helper for working with access bits
-    //sectorTrailerWrite_PK,
+    sectorTrailerWrite_PK,
     // --- Value Block operations (linear address) ---
     valueBlockRead_PK,
     valueBlockWrite_PK,
@@ -1636,6 +1663,7 @@ const NeobandSDK = (() => {
     valueBlockInSectorDecrement_PK,
     // --- Other Card operations ---
     getExternalFieldState,
+    loadKey,
   };
 })();
 

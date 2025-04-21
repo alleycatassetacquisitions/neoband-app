@@ -151,11 +151,10 @@ const core = {
             }
         };
         if (typeof utils !== 'undefined' && typeof utils.log === 'function') {
-            utils.log("Rival App Core Initializing...", 'info');
+            utils.log("Neoband App Core Initializing...", 'info');
         } else {
-            console.log("Rival App Core Initializing...");
+            console.log("Neoband App Core Initializing...");
         }
-
         // Check if FIELD_MAP from map.js is loaded
         if (typeof FIELD_MAP === 'undefined') {
             console.error("CRITICAL ERROR: FIELD_MAP is not defined. Ensure map.js is loaded before core.js.");

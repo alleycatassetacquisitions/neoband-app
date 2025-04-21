@@ -27,13 +27,18 @@
     -->
     <link rel="stylesheet" type="text/css" href="app/style.css">
 
+    <!-- Allegeince logos-->
+    <link rel="preload" as="image" href="app/NEO_ENDLINE_Color_Logo-200.png">
+    <link rel="preload" as="image" href="app/NEO_HELIX_Color_Logo-200.png">
+    <link rel="preload" as="image" href="app/NEO_Resistance_Logo-200.png">
+
     <!-- 
       Script loading order is critical for proper functionality
       IMPORTANT: All scripts must be referenced with "app/" prefix for uFR Zero device compatibility
       despite actually being located in the root directory (not in an app/ folder).
       This is a requirement of the D-Logic app shell.
       
-      Load sequence:
+      Load sequence:allegiance-logo
       1. keys.js - Defines the encryption keys for NFC operations
       2. neoband-sdk.js - Core SDK for NFC communication
       3. map.js - Defines the MIFARE memory map structure (FIELD_MAP)
@@ -141,6 +146,16 @@
                  <input id="reg-current-username" class="input" type="text" readonly="" placeholder="(Not Read)">
              </div>
 
+            <!--Added Missing Allegiance Selection Dropdown
+             <div class="form-group">
+                <label for="reg-allegiance-select">Assign Allegiance:</label>
+                <select id="reg-allegiance-select" class="input">
+                    <option value="">-- Select Allegiance --</option>
+                    
+                </select>
+             </div> 
+            -->
+
             <div class="form-group">
                 <label for="reg-status">Band Status:</label>
                 <input id="reg-status" class="status-display" type="text" readonly="" value="Unknown" title="Band Status">
@@ -148,10 +163,10 @@
 
             <div class="button-group">
                 <button id="reg-scan-btn" class="btn">Scan Tag</button>
+                <button id="reg-provision-btn" class="btn btn-warning">Provision Neoband</button>
+                <button id="reg-write-btn" class="btn">Register Neoband</button>                
                 <button id="reg-read-btn" class="btn btn-secondary">Read</button>
-                <button id="reg-write-btn" class="btn">Write</button>
-                <button id="reg-reset-btn" class="btn btn-danger">Reset</button>
-                <button id="reg-provision-btn" class="btn btn-warning">Provision Card</button>
+                <button id="reg-reset-btn" class="btn btn-danger">Do Not Touch</button>
             </div>
         </div>
 
@@ -226,14 +241,36 @@
             <!-- Player Data Section -->
             <section id="allegiance-player-data" class="player-data-frame">
                 <h3>Player Data</h3>
-                <div class="form-group">
-                    <label>Current User:</label>
-                    <input id="allegiance-current-username" class="input" type="text" readonly placeholder="Scan Tag...">
+                <!-- START: Restructure Player Data Content -->
+                <div class="player-data-content">
+                    <div class="player-data-fields">
+                        <div class="form-group">
+                            <label>Current User:</label>
+                            <input id="allegiance-current-username" class="input" type="text" readonly placeholder="Scan Tag...">
+                        </div>
+                        <div class="form-group">
+                            <label for="allegiance-set-current-select">Select Allegiance:</label>
+                            <select id="allegiance-set-current-select" class="input">
+                                <option value="">-- Choose Allegiance --</option>
+                                <!-- Options dynamically populated by ui.js -->
+                            </select>
+                        </div>
+                        <!--
+                        <div class="button-group">
+                            <button id="allegiance-save-current-btn" class="btn btn-secondary" disabled>Save Allegiance</button> //Initially disabled
+                        </div>
+                            -->
+                    </div>
+                    <div class="player-data-logo">
+                        <!-- Logo moved here -->
+                         <img id="allegiance-logo" src="" alt="Allegiance Logo" class="logo-hidden" title="Click to save this allegiance">
+                        <label class="allegiance-logo-label">Click to Bind:</label>
+                        
+                        <!-- Note: Associated CSS for #allegiance-logo, .logo-hidden should still apply -->
+                         <!-- Ensure style.css has rules for .player-data-logo if needed -->
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Current Allegiance:</label>
-                    <input id="allegiance-current-allegiance" class="input" type="text" readonly placeholder="(Not Read)">
-                </div>
+                 <!-- END: Restructure Player Data Content -->
             </section>
 
             <!-- Everything else under Player Data -->
@@ -257,6 +294,7 @@
                  <button id="allegiance-scan-btn" class="btn">Scan Tag</button>
                  <button id="allegiance-read-btn" class="btn btn-secondary" disabled>Read Allegiance Data</button>
                  <button id="allegiance-write-btn" class="btn" disabled>Write Allegiance Data</button>
+                 <button id="allegiance-save-ui-btn" class="btn btn-secondary">Save UI Edits</button>
             </div>
         </div>
 

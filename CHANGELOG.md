@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Version 3.0.8] - 2025-04-13
+
+### Fixed
+- **Missing Registration Allegiance Dropdown:** Added the missing `<select id="reg-allegiance-select">` element to the Registration page in `index.html`. This resolves the "Select element with ID 'reg-allegiance-select' not found" error that occurred during `ui.init` because `populateAllegianceAssignSelect` was trying to populate a non-existent element.
+
 ## [Version 3.0.7] - Sector 0 Write Protection
 
 ### Fixed
@@ -28,22 +33,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Root cause and solution documented in `Logisec-2025/secotr-trailer-error-fix.md`.
   - **Affected files:** `app/neoband-sdk.js`, `Logisec-2025/secotr-trailer-error-fix.md`
 
-## [Version 3.0.5]
+## [Version 3.0.5] - 2025-04-13
 
 ### Added
-- **Admin Page: Server IP Settings Section**
-  - Added a new "Settings" section to the Admin page with a "Server IP" input field and a "Save" button.
-  - Allows users to enter and persist the backend server's IP address in localStorage.
-  - The current server IP is loaded from localStorage and displayed in the input field on page load.
-  - All API sync operations now use the configured server IP instead of a hardcoded value.
-  - UI feedback is provided on save (success or error).
-  - Affected files: `app/admin.js`, `app/operations.js`
+- **Feature: Set Current Allegiance on Allegiance Page**
+  - Modified `index.html`: On the Allegiance page player data section, commented out the read-only 'Current Allegiance' input and replaced it with a dropdown select (`allegiance-set-current-select`) and a 'Save Allegiance' button (`allegiance-save-current-btn`).
+  - Modified `operations.js`: Corrected the `writeUserAllegiance` function to use `NeobandSDK.blockInSectorWrite_PK` (PK authentication) with the staff Key B (`window.NEOBAND_KEYS.staff.user.neoKey`) when writing the selected allegiance name to Sector 39, Block 3. Added validation and improved error handling.
+  - Modified `ui.js`:
+    - Added `populateAllegianceSetCurrentSelect` function to populate the new dropdown on the Allegiance page.
+    - Added `handleAllegianceSaveCurrent` event handler for the new 'Save Allegiance' button, which calls `operations.writeUserAllegiance`.
+    - Updated `ui.init` to call the populate function and add the event listener for the new button.
+    - Updated `ui.render` to correctly enable/disable the new 'Save Allegiance' button based on tag presence and operation status.
+    - Modified `ui.readAndUpdateCurrentAllegiance` to update the selected option in the new `allegiance-set-current-select` dropdown (instead of the old read-only input) when on the Allegiance page. It continues to update the read-only field on the Faction page.
+    - Refactored allegiance dropdown population logic into `populateAllegianceSelectByName` for reusability and added a "(None)" option for clearing allegiance.
 
 ### Changed
 - **Dynamic Server IP for Sync**
   - Refactored `syncFaction1DataToServer` in `app/operations.js` to use the server IP from localStorage via `getServerBaseUrl()`.
   - Exposed `getServerBaseUrl` and `setServerBaseUrl` on the global window object for use by the admin UI.
   - Improved logging for server IP changes and sync operations.
+
+### Added
+- Added `operations.resetTagToFactoryDefaults` function to perform a full factory reset (Sectors 1-39) on MIFARE Classic 4k tags.
+- Updated `ui.handleRegReset` (bound to Registration page 'Reset' button) to call the new `resetTagToFactoryDefaults` operation, replacing the previous logic which only cleared Sector 39 user data.
+- The factory reset writes default keys (`FFFFFFFFFFFF`) and access conditions (`FF078069`) to sector trailers and wipes data blocks.
 
 ## [Version 3.0.4]
 
@@ -441,3 +454,127 @@ Initial project setup and basic functionality implementation.
   - Implements detailed error logging and throws descriptive errors for invalid key formats.
   - Ensures consistent key validation and error handling across all NFC operations.
   - Affected files: `app/utils.js`, `app/operations.js`
+
+## [2.0.0-alpha.5] - 2024-07-30
+
+### Added
+- **Allegiance UI Save Button**: Added a "Save UI Edits" button (`#allegiance-save-ui-btn`) to the Allegiances page to trigger saving of UI changes.
+
+### Changed
+- **Refactor: UI Persistence**: Moved UI persistence functionality (saving/loading Faction/Allegiance input field states via `localStorage`) from `app/ui-persistence.js` to `app/utils.js`. The original `app/ui-persistence.js` file has been commented out, and its script reference in `index.html` has also been commented out.
+- **Event Handling**: Event listeners for UI persistence save buttons (`#faction-save-btn`, `#allegiance-save-ui-btn`) are now attached within the `DOMContentLoaded` listener in `app/utils.js`.
+- **Initialization**: Logic to automatically load saved UI settings on `DOMContentLoaded` is now located in `app/utils.js`.
+
+### Removed
+- **UI Persistence File (Effectively)**: While `app/ui-persistence.js` remains, its code is commented out, and it is no longer loaded by the application.
+
+## [2.0.0-alpha.6] - 2024-07-30
+
+### Changed
+- **UI Persistence Enhancement**: 
+    - Modified `saveFactionUISettings` and `saveAllegianceUISettings` (in `app/utils.js`) to save the text content of the main title display (`#faction-name-display`, `#allegiance-name-display`) and the text content of the labels associated with each input field within their respective containers.
+    - Modified `loadFactionUISettings` and `loadAllegianceUISettings` (in `app/utils.js`) to load and apply these saved titles and labels.
+    - Modified `displayFactionFields` and `displayAllegianceFields` (in `app/ui.js`) to call the corresponding `load*UISettings` function *after* generating the fields, ensuring saved UI customizations are loaded upon selection.
+    - Initial title/label elements in `ui.js` now use placeholders based on `FIELD_MAP` data, allowing the load functions to correctly populate saved values.
+- **UI Buttons**: Enabled the 'Save UI Edits' buttons (`#faction-save-btn`, `#allegiance-save-ui-btn`) unconditionally on page load via the `DOMContentLoaded` listener in `app/utils.js`. 
+
+## [2.0.0-alpha.7] - 2024-07-30
+
+### Fixed
+- **UI Persistence Loading**: Addressed issue where dynamically generated Faction/Allegiance fields might not appear after saving UI edits, refreshing, and re-selecting the faction/allegiance.
+    - Modified `displayFactionFields` and `displayAllegianceFields` in `app/ui.js` to ensure the title display and fields container are explicitly cleared before generating new content.
+    - Introduced a `setTimeout(..., 0)` delay before calling `load*UISettings` within `display*Fields` functions in `app/ui.js` to ensure the DOM updates are complete before attempting to load saved values.
+    - Refactored `loadFactionUISettings` and `loadAllegianceUISettings` in `app/utils.js` with improved error handling (separate try-catch blocks for parsing and DOM manipulation) and more specific targeting of title/label input elements when applying saved values.
+- **UI Persistence Saving**: Corrected `saveFactionUISettings` and `saveAllegianceUISettings` in `app/utils.js` to use the dynamic ID of the title input element as the key when saving the Faction/Allegiance title, ensuring consistency with the loading logic.
+
+### Added
+- **validateKeyHex Utility Function:**
+  - Added `validateKeyHex` to `utils.js` to validate 12-character hexadecimal NFC key strings.
+  - Resolves uncaught reference errors when calling `utils.validateKeyHex` from `operations.js` and other modules.
+  - Implements detailed error logging and throws descriptive errors for invalid key formats.
+  - Ensures consistent key validation and error handling across all NFC operations.
+  - Affected files: `app/utils.js`, `app/operations.js`
+
+## [2.0.0-alpha.8] - 2024-07-30
+
+### Added
+- **Allegiance Logo Display**: 
+    - Added an `updateAllegianceLogo` function to `ui.js` to display the appropriate logo (`Endline`, `Helix`, `The Resistance`) based on the allegiance name, using CSS class toggling (`.logo-hidden`) for visibility.
+    - Added an event listener to the 'Set Current Allegiance' dropdown (`allegiance-set-current-select`) in `ui.js` (`handleAllegianceSetCurrentSelectChange`) to update the displayed logo when the dropdown value changes.
+    - Added an event listener to the allegiance logo element (`#allegiance-logo`) in `ui.js` (`handleAllegianceLogoClick`) to allow saving the currently displayed allegiance to the tag by clicking the logo.
+
+### Changed
+- **UI Initialization**: Modified `ui.init` to add the new logo/dropdown listeners and ensure the logo is hidden by default.
+- **Read Allegiance**: Modified `ui.readAndUpdateCurrentAllegiance` to call `updateAllegianceLogo` after reading the allegiance from the tag, ensuring the logo reflects the tag's current state.
+
+## [2.0.0-alpha.9] - 2024-07-30
+
+### Fixed
+- **Syntax Error**: Corrected a syntax error in `app/operations.js` where the `handleReset` function was defined outside the main `operations` object. Moved the function definition inside the object.
+
+### Changed
+- **UI Persistence Enhancement**: 
+    - Modified `saveFactionUISettings` and `saveAllegianceUISettings` (in `app/utils.js`) to save the text content of the main title display (`#faction-name-display`, `#allegiance-name-display`) and the text content of the labels associated with each input field within their respective containers.
+    - Modified `loadFactionUISettings` and `loadAllegianceUISettings` (in `app/utils.js`) to load and apply these saved titles and labels.
+    - Modified `displayFactionFields` and `displayAllegianceFields` (in `app/ui.js`) to call the corresponding `load*UISettings` function *after* generating the fields, ensuring saved UI customizations are loaded upon selection.
+    - Initial title/label elements in `ui.js` now use placeholders based on `FIELD_MAP` data, allowing the load functions to correctly populate saved values.
+- **UI Buttons**: Enabled the 'Save UI Edits' buttons (`#faction-save-btn`, `#allegiance-save-ui-btn`) unconditionally on page load via the `DOMContentLoaded` listener in `app/utils.js`. 
+
+### Added
+- **validateKeyHex Utility Function:**
+  - Added `validateKeyHex` to `utils.js` to validate 12-character hexadecimal NFC key strings.
+  - Resolves uncaught reference errors when calling `utils.validateKeyHex` from `operations.js` and other modules.
+  - Implements detailed error logging and throws descriptive errors for invalid key formats.
+  - Ensures consistent key validation and error handling across all NFC operations.
+  - Affected files: `app/utils.js`, `app/operations.js`
+
+    - Refactored `loadFactionUISettings` and `loadAllegianceUISettings` in `app/utils.js` with improved error handling (separate try-catch blocks for parsing and DOM manipulation) and more specific targeting of title/label input elements when applying saved values. 
+
+## [2.0.0-alpha.10] - 2024-07-30
+
+### Fixed
+- **Missing HTML Element**: Added the required `<img id="allegiance-logo" ...>` element to the Allegiance page (`index.html`) within the `#allegiance-player-data` section. This resolves the console errors "Allegiance logo element not found" that occurred during UI initialization and updates. 
+
+## [2.0.0-alpha.11] - 2024-07-30
+
+### Fixed
+- **Logo Init Timing**: Fixed issue where the allegiance logo element (`#allegiance-logo`) might not be found during `ui.init` even after being added to `index.html`. Deferred the parts of `ui.init` that access the logo (listener attachment, initial hide) using `setTimeout(..., 0)` to ensure the element is ready in the DOM. 
+
+## [2.0.0-alpha.12] - 2024-07-30
+
+### Fixed
+- **HTML Syntax**: Removed unnecessary self-closing slash from the `<img id="allegiance-logo">` tag in `index.html` for better HTML5 compliance. 
+
+## [2.0.0-alpha.13] - 2024-07-31
+
+### Fixed
+- **Inline CSS**: Removed inline `style` attributes from the allegiance logo container, label, and image elements in `index.html`.
+- **CSS Styling**: Added corresponding CSS rules to `style.css` for `.allegiance-logo-container`, `.allegiance-logo-label`, and `#allegiance-logo` to maintain appearance and behavior. Added `.allegiance-logo-label` class to the relevant label in `index.html`.
+
+    - Refactored `loadFactionUISettings` and `loadAllegianceUISettings` in `app/utils.js` with improved error handling (separate try-catch blocks for parsing and DOM manipulation) and more specific targeting of title/label input elements when applying saved values. 
+
+## [2.0.0-alpha.14] - 2024-07-31
+
+### Fixed
+- **Allegiance Player Data Structure**: Restructured the HTML within the `#allegiance-player-data` section in `index.html` to match the reference implementation structure. Introduced `.player-data-content`, `.player-data-fields`, and `.player-data-logo` divs to properly contain the user fields, dropdown, button, and allegiance logo, aligning with intended CSS layout rules. Removed the previous `.allegiance-logo-container` div.
+
+    - Refactored `loadFactionUISettings` and `loadAllegianceUISettings` in `app/utils.js` with improved error handling (separate try-catch blocks for parsing and DOM manipulation) and more specific targeting of title/label input elements when applying saved values. 
+
+## [Unreleased] - 2025-04-20
+### Added
+- **Standalone Factory Reset Function:** Created a new, separate `operations.factoryResetCard` function specifically for resetting MIFARE Classic 4k tags to factory defaults (Sectors 1-39: `FFFFFFFFFFFF` keys, `FF078069` access). This isolates the reset logic from the `provisionCardWithCustomKeys` function to prevent regressions in provisioning functionality.
+- Updated `ui.handleRegReset` (Registration page 'Reset' button) to call the new `factoryResetCard` function.
+- Added handling for `UFR_FORBIDEN_DIRECT_WRITE_IN_SECTOR_TRAILER` error during trailer writes in `factoryResetCard` to attempt data block wiping even if this specific error occurs.
+
+### Changed
+- Renamed the previous factory reset attempt function (`resetTagToFactoryDefaults`) to `factoryResetCard` and ensured it's fully independent.
+
+### Fixed
+- Prevented factory reset implementation from breaking the existing `provisionCardWithCustomKeys` functionality by creating a separate function.
+
+## [3.0.5] - 2025-04-21
+
+### Fixed
+- **Factory Reset Function:** Fixed the sector trailer write issue in the `factoryResetCard` function by switching from `sectorTrailerWrite_PK` (which was causing `UFR_FORBIDEN_DIRECT_WRITE_IN_SECTOR_TRAILER` errors) to the non-PK `sectorTrailerWrite` method.
+- Added missing `loadKey` function to `neoband-sdk.js` to support loading authentication keys into reader slots.
+- Modified block wiping in `factoryResetCard` to use non-PK methods with reader key slots for more reliable operation.

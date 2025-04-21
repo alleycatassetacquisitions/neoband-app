@@ -108,15 +108,12 @@ const operations = {
     
 
     /**
-     * Reads a block from a given sector using the specified role.
-     * Uses NeobandSDK.readUserSectorBlock for per-user access, or blockInSectorRead for admin.
-     *
-     * @param {number} sector - Sector number (0-39)
-     * @param {number} block - Block number within sector
-     * @returns {Promise<string|null>} Hex data or null on error
+     * DEPRECATED: Legacy readSectorBlock implementation using PK authentication.
+     * This version used explicit key authentication and is preserved for reference.
+     * See CHANGELOG.md for migration details.
      */
-    readSectorBlock: async function(sector, block) {
-        // Access control removed for reads, as all roles use the universal read key.
+    /*
+    readSectorBlock: async function(sector, block, key = "FFFFFFFFFFFF", authMode = 0x60) {
         try {
             // Validate sector and block ranges
             if (typeof sector !== 'number' || typeof block !== 'number' ||
@@ -127,9 +124,23 @@ const operations = {
                     `Sector must be 0–39, block must be ${sector >= 32 && sector <= 39 ? '0–14' : '0–3'}.`
                 );
             }
-            // Call the updated SDK function which now uses the universal read key internally
-            return await NeobandSDK.readSectorBlock(sector, block);
+
+            // Use strict sector/block addressing: pass sector as-is
+            let mappedSector = sector;
+            // Always use keyIndex 0 for Key A authentication (authMode 0x60)
+            const keyIndex = 0;
+            const usedAuthMode = 0x60; // Enforce Key A
+
+            // Log the actual parameters passed to the SDK for traceability
+            utils.log(
+                `[SDK Call] NeobandSDK.readSectorBlock called with sector=${mappedSector}, block=${block}, authMode=${usedAuthMode}, keyIndex=${keyIndex}`,
+                'debug'
+            );
+            // Attempt to read using NeobandSDK
+            const hex = await NeobandSDK.readSectorBlock(mappedSector, block, usedAuthMode, keyIndex);
+            return hex;
         } catch (err) {
+            // Log error with detailed context for debugging and changelog traceability
             utils.log(
                 `NeobandSDK.readSectorBlock error (Sector ${sector}, Block ${block}): ${err.message}`,
                 'error'
@@ -137,7 +148,56 @@ const operations = {
             return null;
         }
     },
+    */
 
+    /**
+     * Reads a block from a given sector using NON-PK authentication.
+     * CORRECTED: Attempts to read using Key B (Auth Mode 0x61) from reader key index 0.
+     * This relies on the reader's index 0 Key B matching the card's Key B for the sector.
+     * This works for Sector 39 (Username) because its Key B is FFFFFFFF (Staff Key).
+     * May fail for other sectors if their Key B is different and not loaded into reader index 0.
+     *
+     * @param {number} sector - Sector number (0-39)
+     * @param {number} block - Block number within sector
+     * @returns {Promise<string|null>} Hex data or null on error
+     */
+    readSectorBlock: async function(sector, block) {
+        const authMode = operations.AUTH_MODE_B; // <<< Use Key B for authentication
+        const keyIndex = 0;                     // <<< Use reader slot 0
+
+        utils.log(`[operations.readSectorBlock] Reading Sector ${sector}, Block ${block} using AuthMode B (0x61), KeyIndex 0`, 'debug');
+
+        try {
+            // Validate sector and block ranges (allow reading trailer for verification if needed)
+             if (typeof sector !== 'number' || typeof block !== 'number' ||
+                 sector < 0 || sector > 39 || block < 0 ||
+                 (sector < 32 && block > 3) || (sector >= 32 && block > 15) ) { // Allow reading up to block 15 for large sectors
+                 throw new Error(
+                     `[readSectorBlock] Invalid sector (${sector}) or block (${block}) parameter.`
+                 );
+             }
+
+            // Call the NON-PK SDK function explicitly with AuthMode B and KeyIndex 0
+            const hexData = await NeobandSDK.readSectorBlock(sector, block, authMode, keyIndex);
+
+            utils.log(`[operations.readSectorBlock] Read successful Sector ${sector}, Block ${block}`, 'success');
+            return hexData;
+
+        } catch (err) {
+            // Log the specific error from the SDK call
+            utils.log(
+                `[operations.readSectorBlock] Error reading Sector ${sector}, Block ${block}: ${err.message}`,
+                'error'
+            );
+            // Log the stack trace for better debugging
+            console.error(err);
+            return null; // Return null to indicate failure
+        }
+    },
+    /**
+     * Reads a block from a given sector using the specified role.
+     * Uses NeobandSDK.readUserSectorBlock for per-user access, or blockInSectorRead for admin.
+     *
     /**
      * DEPRECATED: Legacy linear addressing read function.
      * This linear read logic is no longer used due to strict sector+block addressing.
@@ -174,9 +234,117 @@ const operations = {
     */
 
     /**
+     * Write data to a specific sector and block using NON-PK authentication.
+     * Relies on the correct authentication key being loaded in the reader's keyIndex 0 slot.
+     *
+     * @param {number} sector - Sector number (1-39, Sector 0 forbidden).
+     * @param {number} block - Block number within sector (excluding trailer block).
+     * @param {string} hexData - Hex data string (will be padded to 16 bytes).
+     * @param {string} keyHex - The specific Key B (12 hex chars) expected to be on the card for this sector.
+     * NOTE: This key is NOT sent to the reader with non-PK commands.
+     * Authentication uses the key in reader index 0.
+     * @returns {Promise<boolean>} True if write successful, false otherwise.
+     */
+    /**
+    writeSectorBlock: async function(sector, block, hexData, keyHex) { 
+        // keyHex parameter is kept for potential validation/logging but not used for auth
+        utils.log(`[operations.writeSectorBlock NON-PK] Attempting write Sector ${sector}, Block ${block}`, 'debug');
+        const keyIndex = 0; // Relying on reader's default key slot
+        // Use Auth Mode B (0x61) assuming the Key B in index 0 matches the card's current Key B for the sector
+        const authMode = operations.AUTH_MODE_B; 
+
+        try {
+            // Validate sector and block ranges FOR WRITING (no sector 0, no trailer)
+            utils.validateSectorBlock(sector, block, true); // Util function handles checks and throws
+
+            // Validate the key we *expect* to be needed (optional, for logging/debugging)
+            if (!keyHex || !/^[0-9A-Fa-f]{12}$/i.test(keyHex)) {
+                console.warn(`[operations.writeSectorBlock NON-PK] Invalid or missing keyHex provided for reference for Sector ${sector}, Block ${block}. This key is NOT sent to the reader.`);
+            }
+
+            // Ensure data is exactly 16 bytes (32 hex chars), pad with '00'
+            const dataToWrite = hexData.padEnd(32, '0'); 
+            if (dataToWrite.length > 32) {
+                 console.warn(`[operations.writeSectorBlock NON-PK] Truncating hexData longer than 16 bytes for Sector ${sector}, Block ${block}`);
+                 hexData = dataToWrite.substring(0, 32);
+            } else {
+                 hexData = dataToWrite;
+            }
+            
+            utils.log(`[operations.writeSectorBlock NON-PK] Padded hex data: ${hexData}`, 'debug');
+            utils.log(`[operations.writeSectorBlock NON-PK] Using AuthMode: ${authMode} (Key B), KeyIndex: ${keyIndex}`, 'debug');
+
+            // Call the correct NON-PK SDK function: blockInSectorWrite
+            const status = await NeobandSDK.blockInSectorWrite(sector, block, hexData, authMode, keyIndex);
+
+            // Check status
+            const success = status && String(status).includes('UFR_OK');
+            if (!success) {
+                throw new Error(`Write operation failed for Sector ${sector}, Block ${block}. SDK Status: ${status}`);
+            }
+
+            utils.log(`[operations.writeSectorBlock NON-PK] Wrote successfully to Sector ${sector}, Block ${block}`, 'success');
+            return true; // Indicate success
+
+        } catch (err) {
+            // Log specific error
+            utils.log(`[operations.writeSectorBlock NON-PK] Error writing Sector ${sector}, Block ${block}: ${err.message}`, 'error');
+            // Log stack trace
+            console.error(err); 
+            return false; // Indicate failure
+        }
+    },
+    */
+   /**
+     * Write data to a specific sector and block using PK authentication.
+     * USES PK Function.
+     * @param {number} sector - Sector number (1-39, Sector 0 forbidden).
+     * @param {number} block - Block number within sector (excluding trailer block).
+     * @param {string} hexData - Hex data string (will be padded to 16 bytes).
+     * @param {string} keyHex - The specific Key B (12 hex chars) required for authentication.
+     * @returns {Promise<boolean>} True if write successful, false otherwise.
+     */
+   writeSectorBlock: async function(sector, block, hexData, keyHex) { // Renamed from previous non-PK version
+    utils.log(`[operations.writeSectorBlock PK] Writing Sector ${sector}, Block ${block} using provided Key B`, 'debug');
+   try {
+       utils.validateSectorBlock(sector, block, true); 
+
+       if (!keyHex || !/^[0-9A-Fa-f]{12}$/i.test(keyHex)) {
+           throw new Error(`Invalid or missing keyHex provided for write to Sector ${sector}, Block ${block}.`);
+       }
+
+       const dataToWrite = hexData.padEnd(32, '0'); 
+       if (dataToWrite.length > 32) {
+            console.warn(`[operations.writeSectorBlock PK] Truncating hexData longer than 16 bytes`);
+            hexData = dataToWrite.substring(0, 32);
+       } else {
+            hexData = dataToWrite;
+       }
+       
+       utils.log(`[operations.writeSectorBlock PK] Padded hex data: ${hexData}`, 'debug');
+
+       // *** Ensure this uses the PK function ***
+       const status = await NeobandSDK.blockInSectorWrite_PK(sector, block, hexData, operations.AUTH_MODE_B, keyHex);
+
+       const success = status && String(status).includes('UFR_OK');
+       if (!success) {
+           throw new Error(`Write operation failed for Sector ${sector}, Block ${block}. SDK Status: ${status}`);
+       }
+
+       utils.log(`[operations.writeSectorBlock PK] Wrote successfully to Sector ${sector}, Block ${block} using key ${keyHex}`, 'success');
+       return true;
+
+   } catch (err) {
+       utils.log(`[operations.writeSectorBlock PK] Error writing Sector ${sector}, Block ${block}: ${err.message}`, 'error');
+       console.error(err); 
+       return false; // Return false on failure
+   }
+},
+    /**
      * Write data to a specific sector and block using the correct SDK function.
      * Uses NeobandSDK.writeUserSectorBlock for per-user access, or blockInSectorWrite for admin.
      */
+    /** 
     writeSectorBlock: async function(sector, block, hexData, keyHex) {
         // Access control (CredentialMgr check removed) assumes the calling function has validated appropriately.
 
@@ -212,7 +380,8 @@ const operations = {
             return false;
         }
     },
-
+    */
+    
     /**
      * Read username from Sector 39, Block 0.
      *
@@ -265,7 +434,98 @@ const operations = {
             throw error;
         }
     },
+    /**
+     * Reads a single faction field from the specified sector/block.
+     * CORRECTED: Uses blockInSectorRead_PK with universalReadKeyA.
+     */
+    readFactionField: async function(sector, block, label = 'Faction Field') {
+        utils.log(`[operations.readFactionField] Reading ${label} (Sector ${sector}, Block ${block}) using PK + Universal Key A`, 'debug');
+        try {
+            // Validate sector/block for reading
+            utils.validateSectorBlock(sector, block, false); 
 
+            // Get the universal read key
+            if (!window.NEOBAND_KEYS?.universalReadKeyA) {
+                throw new Error("[readFactionField] Universal Read Key A is missing in configuration.");
+            }
+            const universalKeyA = window.NEOBAND_KEYS.universalReadKeyA;
+
+            // Use the _PK variant for reading with the explicitly provided universal Key A
+            // Authenticate using Key A (0x60)
+            const hexData = await NeobandSDK.blockInSectorRead_PK(sector, block, operations.AUTH_MODE_A, universalKeyA);
+            
+            const factionText = utils.hexToText(hexData);
+            utils.log(`[operations.readFactionField] ${label} read successfully. Text: "${factionText}"`, 'success');
+            return factionText;
+
+        } catch (error) {
+            utils.log(`[operations.readFactionField] ${label} read error: ${error.message}`, 'error');
+            console.error(error); // Log stack trace
+            return ""; // Return empty on error
+        }
+    },
+/**
+     * Gemi V1.
+     * Reads a single faction field from the specified sector/block.
+     * Uses blockInSectorRead_PK with universalReadKeyA.
+     */
+    /**
+readFactionField: async function(sector, block, label = 'Faction Field') {
+    utils.log(`[operations.readFactionField] Reading Sector ${sector}, Block ${block} using PK + Universal Key A`, 'debug');
+    try {
+        utils.validateSectorBlock(sector, block, false); 
+
+        if (!window.NEOBAND_KEYS?.universalReadKeyA) {
+            throw new Error("[readFactionField] Universal Read Key A is missing in configuration.");
+        }
+        const universalKeyA = window.NEOBAND_KEYS.universalReadKeyA;
+
+        // *** Ensure this uses the PK function ***
+        const hexData = await NeobandSDK.blockInSectorRead_PK(sector, block, operations.AUTH_MODE_A, universalKeyA);
+        
+        const factionText = utils.hexToText(hexData);
+        utils.log(`[operations.readFactionField] ${label} converted hex to text: ${factionText}`, 'debug');
+        return factionText;
+
+    } catch (error) {
+        utils.log(`[operations.readFactionField] ${label} read error: ${error.message}`, 'error');
+        console.error(error); 
+        return ""; // Return empty on error
+    }
+},
+*/
+// OPTION C PK READ
+/**
+ * Reads a single faction field from the specified sector/block.
+ * CORRECTED: Uses blockInSectorRead_PK with universalReadKeyA.
+ */
+/**
+readFactionField: async function(sector, block, label = 'Faction Field') {
+    utils.log(`[operations.readFactionField] Reading Sector ${sector}, Block ${block} using PK + Universal Key A`, 'debug');
+    try {
+        // Validate sector/block
+        utils.validateSectorBlock(sector, block, false); // False for read operation
+
+        // Get the universal read key
+        if (!window.NEOBAND_KEYS?.universalReadKeyA) {
+            throw new Error("[readFactionField] Universal Read Key A is missing in configuration.");
+        }
+        const universalKeyA = window.NEOBAND_KEYS.universalReadKeyA;
+
+        // Use the _PK variant for reading with the explicitly provided universal Key A
+        const hexData = await NeobandSDK.blockInSectorRead_PK(sector, block, operations.AUTH_MODE_A, universalKeyA);
+        const factionText = utils.hexToText(hexData);
+        utils.log(`${label} converted hex to text: ${factionText}`, 'debug');
+        return factionText;
+
+    } catch (error) {
+        utils.log(`[operations.readFactionField] ${label} read error: ${error}`, 'error');
+        console.error(error); // Log stack trace
+        // Return empty string or throw, depending on how UI handles errors
+        return ""; 
+    }
+},
+*/
     /**
      * Read faction field.
      */
@@ -277,6 +537,7 @@ const operations = {
     * See CHANGELOG.md for details on the sector/block migration and bugfix.
     * The original linear logic is preserved as a backup (see commented code).
     */
+   /**
    readFactionField: async function(sector, block, label = 'Faction Field') {
        try {
            // Read using universal read key (role no longer needed)
@@ -289,23 +550,49 @@ const operations = {
            throw error;
        }
    },
+ */
+   writeFactionField: async function(sector, block, data, role, label = 'Faction Field') { // Takes ROLE
+    utils.log(`[operations.writeFactionField] Writing ${label} for role ${role} to Sector ${sector}, Block ${block}`, 'debug');
+    try {
+        // Convert data to hex and pad to 32 characters
+        const hexData = utils.textToHex(data).padEnd(32, '0'); // Pad data with 00
+        utils.log(`${label} converted text to hex: ${hexData}`, 'debug');
 
+        // *** Get the specific faction key based on the role identifier ***
+        const factionKeyHex = window.NEOBAND_KEYS?.factions?.[role]?.neoKey;
+        if (!factionKeyHex) {
+            throw new Error(`[writeFactionField] Faction key (neoKey) not found for role: ${role}`);
+        }
+        // *** End Key Lookup ***
+
+        // Call writeSectorBlock (which uses PK internally), passing the specific key
+        return await this.writeSectorBlock(sector, block, hexData, factionKeyHex);
+
+    } catch (error) {
+        utils.log(`[operations.writeFactionField] ${label} write error: ${error.message}`, 'error');
+        console.error(error); // Log stack trace
+        throw error; // Re-throw error for UI to handle
+    }
+},
     /**
      * Write faction field.
      *
      * Uses role-based access. For admin writes, pass 'admin' as the role. For user/faction writes, pass the appropriate role string.
      * The default key is handled internally by writeSectorBlock based on the role.
      */
+/**
     writeFactionField: async function(sector, block, data, role, label = 'Faction Field') {
         try {
             // Convert data to hex and pad to 32 characters
             const hexData = utils.textToHex(data).padEnd(32, '0');
             utils.log(`${label} converted text to hex: ${hexData}`, 'debug');
+
             // Get the specific faction key based on the role identifier
             const factionKeyHex = window.NEOBAND_KEYS?.factions?.[role]?.neoKey;
             if (!factionKeyHex) {
                 throw new Error(`[writeFactionField] Faction key not found for role: ${role}`);
             }
+
             // Call the modified writeSectorBlock with the specific key
             return await this.writeSectorBlock(sector, block, hexData, factionKeyHex);
         } catch (error) {
@@ -313,14 +600,45 @@ const operations = {
             throw error;
         }
     },
+    */
+     /**
+     * Read allegiance field.
+     * CORRECTED: Uses blockInSectorRead_PK with universalReadKeyA.
+     */
+     readAllegianceField: async function(sector, block, label = 'Allegiance Field') {
+        utils.log(`[operations.readAllegianceField] Reading ${label} (Sector ${sector}, Block ${block}) using PK + Universal Key A`, 'debug');
+        try {
+            // Validate sector/block for reading
+            utils.validateSectorBlock(sector, block, false); 
 
+            // Get the universal read key
+            if (!window.NEOBAND_KEYS?.universalReadKeyA) {
+                throw new Error("[readAllegianceField] Universal Read Key A is missing in configuration.");
+            }
+            const universalKeyA = window.NEOBAND_KEYS.universalReadKeyA;
+
+            // Use the _PK variant for reading with the explicitly provided universal Key A
+            // Authenticate using Key A (0x60)
+            const hexData = await NeobandSDK.blockInSectorRead_PK(sector, block, operations.AUTH_MODE_A, universalKeyA);
+            
+            const allegianceText = utils.hexToText(hexData);
+            utils.log(`[operations.readAllegianceField] ${label} read successfully. Text: "${allegianceText}"`, 'success');
+            return allegianceText;
+
+        } catch (error) {
+            utils.log(`[operations.readAllegianceField] ${label} read error: ${error.message}`, 'error');
+            console.error(error); // Log stack trace
+            return ""; // Return empty on error
+        }
+    },
     /**
      * Read allegiance field.
      */
+    /**
     readAllegianceField: async function(sector, block, label = 'Allegiance Field') {
         try {
             // Read using universal read key (role no longer needed)
-            const hexData = await this.readSectorBlock(sector, block);
+            const hexData = await this.readSectorBlock_PK(sector, block);
             const allegianceText = utils.hexToText(hexData);
             utils.log(`${label} converted hex to text: ${allegianceText}`, 'debug');
             return allegianceText;
@@ -329,6 +647,7 @@ const operations = {
             return "";
         }
     },
+    */
 
     /**
      * Write allegiance field.
@@ -496,7 +815,7 @@ const operations = {
      * Writes the user's allegiance affiliation to Sector 39, Block 3.
      * This is a special operation allowed for Allegiance-level users (via app logic) 
      * targeting a block normally managed by Staff/Registration.
-     * Uses the universal staff key for writing, assuming Sector 39 allows Key B writes.
+     * Uses the staff key for writing, assuming Sector 39 allows Key B writes.
      * 
      * @param {string} allegianceName - The name of the allegiance to write.
      * @returns {Promise<boolean>} - True if the write was successful, false otherwise.
@@ -505,42 +824,57 @@ const operations = {
         // Get the correct sector and block from FIELD_MAP for allegiance field
         const sector = FIELD_MAP.user.fields.field4.sector; // Should be 39
         const block = FIELD_MAP.user.fields.field4.block;   // Should be 3
-        // Use the default staff key (defined in keys.js, often FFFFFFFFFFFF)
-        // Assume this key is set as Key B for Sector 39 and allows writing to Block 3.
-        const key = window.NEOBAND_KEYS.staff.user.neoKey; 
-        const authMode = this.AUTH_MODE_B; // Use Key B for writing
-        const keyIndex = 0; // Key index for reader-stored keys (0 = default Key A/B slot)
+        // Use the staff key B defined in keys.js
+        const key = window.NEOBAND_KEYS?.staff?.user?.neoKey; 
+        // const authMode = this.AUTH_MODE_B; // Use Key B for writing - Not needed for PK
+        // const keyIndex = 0; // Key index for reader-stored keys - Not needed for PK
 
-        utils.log(`[writeUserAllegiance] Preparing to write "${allegianceName}" to Sector ${sector}, Block ${block} using Key B (staff key).`, 'info');
+        utils.log(`[writeUserAllegiance] Preparing to write "${allegianceName}" to Sector ${sector}, Block ${block} using Staff Key B (PK).`, 'info');
+
+        if (!key) {
+            const errMsg = "[writeUserAllegiance] Error: Staff Key B not found in configuration.";
+            utils.log(errMsg, 'error');
+            throw new Error(errMsg); // Throw error if key is missing
+        }
 
         if (!allegianceName) {
-            utils.log("[writeUserAllegiance] Error: Allegiance name cannot be empty.", 'error');
-            return false; // Or clear the block if empty name means removal?
+            // If allegianceName is empty, write nulls to clear the block
+            allegianceName = ""; 
+            utils.log("[writeUserAllegiance] Empty allegiance name provided. Clearing block.", 'warning');
         }
 
         try {
+            // Validate sector/block for writing (no trailer)
+            utils.validateSectorBlock(sector, block, true);
+
             // Convert allegiance name to hex, pad to 16 bytes (32 hex chars)
             let hexData = utils.textToHex(allegianceName.slice(0, 16)); // Ensure max 16 chars
             hexData = hexData.padEnd(32, '0'); // Pad with nulls (0x00)
 
             utils.log(`[writeUserAllegiance] Writing hex data: ${hexData} to Sector ${sector}, Block ${block}`, 'debug');
 
-            // Use the existing writeSectorBlock via NeobandSDK, specifying Key B auth
-            await NeobandSDK.sectorTrailerWrite(sector, keyA, accessBits, userByte, keyB, authMode, keyIndex);
+            // *** Corrected: Use blockInSectorWrite_PK with Staff Key B ***
+            const status = await NeobandSDK.blockInSectorWrite_PK(
+                sector, 
+                block, 
+                hexData, 
+                operations.AUTH_MODE_B, // Authenticate using Key B
+                key                     // Provide the actual Staff Key B
+            );
             // Check status based on expected SDK response format
-            const success = successStatus && successStatus.includes('UFR_OK');
+            const success = status && String(status).includes('UFR_OK');
 
             if (success) {
                 utils.log(`[writeUserAllegiance] Successfully wrote allegiance to Sector ${sector}, Block ${block}.`, 'success');
                 return true;
             } else {
-                utils.log(`[writeUserAllegiance] NeobandSDK.writeSectorBlock failed for Sector ${sector}, Block ${block}.`, 'error');
-                // Removed non-existent getLastError call. Error is logged by SDK/readSectorBlock.
-                throw new Error(`NFC write failed for user allegiance. Check SDK logs for details.`);
+                const errMsg = `[writeUserAllegiance] NeobandSDK.blockInSectorWrite_PK failed for Sector ${sector}, Block ${block}. SDK Status: ${status}`;
+                utils.log(errMsg, 'error');
+                throw new Error(errMsg); // Throw specific error
             }
         } catch (error) {
+            // Catch validation errors or SDK errors
             utils.log(`[writeUserAllegiance] Error writing allegiance to Sector ${sector}, Block ${block}: ${error.message}`, 'error');
-            // Consider re-throwing or returning false based on desired error handling
             // Re-throwing allows the UI handler to catch and display the specific error
             throw error; 
         }
@@ -692,6 +1026,158 @@ const operations = {
             console.error("[Provisioning] Detailed error:", error);
             return { success: false, message: errorMsg };
         }
+    },
+
+    /**
+     * Resets a provisioned MIFARE Classic 4K tag to factory defaults.
+     * This is a standalone operation, separate from provisioning.
+     * Iterates through sectors 1-39, authenticates using keys from NEOBAND_KEYS,
+     * writes factory default keys (FFFFFFFFFFFF) and access bits (FF078069)
+     * to the sector trailer, and overwrites data blocks with zeros.
+     *
+     * @returns {Promise<{success: boolean, message: string}>} Object indicating success/failure and summary message.
+     */
+    factoryResetCard: async function() {
+        utils.log("[Factory Reset] Starting standalone tag reset to factory defaults...", 'info');
+
+        const factoryKeyA = 'FFFFFFFFFFFF';
+        const factoryKeyB = 'FFFFFFFFFFFF';
+        const factoryAccessBits = 'FF0780'; // Access Bits part
+        const factoryUserByte = '69';     // User Byte / GPB part
+
+        let sectorsProcessed = 0;
+        let sectorsSuccess = 0;
+        let sectorsFailed = 0;
+        let dataBlocksWiped = 0;
+        let dataBlockErrors = 0;
+
+        // 1. Create a map of sector -> current Key B from NEOBAND_KEYS
+        const sectorKeyMap = {};
+        try {
+            if (!window.NEOBAND_KEYS) throw new Error("NEOBAND_KEYS configuration not loaded.");
+
+            // Factions
+            if (window.NEOBAND_KEYS.factions) {
+                for (const key in window.NEOBAND_KEYS.factions) {
+                    const item = window.NEOBAND_KEYS.factions[key];
+                    if (item && typeof item.sector === 'number' && item.neoKey) {
+                        sectorKeyMap[item.sector] = item.neoKey;
+                    }
+                }
+            }
+            // Allegiances
+            if (window.NEOBAND_KEYS.allegiances) {
+                for (const key in window.NEOBAND_KEYS.allegiances) {
+                    const item = window.NEOBAND_KEYS.allegiances[key];
+                    if (item && typeof item.sector === 'number' && item.neoKey) {
+                        sectorKeyMap[item.sector] = item.neoKey;
+                    }
+                }
+            }
+            // Staff (Sector 39)
+            if (window.NEOBAND_KEYS.staff?.user && typeof window.NEOBAND_KEYS.staff.user.sector === 'number' && window.NEOBAND_KEYS.staff.user.neoKey) {
+                sectorKeyMap[window.NEOBAND_KEYS.staff.user.sector] = window.NEOBAND_KEYS.staff.user.neoKey;
+            }
+             utils.log(`[Factory Reset] Built sector key map. Found keys for ${Object.keys(sectorKeyMap).length} sectors.`, 'debug');
+        } catch (e) {
+             utils.log(`[Factory Reset] Error building sector key map: ${e.message}`, 'error');
+             return { success: false, message: `Error reading key configuration: ${e.message}` };
+        }
+
+        // 2. Iterate through sectors 1 to 39 (Skip sector 0 - protected)
+        for (let sector = 1; sector <= 39; sector++) {
+            sectorsProcessed++;
+            const currentKeyB = sectorKeyMap[sector];
+            const trailerBlock = sector < 32 ? 3 : 15;
+
+            if (!currentKeyB) {
+                utils.log(`[Factory Reset] Skipping Sector ${sector}: No current Key B found in NEOBAND_KEYS configuration. Cannot authenticate for trailer write.`, 'warning');
+                sectorsFailed++;
+                continue; // Skip to the next sector
+            }
+
+            let trailerWriteSuccess = false;
+            try {
+                // 3. Write Factory Trailer using current Key B for auth via non-PK sectorTrailerWrite
+                utils.log(`[Factory Reset] Sector ${sector}: Authenticating with current Key B to write factory trailer using sectorTrailerWrite...`, 'debug');
+
+                // Load the current Key B into reader slot 0 first
+                // This step is essential for the non-PK function to work correctly
+                await NeobandSDK.loadKey(currentKeyB, 0);
+                
+                // Now use sectorTrailerWrite with the reader's key slot 0
+                const status = await NeobandSDK.sectorTrailerWrite(
+                    sector,
+                    factoryKeyA,        // New Key A to write
+                    factoryAccessBits,  // New Access Bits
+                    factoryUserByte,    // New User Byte
+                    factoryKeyB,        // New Key B to write
+                    operations.AUTH_MODE_B, // Authenticate using Key B
+                    0                   // Use key index 0 (where we loaded the current Key B)
+                );
+
+                // Check status carefully
+                if (status && String(status).includes('UFR_OK')) {
+                    utils.log(`[Factory Reset] Sector ${sector}: Successfully wrote factory trailer.`, 'success');
+                    trailerWriteSuccess = true;
+                } else {
+                    throw new Error(`Failed to write factory trailer. SDK Status: ${status}`);
+                }
+
+            } catch (trailerError) {
+                utils.log(`[Factory Reset] Sector ${sector}: Error writing factory trailer: ${trailerError.message}`, 'error');
+                console.error(`[Factory Reset] Sector ${sector} trailer error details:`, trailerError);
+                sectorsFailed++;
+                continue; // Skip data block wipe if trailer write failed
+            }
+
+            // 4. Overwrite Data Blocks (if trailer write succeeded)
+            if (trailerWriteSuccess) {
+                const numDataBlocks = trailerBlock; // Blocks 0 to trailerBlock-1
+                for (let block = 0; block < numDataBlocks; block++) {
+                    try {
+                         utils.log(`[Factory Reset] Sector ${sector}, Block ${block}: Wiping data block (auth with FACTORY Key B: ${factoryKeyB})...`, 'debug');
+                         const zeroData = '00000000000000000000000000000000'; // 16 bytes of 0x00
+
+                         // Load the FACTORY Key B into reader slot 0 for data block wiping
+                         await NeobandSDK.loadKey(factoryKeyB, 0);
+
+                         // Use blockInSectorWrite (non-PK version) with reader key slot 0
+                         const writeStatus = await NeobandSDK.blockInSectorWrite(
+                             sector,
+                             block,
+                             zeroData,
+                             operations.AUTH_MODE_B, // Authenticate with Key B
+                             0                  // Use key index 0 (where we loaded the FACTORY Key B)
+                         );
+
+                         if (writeStatus && String(writeStatus).includes('UFR_OK')) {
+                             dataBlocksWiped++;
+                         } else {
+                            throw new Error(`Data block write failed. SDK Status: ${writeStatus}`);
+                         }
+                    } catch (dataBlockError) {
+                        utils.log(`[Factory Reset] Sector ${sector}, Block ${block}: Error wiping data block: ${dataBlockError.message}`, 'error');
+                        dataBlockErrors++;
+                        // Optionally break or continue based on desired strictness
+                        // break; // Stop wiping blocks in this sector on first error
+                    }
+                }
+                // If we reached here after attempting to wipe blocks, count sector as success
+                // even if some data blocks failed (trailer should be reset)
+                sectorsSuccess++;
+            }
+        } // End sector loop
+
+        // 5. Compile results and return
+        const totalSectors = 39; // 1 to 39
+        let message = `Factory Reset finished. Processed ${sectorsProcessed}/${totalSectors} sectors. ` +
+                      `Trailer Success/Proceed: ${sectorsSuccess}, Trailer Hard Fail: ${sectorsFailed}. ` +
+                      `Data blocks wiped: ${dataBlocksWiped}, Data block errors: ${dataBlockErrors}.`;
+        const overallSuccess = sectorsFailed === 0 && dataBlockErrors === 0; // Define success strictly as no hard fails
+
+        utils.log(`[Factory Reset] ${message}`, overallSuccess ? 'success' : 'warning');
+        return { success: overallSuccess, message: message };
     },
 };
 

@@ -578,3 +578,19 @@ Initial project setup and basic functionality implementation.
 - **Factory Reset Function:** Fixed the sector trailer write issue in the `factoryResetCard` function by switching from `sectorTrailerWrite_PK` (which was causing `UFR_FORBIDEN_DIRECT_WRITE_IN_SECTOR_TRAILER` errors) to the non-PK `sectorTrailerWrite` method.
 - Added missing `loadKey` function to `neoband-sdk.js` to support loading authentication keys into reader slots.
 - Modified block wiping in `factoryResetCard` to use non-PK methods with reader key slots for more reliable operation.
+
+## [vNEXT] - YYYY-MM-DD
+
+### Changed
+- **NFC Authentication**: Modified NFC operations (`operations.js`) to use non-PK authentication with reader default Key A (Auth Mode 0x60, Key Index 0) for all sector/block reads and writes. Removed reliance on custom keys defined in `keys.js`.
+- **Key Provisioning**: Removed the custom key provisioning feature. Commented out `provisionCardWithCustomKeys` and the associated UI trigger handler `window.handleGlobalProvisionCard` in `operations.js`.
+- **Key Definitions**: Commented out `universalReadKeyA`, `factions`, and `allegiances` key objects in `keys.js` as they are no longer used for direct NFC authentication.
+- **Login**: Commented out login page HTML (`index.html`), associated JS functions/listeners (`ui.js`), and updated initial page in `core.js` and `ui.js` to default to the Registration page.
+
+### Removed
+- Custom key provisioning functionality.
+- Direct use of `factions`, `allegiances`, and `universalReadKeyA` for NFC authentication.
+- Login page and associated functionality.
+
+### Fixed
+- **ReferenceError**: Updated `readFactionField` and `readAllegianceField` in `operations.js` to use the modified `readSectorBlock` (non-PK, Key A, Index 0), preventing ReferenceErrors caused by accessing the now-commented-out `universalReadKeyA` and aligning them with the new authentication strategy.

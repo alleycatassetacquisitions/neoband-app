@@ -140,12 +140,15 @@ const core = {
      */
     init: function() {
         core.currentState = {
-            activePage: 'loginPage',
+            activePage: 'registrationPage',
             scannedTagInfo: { uid: null },
             isTagPresent: false,
             isOperationInProgress: false,
             currentUsername: null,
+            currentAllegiance: null,
             selectedFaction: null,
+            selectedAllegiance: null,
+            lastOperationStatus: 'idle',
             admin: {
                 enableNfcSync: false
             }

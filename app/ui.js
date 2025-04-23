@@ -83,10 +83,14 @@ const ui = {
         utils.log("UI Initializing...", 'info');
 
         //Login Page Elements & Listeners
-        document.getElementById('login-submit-btn')?.addEventListener('click', this.handleLoginSubmit.bind(this)); // Use bind(this) to maintain context
+        /* --- MODIFICATION START: Comment out login listener --- */
+        // document.getElementById('login-submit-btn')?.addEventListener('click', this.handleLoginSubmit.bind(this)); 
+        /* --- MODIFICATION END --- */
 
         // Navigation Link Listeners
-        document.getElementById('nav-login')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('loginPage'); });
+        /* --- MODIFICATION START: Comment out login nav listener --- */
+        // document.getElementById('nav-login')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('loginPage'); });
+        /* --- MODIFICATION END --- */
         document.getElementById('nav-reg')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('registrationPage'); });
         document.getElementById('nav-faction')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('factionPage'); });
         document.getElementById('nav-allegiance')?.addEventListener('click', (e) => { e.preventDefault(); this.showPage('allegiancesPage'); });
@@ -147,14 +151,17 @@ const ui = {
         // --- END DEFER LOGO-RELATED INIT --- 
 
         // Populate dynamic dropdowns
-        this.populateLoginUserSelect();
+        /* --- MODIFICATION START: Comment out login dropdown population --- */
+        // this.populateLoginUserSelect();
+        /* --- MODIFICATION END --- */
         this.populateFactionSelect();
         this.populateAllegianceSelect();
         this.populateAllegianceAssignSelect();
         this.populateAllegianceSetCurrentSelect();
 
         utils.log("UI Initialized (listeners attached, dropdowns populated).", 'success');
-        this.showPage(core.currentState.activePage); // Show initial page
+        // Show initial page (Defaulting to registration instead of login)
+        this.showPage(core.currentState.activePage || 'registrationPage'); 
         this.render(); // Initial render based on default state
     },
 
@@ -226,13 +233,18 @@ const ui = {
         ui.setButtonDisabled('allegiance-save-current-btn', isOpRunning || !isTagScanned);
 
         // --- Update active page ---
-        this.showPage(state.activePage || 'loginPage'); // Default to login page
-        utils.log(`UI Render complete for page: ${state.activePage}`, 'debug');
+        // Default to registration page if activePage is missing or was loginPage
+        const defaultPage = 'registrationPage';
+        const currentPage = state.activePage === 'loginPage' ? defaultPage : (state.activePage || defaultPage);
+        this.showPage(currentPage); 
+        utils.log(`UI Render complete for page: ${currentPage}`, 'debug');
     },
 
     /**
      * Populates the login user select dropdown.
      */
+    /* --- MODIFICATION START: Comment out populateLoginUserSelect --- */
+    /*
     populateLoginUserSelect: function() {
         const selectElement = document.getElementById('login-user-select');
         if (!selectElement) {
@@ -248,129 +260,90 @@ const ui = {
         // Add Staff
         if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.staff && window.NEOBAND_KEYS.staff.user) {
             const staffOption = document.createElement('option');
-            staffOption.value = 'staff';
-            staffOption.textContent = 'Staff (' + window.NEOBAND_KEYS.staff.user.name + ')';
+            staffOption.value = window.NEOBAND_KEYS.staff.user.name; // Use name as value
+            staffOption.textContent = window.NEOBAND_KEYS.staff.user.name;
             selectElement.appendChild(staffOption);
-        }
-
-        // Add Admin
-        if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.admin) {
-            const adminOption = document.createElement('option');
-            adminOption.value = 'admin';
-            adminOption.textContent = 'Admin (' + window.NEOBAND_KEYS.admin.name + ')';
-            selectElement.appendChild(adminOption);
         }
 
         // Add Factions
         if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.factions) {
-            for (const factionKey in window.NEOBAND_KEYS.factions) {
-                const faction = window.NEOBAND_KEYS.factions[factionKey];
+            Object.keys(window.NEOBAND_KEYS.factions).forEach(key => {
+                const faction = window.NEOBAND_KEYS.factions[key];
                 const option = document.createElement('option');
-                option.value = `faction_${factionKey}`; // Unique value for each faction
-                option.textContent = `Faction: ${faction.name}`;
+                option.value = faction.name; // Use name as value
+                option.textContent = faction.name;
                 selectElement.appendChild(option);
-            }
+            });
         }
 
         // Add Allegiances
         if (window.NEOBAND_KEYS && window.NEOBAND_KEYS.allegiances) {
-            for (const allegianceKey in window.NEOBAND_KEYS.allegiances) {
-                const allegiance = window.NEOBAND_KEYS.allegiances[allegianceKey];
+            Object.keys(window.NEOBAND_KEYS.allegiances).forEach(key => {
+                const allegiance = window.NEOBAND_KEYS.allegiances[key];
                 const option = document.createElement('option');
-                option.value = `allegiance_${allegianceKey}`; // Unique value for each allegiance
-                option.textContent = `Allegiance: ${allegiance.name}`;
+                option.value = allegiance.name; // Use name as value
+                option.textContent = allegiance.name;
                 selectElement.appendChild(option);
-            }
+            });
         }
-        utils.log('Login user select populated.', 'debug');
+
+         utils.log('Login user select populated.', 'debug');
     },
+    */
+    /* --- MODIFICATION END --- */
 
     /**
      * Handles the login submission.
      * Validates credentials and redirects the user.
      */
+    /* --- MODIFICATION START: Comment out handleLoginSubmit --- */
+    /*
     handleLoginSubmit: function() {
         const userSelect = document.getElementById('login-user-select');
         const passwordInput = document.getElementById('login-password');
-        const selectedValue = userSelect.value;
+        const selectedUser = userSelect.value;
         const password = passwordInput.value;
+        const errorMessageDiv = document.getElementById('error-message');
 
-        if (!selectedValue) {
-            this.showError('Please select a user.');
+        errorMessageDiv.textContent = ''; // Clear previous errors
+
+        if (!selectedUser) {
+            errorMessageDiv.textContent = 'Please select a user.';
             return;
         }
         if (!password) {
-            this.showError('Please enter a password.');
+            errorMessageDiv.textContent = 'Please enter a password.';
             return;
         }
 
-        let isValid = false;
-        let redirectPage = 'loginPage'; // Default page
-        let userType = '';
-        let userName = '';
+        // Simplified authentication logic (replace with actual authentication)
+        // This example assumes the password matches the user's neoKey or admin password
+        let expectedPassword = null;
 
-        try {
-            if (selectedValue === 'staff') {
-                userType = 'Staff';
-                userName = window.NEOBAND_KEYS.staff.user.name;
-                // Staff uses neoKey as password
-                if (password === window.NEOBAND_KEYS.staff.user.neoKey) {
-                    isValid = true;
-                    redirectPage = 'registrationPage';
-                }
-            } else if (selectedValue === 'admin') {
-                userType = 'Admin';
-                userName = window.NEOBAND_KEYS.admin.name;
-                // Admin uses its specific password
-                if (password === window.NEOBAND_KEYS.admin.password) {
-                    isValid = true;
-                    redirectPage = 'adminPage';
-                }
-            } else if (selectedValue.startsWith('faction_')) {
-                const factionKey = selectedValue.substring(8);
-                const faction = window.NEOBAND_KEYS.factions[factionKey];
-                userType = 'Faction';
-                userName = faction.name;
-                // Factions use neoKey as password
-                if (faction && password === faction.neoKey) {
-                    isValid = true;
-                    redirectPage = 'factionPage';
-                    // Pre-select this faction on the faction page
-                    core.updateState({ selectedFaction: factionKey }, false); // Don't re-render yet
-                }
-            } else if (selectedValue.startsWith('allegiance_')) {
-                const allegianceKey = selectedValue.substring(11);
-                const allegiance = window.NEOBAND_KEYS.allegiances[allegianceKey];
-                userType = 'Allegiance';
-                userName = allegiance.name;
-                // Allegiances use neoKey as password
-                if (allegiance && password === allegiance.neoKey) {
-                    isValid = true;
-                    redirectPage = 'allegiancesPage';
-                    // Pre-select this allegiance on the allegiance page
-                    core.updateState({ selectedAllegiance: allegianceKey }, false); // Don't re-render yet
-                }
-            }
-        } catch (error) {
-            utils.log(`Error during login validation: ${error}`, 'error');
-            this.showError('An unexpected error occurred during login.');
-            return;
+        if (selectedUser === "admin") {
+            expectedPassword = window.NEOBAND_KEYS?.admin?.password;
+        } else if (window.NEOBAND_KEYS?.staff?.user?.name === selectedUser) {
+            expectedPassword = window.NEOBAND_KEYS.staff.user.neoKey;
+        } else if (window.NEOBAND_KEYS?.factions) {
+            const faction = Object.values(window.NEOBAND_KEYS.factions).find(f => f.name === selectedUser);
+            if (faction) expectedPassword = faction.neoKey;
+        } else if (window.NEOBAND_KEYS?.allegiances) {
+            const allegiance = Object.values(window.NEOBAND_KEYS.allegiances).find(a => a.name === selectedUser);
+            if (allegiance) expectedPassword = allegiance.neoKey;
         }
 
-        if (isValid) {
-            utils.log(`${userType} '${userName}' logged in successfully. Redirecting to ${redirectPage}.`, 'success');
-            // Clear password field after successful login
-            passwordInput.value = ''; 
-            // Update core state about logged-in user (optional, but good practice)
-            core.updateState({ loggedInUserType: userType, loggedInUserName: userName }); // This will trigger render
-            this.showPage(redirectPage); // Navigate to the page
+        if (expectedPassword && password === expectedPassword) {
+            utils.log(`Login successful for user: ${selectedUser}`, 'success');
+            // Update state - e.g., set logged-in user, role, permissions
+            core.updateState({ isAuthenticated: true, currentUser: selectedUser }); // Example state update
+            this.showPage('registrationPage'); // Redirect to registration page after login
         } else {
-            utils.log(`Login failed for user selection: ${selectedValue}`, 'warning');
-            this.showError('Invalid user or password.');
-            // Optionally clear password field on failure too
-            // passwordInput.value = ''; 
+            utils.log(`Login failed for user: ${selectedUser}`, 'error');
+            errorMessageDiv.textContent = 'Invalid username or password.';
         }
     },
+    */
+    /* --- MODIFICATION END --- */
 
     /**
      * Shows the specified page and hides others. Updates nav highlighting.

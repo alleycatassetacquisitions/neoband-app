@@ -6,10 +6,17 @@
 
 window.NEOBAND_KEYS = {
     // All users can read all sectors and blocks using the universal read key (Key A for all sectors) - read-only:
+    /* --- MODIFICATION START: Comment out unused keys --- */
+    /*
     universalReadKeyA: "A0A1A2A3A4A5",
+    */
+    /* --- MODIFICATION END --- */
    
     // The default staff key for writing to the sector 39:
-  staff: {
+    // Note: The `staff` key remains as Sector 39 (username) write operations still occur,
+    // although authentication now uses the reader's default Key A (Index 0),
+    // not this specific key directly.
+    staff: {
     user: {name: "User Data", neoKey:"FFFFFFFFFFFF", sector: 39 },
   },
     // Admin can read/write all sectors by either:
@@ -23,6 +30,8 @@ window.NEOBAND_KEYS = {
     //All factions and allegiances have their own unique NFC key for writing to their own data sectors and blocks and are also their password to the app
     // 
     // 30 factions
+    /* --- MODIFICATION START: Comment out unused keys --- */
+    /*
     factions: {
       faction1:  { name: "Alleycat",  neoKey: "010101010101", sector: 1 },
       faction2:  { name: "The Thirteens",  neoKey: "020202020202", sector: 2 },
@@ -55,12 +64,18 @@ window.NEOBAND_KEYS = {
       faction29: { name: "Faction #29", neoKey: "1D1D1D1D1D1D", sector: 29 },
       faction30: { name: "Faction #30", neoKey: "1E1E1E1E1E1E", sector: 30 },
     },
+    */
+    /* --- MODIFICATION END --- */
    
     // 3 allegiances
+    /* --- MODIFICATION START: Comment out unused keys --- */
+    /*
     allegiances: {
       allegiance1: { name: "Endline", neoKey: "A1A1A1A1A1A1", sector: 36 },
       allegiance2: { name: "Helix", neoKey: "A2A2A2A2A2A2", sector: 37 },
       allegiance3: { name: "The Resistance", neoKey: "A3A3A3A3A3A3", sector: 38 }
     }
+    */
+    /* --- MODIFICATION END --- */
    };
   
